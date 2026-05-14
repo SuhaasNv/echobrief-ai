@@ -15,7 +15,10 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppUploadRouteImport } from './routes/app.upload'
 import { Route as AppMeetingsRouteImport } from './routes/app.meetings'
+import { Route as AppChatRouteImport } from './routes/app.chat'
+import { Route as AppMeetingsIdRouteImport } from './routes/app.meetings.$id'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -47,10 +50,25 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppUploadRoute = AppUploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMeetingsRoute = AppMeetingsRouteImport.update({
   id: '/meetings',
   path: '/meetings',
   getParentRoute: () => AppRoute,
+} as any)
+const AppChatRoute = AppChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMeetingsIdRoute = AppMeetingsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppMeetingsRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -59,16 +77,22 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/app/meetings': typeof AppMeetingsRoute
+  '/app/chat': typeof AppChatRoute
+  '/app/meetings': typeof AppMeetingsRouteWithChildren
+  '/app/upload': typeof AppUploadRoute
   '/app/': typeof AppIndexRoute
+  '/app/meetings/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/app/meetings': typeof AppMeetingsRoute
+  '/app/chat': typeof AppChatRoute
+  '/app/meetings': typeof AppMeetingsRouteWithChildren
+  '/app/upload': typeof AppUploadRoute
   '/app': typeof AppIndexRoute
+  '/app/meetings/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,8 +101,11 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/app/meetings': typeof AppMeetingsRoute
+  '/app/chat': typeof AppChatRoute
+  '/app/meetings': typeof AppMeetingsRouteWithChildren
+  '/app/upload': typeof AppUploadRoute
   '/app/': typeof AppIndexRoute
+  '/app/meetings/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -88,10 +115,22 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/signup'
+    | '/app/chat'
     | '/app/meetings'
+    | '/app/upload'
     | '/app/'
+    | '/app/meetings/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/forgot-password' | '/login' | '/signup' | '/app/meetings' | '/app'
+  to:
+    | '/'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
+    | '/app/chat'
+    | '/app/meetings'
+    | '/app/upload'
+    | '/app'
+    | '/app/meetings/$id'
   id:
     | '__root__'
     | '/'
@@ -99,8 +138,11 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/signup'
+    | '/app/chat'
     | '/app/meetings'
+    | '/app/upload'
     | '/app/'
+    | '/app/meetings/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -155,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/upload': {
+      id: '/app/upload'
+      path: '/upload'
+      fullPath: '/app/upload'
+      preLoaderRoute: typeof AppUploadRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/meetings': {
       id: '/app/meetings'
       path: '/meetings'
@@ -162,16 +211,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMeetingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/chat': {
+      id: '/app/chat'
+      path: '/chat'
+      fullPath: '/app/chat'
+      preLoaderRoute: typeof AppChatRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/meetings/$id': {
+      id: '/app/meetings/$id'
+      path: '/$id'
+      fullPath: '/app/meetings/$id'
+      preLoaderRoute: typeof AppMeetingsIdRouteImport
+      parentRoute: typeof AppMeetingsRoute
+    }
   }
 }
 
+interface AppMeetingsRouteChildren {
+  AppMeetingsIdRoute: typeof AppMeetingsIdRoute
+}
+
+const AppMeetingsRouteChildren: AppMeetingsRouteChildren = {
+  AppMeetingsIdRoute: AppMeetingsIdRoute,
+}
+
+const AppMeetingsRouteWithChildren = AppMeetingsRoute._addFileChildren(
+  AppMeetingsRouteChildren,
+)
+
 interface AppRouteChildren {
-  AppMeetingsRoute: typeof AppMeetingsRoute
+  AppChatRoute: typeof AppChatRoute
+  AppMeetingsRoute: typeof AppMeetingsRouteWithChildren
+  AppUploadRoute: typeof AppUploadRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppMeetingsRoute: AppMeetingsRoute,
+  AppChatRoute: AppChatRoute,
+  AppMeetingsRoute: AppMeetingsRouteWithChildren,
+  AppUploadRoute: AppUploadRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
