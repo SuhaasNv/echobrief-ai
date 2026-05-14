@@ -1,7 +1,9 @@
 {
+  // Frontend SSR-only Worker (no API bindings — those live in the Node API service on Railway).
+  // The Hono API + BullMQ worker are separate Node processes (see src/api.ts and src/server/workers/main.ts).
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "tanstack-start-app",
+  "name": "echobrief-web",
   "compatibility_date": "2025-09-24",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "src/server.ts",
+  "main": "src/server.ts"
 }

@@ -1,0 +1,49 @@
+# Local development environment.
+# Copy to .env (gitignored). Railway production secrets are set in the dashboard.
+
+NODE_ENV=development
+APP_URL=http://localhost:3000
+PORT=3000
+
+# --- Railway Postgres (use the proxy URL for local dev, internal URL inside Railway) ---
+DATABASE_URL=
+
+# --- Railway Redis (use the proxy URL for local dev, internal URL inside Railway) ---
+REDIS_URL=
+
+# --- Better Auth ---
+# Generate: openssl rand -base64 32
+BETTER_AUTH_SECRET=
+BETTER_AUTH_URL=http://localhost:3000
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+
+# --- AI providers ---
+# AssemblyAI: transcription (incl. voice agent / live mode)
+ASSEMBLYAI_API_KEY=
+# OpenAI: GPT-5 for LLM, text-embedding-3-small for vectors
+OPENAI_API_KEY=
+OPENAI_MODEL_PRIMARY=gpt-5
+OPENAI_MODEL_LIGHT=gpt-5-mini
+
+# --- Email ---
+RESEND_API_KEY=
+
+# --- Audio storage (Cloudflare R2 — keep using it; S3-compatible from Node) ---
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=echobrief-audio
+R2_PUBLIC_BASE_URL=
+
+# --- Integration token encryption (32-byte base64) ---
+# Generate: openssl rand -base64 32
+INTEGRATION_TOKEN_ENCRYPTION_KEY=
+
+# --- Integration OAuth (V2) ---
+NOTION_CLIENT_ID=
+NOTION_CLIENT_SECRET=
+LINEAR_CLIENT_ID=
+LINEAR_CLIENT_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
