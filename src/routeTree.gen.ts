@@ -16,8 +16,12 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppUploadRouteImport } from './routes/app.upload'
+import { Route as AppSharedRouteImport } from './routes/app.shared'
+import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppMeetingsRouteImport } from './routes/app.meetings'
 import { Route as AppChatRouteImport } from './routes/app.chat'
+import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
+import { Route as AppActionItemsRouteImport } from './routes/app.action-items'
 import { Route as AppMeetingsIdRouteImport } from './routes/app.meetings.$id'
 
 const SignupRoute = SignupRouteImport.update({
@@ -55,6 +59,16 @@ const AppUploadRoute = AppUploadRouteImport.update({
   path: '/upload',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSharedRoute = AppSharedRouteImport.update({
+  id: '/shared',
+  path: '/shared',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMeetingsRoute = AppMeetingsRouteImport.update({
   id: '/meetings',
   path: '/meetings',
@@ -63,6 +77,16 @@ const AppMeetingsRoute = AppMeetingsRouteImport.update({
 const AppChatRoute = AppChatRouteImport.update({
   id: '/chat',
   path: '/chat',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppActionItemsRoute = AppActionItemsRouteImport.update({
+  id: '/action-items',
+  path: '/action-items',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMeetingsIdRoute = AppMeetingsIdRouteImport.update({
@@ -77,8 +101,12 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/app/action-items': typeof AppActionItemsRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/chat': typeof AppChatRoute
   '/app/meetings': typeof AppMeetingsRouteWithChildren
+  '/app/settings': typeof AppSettingsRoute
+  '/app/shared': typeof AppSharedRoute
   '/app/upload': typeof AppUploadRoute
   '/app/': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
@@ -88,8 +116,12 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/app/action-items': typeof AppActionItemsRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/chat': typeof AppChatRoute
   '/app/meetings': typeof AppMeetingsRouteWithChildren
+  '/app/settings': typeof AppSettingsRoute
+  '/app/shared': typeof AppSharedRoute
   '/app/upload': typeof AppUploadRoute
   '/app': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
@@ -101,8 +133,12 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/app/action-items': typeof AppActionItemsRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/chat': typeof AppChatRoute
   '/app/meetings': typeof AppMeetingsRouteWithChildren
+  '/app/settings': typeof AppSettingsRoute
+  '/app/shared': typeof AppSharedRoute
   '/app/upload': typeof AppUploadRoute
   '/app/': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
@@ -115,8 +151,12 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/signup'
+    | '/app/action-items'
+    | '/app/analytics'
     | '/app/chat'
     | '/app/meetings'
+    | '/app/settings'
+    | '/app/shared'
     | '/app/upload'
     | '/app/'
     | '/app/meetings/$id'
@@ -126,8 +166,12 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/signup'
+    | '/app/action-items'
+    | '/app/analytics'
     | '/app/chat'
     | '/app/meetings'
+    | '/app/settings'
+    | '/app/shared'
     | '/app/upload'
     | '/app'
     | '/app/meetings/$id'
@@ -138,8 +182,12 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/signup'
+    | '/app/action-items'
+    | '/app/analytics'
     | '/app/chat'
     | '/app/meetings'
+    | '/app/settings'
+    | '/app/shared'
     | '/app/upload'
     | '/app/'
     | '/app/meetings/$id'
@@ -204,6 +252,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppUploadRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/shared': {
+      id: '/app/shared'
+      path: '/shared'
+      fullPath: '/app/shared'
+      preLoaderRoute: typeof AppSharedRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/meetings': {
       id: '/app/meetings'
       path: '/meetings'
@@ -216,6 +278,20 @@ declare module '@tanstack/react-router' {
       path: '/chat'
       fullPath: '/app/chat'
       preLoaderRoute: typeof AppChatRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/analytics': {
+      id: '/app/analytics'
+      path: '/analytics'
+      fullPath: '/app/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/action-items': {
+      id: '/app/action-items'
+      path: '/action-items'
+      fullPath: '/app/action-items'
+      preLoaderRoute: typeof AppActionItemsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/meetings/$id': {
@@ -241,15 +317,23 @@ const AppMeetingsRouteWithChildren = AppMeetingsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppActionItemsRoute: typeof AppActionItemsRoute
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppChatRoute: typeof AppChatRoute
   AppMeetingsRoute: typeof AppMeetingsRouteWithChildren
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppSharedRoute: typeof AppSharedRoute
   AppUploadRoute: typeof AppUploadRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppActionItemsRoute: AppActionItemsRoute,
+  AppAnalyticsRoute: AppAnalyticsRoute,
   AppChatRoute: AppChatRoute,
   AppMeetingsRoute: AppMeetingsRouteWithChildren,
+  AppSettingsRoute: AppSettingsRoute,
+  AppSharedRoute: AppSharedRoute,
   AppUploadRoute: AppUploadRoute,
   AppIndexRoute: AppIndexRoute,
 }
