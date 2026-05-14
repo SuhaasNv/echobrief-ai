@@ -4,8 +4,8 @@ EchoBrief deploys as **three Railway services** in one project:
 
 | Service | What it runs | Start command |
 |---------|-------------|---------------|
-| `api` | Hono REST API | `node dist-api/api.js` |
-| `worker` | BullMQ processing pipeline | `node dist-api/server/workers/main.js` |
+| `api` | Hono REST API | `npx tsx src/api.ts` |
+| `worker` | BullMQ processing pipeline | `npx tsx src/server/workers/main.ts` |
 | `postgres` | Railway Postgres (managed) | — |
 | `redis` | Railway Redis (managed) | — |
 
@@ -21,8 +21,8 @@ The frontend (TanStack Start SSR) is a separate deployment — currently a Cloud
    DATABASE_URL='postgresql://...@yamanote.proxy.rlwy.net:.../railway' npm run migrate
    ```
 3. **Create two services** from this repo (point both at the same Dockerfile):
-   - **api** — leave `startCommand` as default (`node dist-api/api.js`)
-   - **worker** — override `startCommand` to `node dist-api/server/workers/main.js`
+   - **api** — leave `startCommand` as default (`npx tsx src/api.ts`)
+   - **worker** — override `startCommand` to `npx tsx src/server/workers/main.ts`
 4. **Reference variables** in both services (use Railway's reference syntax):
    ```
    DATABASE_URL=${{ Postgres.DATABASE_URL }}

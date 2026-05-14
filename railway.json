@@ -7,6 +7,6 @@
   "deploy": {
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
-    "startCommand": "node dist-api/api.js"
+    "startCommand": "npx tsx src/api.ts"
   }
 }

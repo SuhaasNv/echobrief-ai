@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(psql --version)"
+      "Bash(psql --version)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs -r kill -9)",
+      "Bash(lsof -ti:8080)",
+      "Bash(pkill -f \"tsx.*api.ts\")",
+      "Bash(pkill -f \"tsx.*workers/main\")",
+      "Bash(pkill -f \"concurrently\")",
+      "Bash(pkill -f \"vite dev\")",
+      "Bash(curl -sS -w \"\\\\nHTTP %{http_code}\\\\n\" http://localhost:4000/api/v1/health)",
+      "Bash(curl -sS -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:8080/)",
+      "Bash(awk '{print $2, $8, $9, $10, $11}')"
     ]
   }
 }
