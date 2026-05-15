@@ -65,7 +65,6 @@ export async function analyzeMeeting(transcript: string): Promise<AnalysisResult
   const client = getClient();
   const response = await client.chat.completions.create({
     model: env.OPENAI_MODEL_PRIMARY,
-    temperature: 0.3,
     messages: [
       { role: "system", content: PROMPTS.MEETING_ANALYSIS_SYSTEM },
       { role: "user", content: PROMPTS.meetingAnalysisUser(transcript) },
@@ -111,7 +110,6 @@ export async function scoreMeeting(
   const client = getClient();
   const response = await client.chat.completions.create({
     model: env.OPENAI_MODEL_LIGHT,
-    temperature: 0.3,
     messages: [
       { role: "system", content: PROMPTS.SCORE_SYSTEM },
       { role: "user", content: PROMPTS.scoreUser(transcript, speakerStats, actionItemCount) },
@@ -155,7 +153,6 @@ export async function streamGroundedAnswer(params: {
   const client = getClient();
   const stream = await client.chat.completions.create({
     model: env.OPENAI_MODEL_PRIMARY,
-    temperature: 0.3,
     stream: true,
     messages: [
       { role: "system", content: params.systemContext },
@@ -199,7 +196,6 @@ export async function generateEmail(params: {
   const client = getClient();
   const stream = await client.chat.completions.create({
     model: env.OPENAI_MODEL_PRIMARY,
-    temperature: 0.7,
     stream: true,
     messages: [
       { role: "system", content: PROMPTS.emailSystem(params.type, params.tone) },

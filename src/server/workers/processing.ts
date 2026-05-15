@@ -1,3 +1,4 @@
+/* reload tick */
 /**
  * Processing pipeline (BullMQ job handler).
  *
@@ -14,60 +15,89 @@
 import type { ProcessingJob } from "../env";
 import { getSql } from "../db";
 import { createSignedReadUrl } from "../services/r2";
-import { transcribeAudioUrl } from "../services/assemblyai";
+import { transcribeAudioUrl, type TranscriptionWord } from "../services/assemblyai";
 import { analyzeMeeting, scoreMeeting } from "../services/llm";
 import { embedChunks } from "../services/openai";
 import {
   sendProcessingCompleteEmail,
   sendProcessingFailedEmail,
 } from "../services/resend";
-import { chunkTranscript } from "../lib/chunking";
+import { chunkTranscript, chunkRawText } from "../lib/chunking";
 import { getEnv } from "../env";
+
+interface SpeakerStat { label: string; talk_time_sec: number; word_count: number }
 
 export async function processMeeting(job: ProcessingJob): Promise<void> {
   const sql = getSql();
 
-  // ---- 1. Transcribe ----------------------------------------------------
-  await sql`UPDATE meetings SET status = 'transcribing' WHERE id = ${job.meeting_id}`;
-
-  const audioUrl = await createSignedReadUrl(job.audio_key, 1800);
-  const transcribeStart = Date.now();
-  const result = await transcribeAudioUrl(audioUrl, job.language ?? "en");
-
-  await sql`
-    INSERT INTO transcripts (meeting_id, raw_text, content, speakers, language, provider)
-    VALUES (
-      ${job.meeting_id},
-      ${result.raw_text},
-      ${JSON.stringify({ words: result.words, paragraphs: result.paragraphs })}::jsonb,
-      ${JSON.stringify(result.speakers)}::jsonb,
-      ${result.language},
-      'assemblyai'
-    )
-    ON CONFLICT (meeting_id) DO UPDATE SET
-      raw_text = EXCLUDED.raw_text,
-      content = EXCLUDED.content,
-      speakers = EXCLUDED.speakers,
-      language = EXCLUDED.language,
-      provider = EXCLUDED.provider
+  // ---- 1. Transcribe (or skip if user uploaded text directly) -----------
+  // For transcript-only uploads, a `transcripts` row already exists and
+  // `audio_key` is empty. Skip the AssemblyAI step entirely.
+  const existing = await sql<Array<{ raw_text: string }>>`
+    SELECT raw_text FROM transcripts WHERE meeting_id = ${job.meeting_id} LIMIT 1
   `;
+  const transcriptProvided = existing.length > 0 && !job.audio_key;
 
-  await sql`UPDATE meetings SET duration_sec = ${result.duration_sec} WHERE id = ${job.meeting_id}`;
+  let raw_text: string;
+  let words: TranscriptionWord[] = [];
+  let speakers: SpeakerStat[] = [];
 
-  await logStep(job, {
-    step: "transcribe",
-    provider: "assemblyai",
-    model: "best",
-    duration_ms: Date.now() - transcribeStart,
-    cost_usd: result.cost_usd,
-    status: "success",
-  });
+  if (transcriptProvided) {
+    raw_text = existing[0].raw_text;
+    await logStep(job, {
+      step: "transcribe",
+      provider: "user",
+      model: "pasted",
+      duration_ms: 0,
+      cost_usd: 0,
+      status: "success",
+    });
+  } else {
+    await sql`UPDATE meetings SET status = 'transcribing' WHERE id = ${job.meeting_id}`;
+
+    const audioUrl = await createSignedReadUrl(job.audio_key, 1800);
+    const transcribeStart = Date.now();
+    const result = await transcribeAudioUrl(audioUrl, job.language ?? "en");
+
+    await sql`
+      INSERT INTO transcripts (meeting_id, raw_text, content, speakers, language, provider)
+      VALUES (
+        ${job.meeting_id},
+        ${result.raw_text},
+        ${JSON.stringify({ words: result.words, paragraphs: result.paragraphs })}::jsonb,
+        ${JSON.stringify(result.speakers)}::jsonb,
+        ${result.language},
+        'assemblyai'
+      )
+      ON CONFLICT (meeting_id) DO UPDATE SET
+        raw_text = EXCLUDED.raw_text,
+        content = EXCLUDED.content,
+        speakers = EXCLUDED.speakers,
+        language = EXCLUDED.language,
+        provider = EXCLUDED.provider
+    `;
+
+    await sql`UPDATE meetings SET duration_sec = ${result.duration_sec} WHERE id = ${job.meeting_id}`;
+
+    await logStep(job, {
+      step: "transcribe",
+      provider: "assemblyai",
+      model: "universal",
+      duration_ms: Date.now() - transcribeStart,
+      cost_usd: result.cost_usd,
+      status: "success",
+    });
+
+    raw_text = result.raw_text;
+    words = result.words;
+    speakers = result.speakers;
+  }
 
   // ---- 2. Analyze -------------------------------------------------------
   await sql`UPDATE meetings SET status = 'analyzing' WHERE id = ${job.meeting_id}`;
 
   const analyzeStart = Date.now();
-  const analysis = await analyzeMeeting(result.raw_text);
+  const analysis = await analyzeMeeting(raw_text);
 
   await sql`
     INSERT INTO summaries (
@@ -120,7 +150,7 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
   // ---- 3. Embed for vector search ---------------------------------------
   await sql`UPDATE meetings SET status = 'indexing' WHERE id = ${job.meeting_id}`;
 
-  const chunks = chunkTranscript(result.words);
+  const chunks = words.length > 0 ? chunkTranscript(words) : chunkRawText(raw_text);
   if (chunks.length > 0) {
     const embedStart = Date.now();
     const { embeddings, cost_usd } = await embedChunks(chunks.map((c) => c.content));
@@ -156,8 +186,8 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
   try {
     const scoreStart = Date.now();
     const { score, cost_usd } = await scoreMeeting(
-      result.raw_text,
-      result.speakers,
+      raw_text,
+      speakers,
       analysis.action_items.length,
     );
 

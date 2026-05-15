@@ -12,6 +12,8 @@ import {
   UploadUrlRequest,
   UploadUrlResponse,
   ConfirmUploadRequest,
+  TranscriptUploadRequest,
+  TranscriptUploadResponse,
   MeetingListQuery,
   MeetingPatchRequest,
   MeetingStatusResponse,
@@ -20,6 +22,7 @@ import {
   buildAudioKey,
   extensionFromMime,
   createPresignedUploadUrl,
+  createSignedReadUrl,
   deleteAudioObject,
 } from "../../services/r2";
 import { enqueueProcessingJob } from "../../services/queue";
@@ -71,6 +74,58 @@ app.post("/upload-url", zValidator("json", UploadUrlRequest), async (c) => {
       audio_key: audioKey,
       expires_at,
     }),
+  );
+});
+
+// ---------------------------------------------------------------------------
+// POST /from-transcript — direct transcript upload (skips AssemblyAI)
+// ---------------------------------------------------------------------------
+app.post("/from-transcript", zValidator("json", TranscriptUploadRequest), async (c) => {
+  const body = c.req.valid("json");
+  const user = c.get("user");
+  const sql = getSql();
+
+  const meetingId = randomUUID();
+  // Rough duration estimate: 150 spoken words per minute average.
+  const wordCount = body.transcript_text.split(/\s+/).filter(Boolean).length;
+  const estimatedSec = Math.max(60, Math.round((wordCount / 150) * 60));
+
+  await sql.begin(async (tx) => {
+    await tx`
+      INSERT INTO meetings (id, user_id, title, duration_sec, language, tags, status)
+      VALUES (
+        ${meetingId},
+        ${user.id},
+        ${body.title},
+        ${estimatedSec},
+        ${body.language},
+        ${tx.array(body.tags)},
+        'queued'
+      )
+    `;
+    await tx`
+      INSERT INTO transcripts (meeting_id, raw_text, content, speakers, language, provider)
+      VALUES (
+        ${meetingId},
+        ${body.transcript_text},
+        '{}'::jsonb,
+        '[]'::jsonb,
+        ${body.language},
+        'user'
+      )
+    `;
+  });
+
+  await enqueueProcessingJob({
+    meeting_id: meetingId,
+    user_id: user.id,
+    audio_key: "", // sentinel: empty audio_key + existing transcript row triggers the skip-transcription path in the worker
+    language: body.language,
+    retry_count: 0,
+  });
+
+  return c.json(
+    TranscriptUploadResponse.parse({ meeting_id: meetingId, status: "queued" }),
   );
 });
 
@@ -259,6 +314,29 @@ app.delete("/:id", async (c) => {
 // ---------------------------------------------------------------------------
 // GET /:id/status — polling
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// GET /:id/audio-url — short-lived signed URL to stream/play the audio
+// ---------------------------------------------------------------------------
+app.get("/:id/audio-url", async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  const sql = getSql();
+  const rows = await sql<Array<{ audio_key: string | null; audio_mime: string | null }>>`
+    SELECT audio_key, audio_mime FROM meetings WHERE id = ${id} AND user_id = ${user.id}
+  `;
+  const meeting = rows[0];
+  if (!meeting) throw new HTTPException(404, { message: "Meeting not found" });
+  if (!meeting.audio_key) throw new HTTPException(404, { message: "No audio for this meeting" });
+
+  const ttl = 30 * 60;
+  const url = await createSignedReadUrl(meeting.audio_key, ttl);
+  return c.json({
+    url,
+    mime: meeting.audio_mime,
+    expires_at: new Date(Date.now() + ttl * 1000).toISOString(),
+  });
+});
+
 app.get("/:id/status", async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");

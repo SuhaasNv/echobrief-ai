@@ -14,7 +14,9 @@
 import { AssemblyAI, type Transcript } from "assemblyai";
 import { getEnv } from "../env";
 
-const MODEL = "best"; // AssemblyAI's flagship; "nano" is cheaper/faster
+// AssemblyAI deprecated the singular `speech_model` field in 2026 and now
+// requires `speech_models` (an array). "universal" is the current flagship.
+const MODELS = ["universal"] as const;
 
 export interface TranscriptionWord {
   word: string;
@@ -74,7 +76,7 @@ export async function transcribeAudioUrl(
   const client = getClient();
   const transcript = await client.transcripts.transcribe({
     audio: audioUrl,
-    speech_model: MODEL,
+    speech_models: [...MODELS],
     speaker_labels: true,
     punctuate: true,
     format_text: true,

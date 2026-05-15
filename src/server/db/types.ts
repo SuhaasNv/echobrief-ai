@@ -24,6 +24,8 @@ export interface UserRow {
   email: string;
   name: string | null;
   avatar_url: string | null;
+  password_hash: string | null;
+  is_admin: boolean;
   created_at: string;
   updated_at: string;
 }

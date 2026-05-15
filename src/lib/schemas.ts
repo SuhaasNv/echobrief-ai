@@ -106,6 +106,29 @@ export const ConfirmUploadRequest = z.object({
   meeting_id: uuidSchema,
 });
 
+/**
+ * Direct transcript upload — skips AssemblyAI. Server creates the meeting +
+ * transcript rows and enqueues a processing job that goes straight to
+ * analysis + embedding.
+ */
+export const TranscriptUploadRequest = z.object({
+  title: z.string().trim().min(1).max(200),
+  transcript_text: z
+    .string()
+    .trim()
+    .min(50, "Transcript must be at least 50 characters")
+    .max(500_000, "Transcript too large (500k char max)"),
+  language: z.string().min(2).max(10).default("en"),
+  tags: z.array(z.string().trim().max(50)).max(10).default([]),
+});
+export type TranscriptUploadRequest = z.infer<typeof TranscriptUploadRequest>;
+
+export const TranscriptUploadResponse = z.object({
+  meeting_id: uuidSchema,
+  status: z.literal("queued"),
+});
+export type TranscriptUploadResponse = z.infer<typeof TranscriptUploadResponse>;
+
 export const MeetingPatchRequest = z
   .object({
     title: z.string().trim().min(1).max(200).optional(),
@@ -217,10 +240,12 @@ export const ActionItemPatchRequest = z
     completed: z.boolean().optional(),
   })
   .strict();
+export type ActionItemPatchRequest = z.infer<typeof ActionItemPatchRequest>;
 
 export const ActionItemExportRequest = z.object({
   provider: IntegrationProvider,
 });
+export type ActionItemExportRequest = z.infer<typeof ActionItemExportRequest>;
 
 // ----------------------------------------------------------------------------
 // Chat (per-meeting)
@@ -287,6 +312,7 @@ export const EmailGenerationRequest = z.object({
   type: EmailType,
   tone: z.enum(["professional", "casual"]).default("professional"),
 });
+export type EmailGenerationRequest = z.infer<typeof EmailGenerationRequest>;
 
 // ----------------------------------------------------------------------------
 // Account
@@ -297,6 +323,7 @@ export const UpdateProfileRequest = z
     avatar_url: z.string().url().optional(),
   })
   .strict();
+export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
 
 // ----------------------------------------------------------------------------
 // Error envelope

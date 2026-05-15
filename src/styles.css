@@ -123,17 +123,77 @@
   --shadow-glow: 0 0 0 1px oklch(0.68 0.16 255 / 0.3), 0 10px 40px -10px oklch(0.68 0.16 255 / 0.4);
 }
 
+/* Light theme — inverted surfaces, same brand palette */
 .light {
   --background: oklch(0.99 0.002 264);
   --foreground: oklch(0.15 0.008 264);
   --surface: oklch(0.97 0.003 264);
   --surface-elevated: oklch(1 0 0);
+
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.15 0.008 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.008 264);
+
+  --primary: oklch(0.18 0.008 264);
+  --primary-foreground: oklch(0.99 0.002 264);
+
+  --secondary: oklch(0.94 0.005 264);
+  --secondary-foreground: oklch(0.18 0.008 264);
+
   --muted: oklch(0.96 0.004 264);
   --muted-foreground: oklch(0.45 0.012 264);
-  --border: oklch(0.15 0.008 264 / 8%);
-  --input: oklch(0.15 0.008 264 / 12%);
+
+  --accent: oklch(0.94 0.005 264);
+  --accent-foreground: oklch(0.18 0.008 264);
+
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0.002 264);
+
+  --border: oklch(0.15 0.008 264 / 10%);
+  --input: oklch(0.15 0.008 264 / 14%);
+  --ring: oklch(0.58 0.18 255);
+
+  --brand: oklch(0.58 0.18 255);
+  --brand-foreground: oklch(0.99 0.002 264);
+  --violet: oklch(0.58 0.2 295);
+  --success: oklch(0.62 0.16 160);
+  --warning: oklch(0.7 0.16 80);
+
+  --chart-1: oklch(0.58 0.18 255);
+  --chart-2: oklch(0.58 0.2 295);
+  --chart-3: oklch(0.62 0.16 160);
+  --chart-4: oklch(0.7 0.16 80);
+  --chart-5: oklch(0.55 0.05 264);
+
+  --sidebar: oklch(0.97 0.003 264);
+  --sidebar-foreground: oklch(0.3 0.008 264);
+  --sidebar-primary: oklch(0.58 0.18 255);
+  --sidebar-primary-foreground: oklch(0.99 0.002 264);
+  --sidebar-accent: oklch(0.94 0.005 264);
+  --sidebar-accent-foreground: oklch(0.18 0.008 264);
+  --sidebar-border: oklch(0.15 0.008 264 / 8%);
+  --sidebar-ring: oklch(0.58 0.18 255);
+
+  --gradient-glow: radial-gradient(60% 60% at 50% 0%, oklch(0.58 0.18 255 / 0.12), transparent 70%);
+  --shadow-elegant: 0 1px 0 0 oklch(1 0 0 / 0.5) inset, 0 10px 40px -20px oklch(0.15 0.008 264 / 0.15);
+  --shadow-glow: 0 0 0 1px oklch(0.58 0.18 255 / 0.25), 0 10px 40px -10px oklch(0.58 0.18 255 / 0.25);
+}
+
+/* View Transitions API — used by applyTheme() in src/lib/theme.ts.
+   Single GPU-snapshot crossfade between light and dark; avoids the jank of
+   animating background-color on hundreds of cells/elements at once. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 2;
 }
 
 @layer base {
@@ -159,15 +219,17 @@
 @layer utilities {
   .bg-grid {
     background-image:
-      linear-gradient(to right, oklch(1 0 0 / 0.04) 1px, transparent 1px),
-      linear-gradient(to bottom, oklch(1 0 0 / 0.04) 1px, transparent 1px);
+      linear-gradient(to right, var(--color-foreground) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-foreground) 1px, transparent 1px);
     background-size: 56px 56px;
+    opacity: 0.04;
   }
+  .light .bg-grid { opacity: 0.06; }
   .bg-grid-fade {
     mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 75%);
   }
   .text-gradient {
-    background: linear-gradient(180deg, oklch(0.99 0.003 264) 0%, oklch(0.7 0.012 264) 100%);
+    background: linear-gradient(180deg, var(--color-foreground) 0%, var(--color-muted-foreground) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -179,10 +241,10 @@
     color: transparent;
   }
   .glass {
-    background: oklch(0.18 0.009 264 / 0.6);
+    background: color-mix(in oklch, var(--color-surface), transparent 40%);
     backdrop-filter: blur(16px) saturate(140%);
     -webkit-backdrop-filter: blur(16px) saturate(140%);
-    border: 1px solid oklch(1 0 0 / 0.06);
+    border: 1px solid var(--color-border);
   }
   .glow-brand {
     box-shadow: var(--shadow-glow);
@@ -199,9 +261,24 @@
   100% { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.06), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--color-foreground), transparent 92%),
+    transparent
+  );
   background-size: 200% 100%;
   animation: shimmer 2s linear infinite;
+}
+
+/* Respect reduced motion globally */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @keyframes pulse-glow {
@@ -209,3 +286,64 @@
   50% { opacity: 0.8; }
 }
 .animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+
+/* ────────────────────────────────────────────────────────────────
+   DataGridHero — generative animated grid background.
+   Wrapped in @layer base so Tailwind utilities (e.g. `absolute`,
+   `pointer-events-none`) from the caller's className can override the
+   defaults — without this, unlayered rules beat @layer utilities in v4.
+   ──────────────────────────────────────────────────────────────── */
+@layer base {
+  .data-grid-hero {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .data-grid-hero .grid-container {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .data-grid-hero .grid-cell {
+    border-radius: 2px;
+    opacity: var(--opacity-min, 0.05);
+    will-change: opacity;
+  }
+  .data-grid-hero .hero-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Mouse-follow glow — soft brand-color radial that tracks cursor */
+  .data-grid-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      300px circle at var(--mouse-x, -300px) var(--mouse-y, -300px),
+      var(--color-brand) 0%,
+      transparent 60%
+    );
+    opacity: calc(var(--mouse-glow-opacity, 0) * 0.28);
+    mix-blend-mode: screen;
+    transition: opacity 200ms ease;
+  }
+  .light .data-grid-hero::after {
+    mix-blend-mode: multiply;
+    opacity: calc(var(--mouse-glow-opacity, 0) * 0.2);
+  }
+}
+
+@keyframes cell-pulse {
+  from { opacity: var(--opacity-min, 0.05); }
+  to   { opacity: var(--opacity-max, 0.22); }
+}
+
+@keyframes caret-blink {
+  0%, 50%   { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}

@@ -1,8 +1,14 @@
+<div align="center">
+
+<img src="docs/echobrief-mark.png" width="120" alt="EchoBrief — circular globe mark" />
+
 # EchoBrief AI
 
-**EchoBrief** is an AI meeting intelligence app: upload audio, get transcription, summaries, action items, and natural-language Q&A over your meeting archive—not just a transcript, but a searchable memory of what was decided and who owns what.
+**Turn meetings into memory.** EchoBrief ingests audio, produces transcripts, summaries, and action items, and gives you natural-language Q&A across everything you have captured—so decisions and follow-ups stay findable long after the call ends.
 
-This repository contains the **web app** (TanStack Start + React), a **Node.js REST API** (Hono), and a **background worker** (BullMQ) that runs the processing pipeline.
+*This repository ships the **web app** (TanStack Start + React), a **Node.js API** (Hono), and a **BullMQ worker** that runs transcription, embeddings, and analysis.*
+
+</div>
 
 ---
 

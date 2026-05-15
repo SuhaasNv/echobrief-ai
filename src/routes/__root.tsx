@@ -7,8 +7,13 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme/theme-provider";
+import { CommandPaletteProvider } from "@/components/command-palette";
+import { themeBootScript } from "@/lib/theme";
 
 import appCss from "../styles.css?url";
+import faviconUrl from "@/assets/favicon.svg?url";
 
 function NotFoundComponent() {
   return (
@@ -82,6 +87,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
+      { rel: "icon", href: faviconUrl, type: "image/svg+xml" },
       {
         rel: "stylesheet",
         href: appCss,
@@ -96,9 +102,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark" style={{ colorScheme: "dark" }}>
       <head>
         <HeadContent />
+        {/* No-flash theme boot. Runs before React hydrates. */}
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
         {children}
@@ -113,7 +121,12 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <ThemeProvider>
+        <CommandPaletteProvider>
+          <Outlet />
+          <Toaster position="bottom-right" richColors closeButton />
+        </CommandPaletteProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

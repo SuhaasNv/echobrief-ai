@@ -13,6 +13,8 @@ import { requireAuth } from "./middleware/auth";
 import { rateLimit } from "./middleware/rate-limit";
 import { getEnv } from "../env";
 
+import adminRoutes from "./routes/admin";
+import authRoutes from "./routes/auth";
 import meetingsRoutes from "./routes/meetings";
 import actionItemsRoutes from "./routes/action-items";
 import chatRoutes from "./routes/chat";
@@ -47,6 +49,7 @@ api.onError(errorHandler);
 api.get("/health", (c) => c.json({ ok: true, env: getEnv().NODE_ENV }));
 
 // Public routes (no auth)
+api.route("/auth", authRoutes);
 api.route("/share", shareRoutes);
 
 // Protected routes
@@ -69,6 +72,7 @@ protectedApi.route("/search", searchRoutes);
 protectedApi.route("/integrations", integrationsRoutes);
 protectedApi.route("/account", accountRoutes);
 protectedApi.route("/generate", generateRoutes);
+protectedApi.route("/admin", adminRoutes);
 
 api.route("/", protectedApi);
 

@@ -10,6 +10,7 @@
 export interface AuthenticatedUser {
   id: string;
   email: string;
+  is_admin: boolean;
   jwt: string;
 }
 

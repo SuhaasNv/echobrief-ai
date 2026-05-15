@@ -1,8 +1,18 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { AuthShell, GoogleButton } from "@/components/auth/auth-shell";
+import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { motion } from "framer-motion";
+import { Loader2, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiRequest, ApiError, setAuthToken } from "@/lib/api/client";
+
+interface LoginResponse {
+  token: string;
+  user: { id: string; email: string; name: string | null; is_admin: boolean };
+}
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — EchoBrief" }] }),
@@ -10,6 +20,35 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || !password) {
+      toast.error("Both fields are required");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await apiRequest<LoginResponse>("/auth/login", {
+        method: "POST",
+        body: { email, password },
+      });
+      setAuthToken(res.token);
+      toast.success("Signed in");
+      // Admins land on the ops console; regular users land on the app dashboard.
+      navigate({ to: res.user.is_admin ? "/admin" : "/app" });
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Sign-in failed";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <AuthShell
       title="Welcome back."
@@ -23,37 +62,70 @@ function LoginPage() {
         </>
       }
     >
-      <div className="space-y-3">
-        <GoogleButton />
-        <div className="relative my-2 text-center">
-          <div className="absolute inset-0 top-1/2 h-px bg-border" />
-          <span className="relative bg-background px-2 text-[11px] uppercase tracking-widest text-muted-foreground">
-            or with email
-          </span>
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <div className="space-y-1.5">
+          <Label htmlFor="email">Work email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@company.com"
+            autoComplete="email"
+            autoFocus
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            window.location.href = "/app";
-          }}
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Work email</Label>
-            <Input id="email" type="email" placeholder="you@company.com" autoComplete="email" />
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <Link
+              to="/forgot-password"
+              className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Forgot?
+            </Link>
           </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">
-                Forgot?
-              </Link>
-            </div>
-            <Input id="password" type="password" placeholder="••••••••" autoComplete="current-password" />
-          </div>
-          <Button type="submit" className="w-full">Sign in</Button>
-        </form>
-      </div>
+          <Input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+
+        <Button type="submit" className="group w-full" disabled={submitting}>
+          <motion.span
+            key={submitting ? "loading" : "idle"}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15 }}
+            className="inline-flex items-center gap-1.5"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Signing in…
+              </>
+            ) : (
+              <>
+                Sign in
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+              </>
+            )}
+          </motion.span>
+        </Button>
+
+        <p className="pt-2 text-center text-[11px] text-muted-foreground">
+          By signing in you agree to our{" "}
+          <Link to="/terms" className="underline-offset-4 hover:underline">terms</Link> and{" "}
+          <Link to="/privacy" className="underline-offset-4 hover:underline">privacy policy</Link>.
+        </p>
+      </form>
     </AuthShell>
   );
 }

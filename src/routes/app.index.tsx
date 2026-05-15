@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Clock, FileAudio, Sparkles, CheckSquare, Upload, ArrowRight } from "lucide-react";
+import { ArrowUpRight, Clock, FileAudio, Sparkles, CheckSquare, Upload, ArrowRight, Loader2 } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -8,37 +8,86 @@ import {
   XAxis,
   Tooltip,
 } from "recharts";
-import { meetings, actionItems } from "@/lib/mock-data";
+import { useMe, useMeetings, useActionItems } from "@/lib/api/hooks";
 
 export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "Dashboard — EchoBrief" }] }),
   component: Dashboard,
 });
 
+// Hardcoded chart sample — there's no aggregate endpoint yet. Replace with
+// real `/account/usage` (or similar) once that endpoint exists.
 const chartData = [
   { d: "Mon", h: 1.2 }, { d: "Tue", h: 3.1 }, { d: "Wed", h: 2.4 },
   { d: "Thu", h: 4.6 }, { d: "Fri", h: 3.2 }, { d: "Sat", h: 0.4 }, { d: "Sun", h: 2.1 },
 ];
 
-const stats = [
-  { label: "Hours transcribed", value: "184.2", delta: "+12%", icon: Clock },
-  { label: "Meetings indexed", value: "247", delta: "+8", icon: FileAudio },
-  { label: "AI summaries", value: "1,420", delta: "+184", icon: Sparkles },
-  { label: "Actions pending", value: "23", delta: "-4", icon: CheckSquare },
-];
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatDuration(sec: number | null): string {
+  if (sec == null) return "—";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function firstName(name: string | null | undefined, email: string): string {
+  if (name && name.trim()) return name.trim().split(" ")[0];
+  return email.split("@")[0];
+}
 
 function Dashboard() {
+  const meQuery = useMe();
+  const meetingsQuery = useMeetings({ limit: 5 });
+  const openActionsQuery = useActionItems({ completed: false });
+
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+  const stats = [
+    {
+      label: "Meetings indexed",
+      value: meetingsQuery.data ? String(meetingsQuery.data.total) : "—",
+      delta: null as string | null,
+      icon: FileAudio,
+    },
+    {
+      label: "Actions pending",
+      value: openActionsQuery.data ? String(openActionsQuery.data.items.length) : "—",
+      delta: null,
+      icon: CheckSquare,
+    },
+    { label: "Hours transcribed", value: "—", delta: null, icon: Clock },
+    { label: "AI summaries", value: "—", delta: null, icon: Sparkles },
+  ];
+
+  const recentMeetings = meetingsQuery.data?.items.slice(0, 4) ?? [];
+  const openActions = openActionsQuery.data?.items.slice(0, 5) ?? [];
+  const meetingsReady = meetingsQuery.data?.items.filter((m) => m.status === "complete").length ?? 0;
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
-            Thursday, May 14
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Good morning, Maya.</h1>
+          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">{today}</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+            {meQuery.data ? `Good to see you, ${firstName(meQuery.data.name, meQuery.data.email)}.` : "Welcome back."}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            You have <span className="text-foreground">3 meetings ready</span> and{" "}
-            <span className="text-foreground">5 action items</span> waiting.
+            {meetingsQuery.isLoading || openActionsQuery.isLoading ? (
+              "Loading your workspace…"
+            ) : (
+              <>
+                You have <span className="text-foreground">{meetingsReady} meeting{meetingsReady === 1 ? "" : "s"} ready</span> and{" "}
+                <span className="text-foreground">
+                  {openActions.length} action item{openActions.length === 1 ? "" : "s"}
+                </span>{" "}
+                waiting.
+              </>
+            )}
           </p>
         </div>
         <Link
@@ -65,25 +114,25 @@ function Dashboard() {
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-semibold tracking-tight">{s.value}</span>
-              <span className={`text-xs ${s.delta.startsWith("-") ? "text-muted-foreground" : "text-success"}`}>
-                {s.delta}
-              </span>
+              {s.delta && (
+                <span className={`text-xs ${s.delta.startsWith("-") ? "text-muted-foreground" : "text-success"}`}>
+                  {s.delta}
+                </span>
+              )}
             </div>
           </motion.div>
         ))}
       </div>
 
-      {/* Activity + Chart */}
+      {/* Activity + Action items */}
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-xl border border-border/70 bg-surface p-6">
+        <div className="rounded-xl border border-border/70 bg-surface p-6 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-medium">Activity</h3>
-              <p className="text-xs text-muted-foreground">Hours transcribed · last 7 days</p>
+              <p className="text-xs text-muted-foreground">Hours transcribed · last 7 days (placeholder)</p>
             </div>
-            <span className="rounded-full bg-accent px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
-              17.0 hrs
-            </span>
+            <span className="rounded-full bg-accent px-2.5 py-1 font-mono text-[10px] text-muted-foreground">17.0 hrs</span>
           </div>
           <div className="mt-6 h-56">
             <ResponsiveContainer width="100%" height="100%">
@@ -104,13 +153,7 @@ function Dashboard() {
                     fontSize: 12,
                   }}
                 />
-                <Area
-                  type="monotone"
-                  dataKey="h"
-                  stroke="oklch(0.68 0.16 255)"
-                  strokeWidth={2}
-                  fill="url(#area)"
-                />
+                <Area type="monotone" dataKey="h" stroke="oklch(0.68 0.16 255)" strokeWidth={2} fill="url(#area)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -123,21 +166,26 @@ function Dashboard() {
               View all →
             </Link>
           </div>
-          <div className="mt-4 space-y-1.5">
-            {actionItems.slice(0, 5).map((a) => (
-              <div key={a.id} className="group flex items-start gap-2.5 rounded-md p-2 transition-colors hover:bg-accent/60">
-                <button className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border/80">
-                  {a.done && <CheckSquare className="h-3 w-3 text-brand" />}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <p className={`truncate text-sm ${a.done ? "text-muted-foreground line-through" : ""}`}>{a.title}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    {a.owner} · {a.due}
-                  </p>
+          {openActionsQuery.isLoading ? (
+            <div className="mt-6 flex justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+          ) : openActions.length === 0 ? (
+            <p className="mt-6 text-center text-xs text-muted-foreground">No open actions.</p>
+          ) : (
+            <div className="mt-4 space-y-1.5">
+              {openActions.map((a) => (
+                <div key={a.id} className="group flex items-start gap-2.5 rounded-md p-2 transition-colors hover:bg-accent/60">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border/80" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm">{a.description}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {a.assignee_name ?? "Unassigned"}
+                      {a.due_date && ` · ${formatDate(a.due_date)}`}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -149,46 +197,44 @@ function Dashboard() {
             All meetings →
           </Link>
         </div>
-        <div className="mt-4 overflow-hidden rounded-xl border border-border/70 bg-surface">
-          {meetings.slice(0, 4).map((m, i) => (
-            <Link
-              key={m.id}
-              to="/app/meetings/$id"
-              params={{ id: m.id }}
-              className={`group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-accent/40 ${
-                i > 0 ? "border-t border-border/60" : ""
-              }`}
-            >
-              <div className="flex -space-x-2">
-                {m.participants.slice(0, 3).map((p) => (
-                  <div
-                    key={p.name}
-                    className={`flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br text-[10px] font-medium text-white ring-2 ring-surface ${p.color}`}
-                  >
-                    {p.initials}
+        {meetingsQuery.isLoading ? (
+          <div className="mt-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : recentMeetings.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-dashed border-border/70 bg-surface/40 py-12 text-center">
+            <p className="text-sm font-medium">No meetings yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Upload your first recording to get started.</p>
+          </div>
+        ) : (
+          <div className="mt-4 overflow-hidden rounded-xl border border-border/70 bg-surface">
+            {recentMeetings.map((m, i) => (
+              <Link
+                key={m.id}
+                to="/app/meetings/$id"
+                params={{ id: m.id }}
+                className={`group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-accent/40 ${i > 0 ? "border-t border-border/60" : ""}`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium">{m.title}</p>
+                    {m.status !== "complete" && m.status !== "failed" && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] text-warning">
+                        <span className="h-1 w-1 animate-pulse rounded-full bg-warning" /> Processing
+                      </span>
+                    )}
                   </div>
-                ))}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-medium">{m.title}</p>
-                  {m.status === "processing" && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] text-warning">
-                      <span className="h-1 w-1 animate-pulse rounded-full bg-warning" />
-                      Processing
-                    </span>
+                  {m.summary_excerpt && (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{m.summary_excerpt}</p>
                   )}
                 </div>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">{m.summary}</p>
-              </div>
-              <div className="hidden text-right text-xs text-muted-foreground md:block">
-                <div>{m.date}</div>
-                <div className="font-mono">{m.duration}</div>
-              </div>
-              <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-            </Link>
-          ))}
-        </div>
+                <div className="hidden text-right text-xs text-muted-foreground md:block">
+                  <div>{formatDate(m.created_at)}</div>
+                  <div className="font-mono">{formatDuration(m.duration_sec)}</div>
+                </div>
+                <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Quick AI prompt */}

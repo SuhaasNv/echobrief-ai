@@ -86,6 +86,17 @@ app.patch("/:id", zValidator("json", ActionItemPatchRequest), async (c) => {
   return c.json({ ok: true });
 });
 
+app.delete("/:id", async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  const sql = getSql();
+  const result = await sql`
+    DELETE FROM action_items WHERE id = ${id} AND user_id = ${user.id}
+  `;
+  if (result.count === 0) throw new HTTPException(404, { message: "Action item not found" });
+  return c.json({ ok: true });
+});
+
 app.post("/:id/export", zValidator("json", ActionItemExportRequest), async (c) => {
   const id = c.req.param("id");
   const { provider } = c.req.valid("json");

@@ -16,12 +16,9 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
 
-  // --- Auth (Better Auth) ---
-  BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be 32+ chars"),
-  BETTER_AUTH_URL: z.string().url().optional(),
-  // Optional Google OAuth for Better Auth
-  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
-  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  // --- Auth (self-hosted JWT) ---
+  // Symmetric secret used to sign + verify HS256 JWTs. 32+ chars required.
+  AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be 32+ chars"),
 
   // --- AI providers ---
   // AssemblyAI handles transcription + speaker diarization (incl. the live

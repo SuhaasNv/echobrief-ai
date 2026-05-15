@@ -13,11 +13,13 @@ import {
   Upload,
   Brain,
   FileText,
-  ChevronRight,
 } from "lucide-react";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { DashboardPreview } from "@/components/marketing/dashboard-preview";
+import { StatsStrip } from "@/components/marketing/stats-strip";
+import { Typewriter } from "@/components/marketing/typewriter";
+import { AmbientBackground } from "@/components/marketing/ambient-background";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
@@ -50,39 +52,30 @@ const fadeUp = {
 function Landing() {
   return (
     <div className="relative min-h-screen overflow-x-clip">
-      {/* ambient background */}
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-grid bg-grid-fade" />
-        <div className="absolute left-1/2 top-0 h-[600px] w-[1100px] -translate-x-1/2 rounded-full bg-brand/15 opacity-60 blur-[120px]" />
-        <div className="absolute right-0 top-[600px] h-[400px] w-[600px] rounded-full bg-violet/10 blur-[120px]" />
-      </div>
+      <AmbientBackground />
 
       <SiteHeader />
 
-      {/* Hero */}
+      {/* Hero — ambient aurora (from <AmbientBackground />) shows through */}
       <section className="relative px-6 pt-24 pb-16 md:pt-32 md:pb-24">
-        <div className="mx-auto max-w-4xl text-center">
-          <motion.div initial="hidden" animate="show" variants={fadeUp}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-surface/60 px-3 py-1 text-xs text-muted-foreground backdrop-blur">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand" />
-              </span>
-              Now with cross-meeting AI search
-              <ChevronRight className="h-3 w-3" />
-            </span>
-          </motion.div>
-
+        <div className="relative mx-auto max-w-4xl text-center">
           <motion.h1
             initial="hidden"
             animate="show"
             variants={{ ...fadeUp, show: { ...fadeUp.show, transition: { duration: 0.9, ease, delay: 0.05 } } }}
-            className="mt-6 text-balance text-5xl font-semibold leading-[1.04] tracking-tight md:text-7xl"
+            className="text-balance text-4xl font-semibold leading-[1.04] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
           >
-            <span className="text-gradient">Your meetings</span>
+            <span className="text-gradient">Your meetings finally become</span>
             <br />
-            <span className="text-gradient">finally become </span>
-            <span className="text-gradient-brand">searchable intelligence.</span>
+            <Typewriter
+              className="text-gradient-brand"
+              words={[
+                "searchable intelligence.",
+                "structured knowledge.",
+                "team memory.",
+                "queryable context.",
+              ]}
+            />
           </motion.h1>
 
           <motion.p
@@ -130,33 +123,67 @@ function Landing() {
           </motion.p>
         </div>
 
-        <div className="mt-20">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.1, delay: 0.4, ease }}
+          className="mt-20"
+        >
           <DashboardPreview />
-        </div>
+        </motion.div>
       </section>
 
-      {/* Trusted by */}
-      <section className="px-6 py-16">
+      <StatsStrip />
+
+      {/* Trusted by — scrolling marquee */}
+      <section className="px-6 py-12">
         <div className="mx-auto max-w-6xl">
           <p className="text-center font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground/70">
             Trusted by product, sales, and research teams at
           </p>
-          <div className="mt-8 grid grid-cols-2 items-center gap-8 sm:grid-cols-3 md:grid-cols-6">
-            {["Northwind", "Vertex", "Lattice", "Helix", "Parallax", "Foundry"].map((name) => (
-              <div
-                key={name}
-                className="text-center text-lg font-semibold tracking-tight text-muted-foreground/60 transition-colors hover:text-foreground"
-              >
-                {name}
-                <span className="text-brand">.</span>
-              </div>
-            ))}
+          <div
+            className="relative mt-8 overflow-hidden"
+            style={{
+              maskImage:
+                "linear-gradient(to right, transparent, black 12%, black 88%, transparent)",
+              WebkitMaskImage:
+                "linear-gradient(to right, transparent, black 12%, black 88%, transparent)",
+            }}
+          >
+            <motion.div
+              className="flex w-max gap-12"
+              animate={{ x: ["0%", "-50%"] }}
+              transition={{ duration: 28, ease: "linear", repeat: Infinity }}
+            >
+              {[
+                "Northwind",
+                "Vertex",
+                "Lattice",
+                "Helix",
+                "Parallax",
+                "Foundry",
+                "Northwind",
+                "Vertex",
+                "Lattice",
+                "Helix",
+                "Parallax",
+                "Foundry",
+              ].map((name, i) => (
+                <div
+                  key={`${name}-${i}`}
+                  className="shrink-0 text-lg font-semibold tracking-tight text-muted-foreground/60"
+                >
+                  {name}
+                  <span className="text-brand">.</span>
+                </div>
+              ))}
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* Features */}
-      <section className="px-6 py-24">
+      <section id="features" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
           <motion.div
             initial="hidden"
@@ -330,7 +357,7 @@ function Landing() {
       </section>
 
       {/* Testimonials */}
-      <section className="px-6 py-24">
+      <section id="testimonials" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-6 md:grid-cols-3">
             {[
@@ -370,7 +397,7 @@ function Landing() {
       </section>
 
       {/* Pricing */}
-      <section className="px-6 py-24">
+      <section id="pricing" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
           <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp} className="text-center">
             <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">Pricing</p>

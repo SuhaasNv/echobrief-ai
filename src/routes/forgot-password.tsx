@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,10 +11,12 @@ export const Route = createFileRoute("/forgot-password")({
 });
 
 function ForgotPage() {
+  // Password reset emails aren't wired yet — Resend integration is a follow-up.
+  // This page shows the form for design continuity and friendly-toasts a stub.
   return (
     <AuthShell
       title="Reset your password."
-      subtitle="Enter your email and we'll send you a recovery link."
+      subtitle="Enter your email and we'll send a recovery link."
       footer={
         <>
           Remembered it?{" "}
@@ -23,7 +26,13 @@ function ForgotPage() {
         </>
       }
     >
-      <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          toast.info("Password reset emails aren't enabled yet. Ping the team to reset manually.");
+        }}
+      >
         <div className="space-y-1.5">
           <Label htmlFor="email">Work email</Label>
           <Input id="email" type="email" placeholder="you@company.com" />
