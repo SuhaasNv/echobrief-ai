@@ -17,6 +17,7 @@ export interface AuthenticatedUser {
 export interface AppVariables {
   user: AuthenticatedUser;
   requestId: string;
+  workspaceId: string;
 }
 
 export type AppBindings = {

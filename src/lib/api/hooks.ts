@@ -37,7 +37,55 @@ export const qk = {
   meetingStatus: (id: string) => ["meeting", id, "status"] as const,
   actionItems: (filters?: Record<string, unknown>) => ["action-items", filters ?? {}] as const,
   integrations: ["integrations"] as const,
+  workspaces: ["workspaces"] as const,
 };
+
+// ---------------------------------------------------------------------------
+// Workspaces
+// ---------------------------------------------------------------------------
+export type WorkspaceColor = "brand" | "violet" | "emerald" | "amber" | "rose" | "slate";
+
+export interface Workspace {
+  id: string;
+  name: string;
+  color: WorkspaceColor;
+  owner_id: string;
+  created_at: string;
+}
+
+export function useWorkspaces() {
+  return useQuery({
+    queryKey: qk.workspaces,
+    queryFn: () => apiRequest<{ items: Workspace[] }>("/workspaces"),
+  });
+}
+
+export function useCreateWorkspace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; color?: WorkspaceColor }) =>
+      apiRequest<Workspace>("/workspaces", { method: "POST", body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.workspaces }),
+  });
+}
+
+export function useUpdateWorkspace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...patch }: { id: string; name?: string; color?: WorkspaceColor }) =>
+      apiRequest<{ ok: true }>(`/workspaces/${id}`, { method: "PATCH", body: patch }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.workspaces }),
+  });
+}
+
+export function useDeleteWorkspace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiRequest<{ ok: true }>(`/workspaces/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.workspaces }),
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Account

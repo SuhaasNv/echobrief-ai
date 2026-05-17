@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { LogOut, ShieldCheck, CheckCircle2, AlertTriangle, FileAudio } from "lucide-react";
+import { LogOut, ShieldCheck, CheckCircle2, AlertTriangle, FileAudio, X } from "lucide-react";
 import { setAuthToken } from "@/lib/api/client";
 import { useMe, useMeetings } from "@/lib/api/hooks";
 import {
@@ -15,7 +15,6 @@ import {
   Settings,
   Search,
   Bell,
-  ChevronsUpDown,
   Plus,
   Menu,
   Command,
@@ -23,6 +22,8 @@ import {
 import { Logo } from "@/components/logo";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { useCommandPalette } from "@/components/command-palette";
+import { WorkspaceSwitcher } from "@/components/app/workspace-switcher";
+import { FirstWorkspaceModal } from "@/components/app/first-workspace-modal";
 
 const nav = [
   { to: "/app", label: "Dashboard", icon: LayoutGrid, exact: true },
@@ -32,7 +33,6 @@ const nav = [
   { to: "/app/action-items", label: "Action Items", icon: CheckSquare },
   { to: "/app/shared", label: "Notes library", icon: Users },
   { to: "/app/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/app/settings", label: "Settings", icon: Settings },
 ];
 
 const SIDEBAR_WIDTH = 248;
@@ -78,6 +78,7 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-screen bg-background">
+      <FirstWorkspaceModal />
       {/* Sidebar — animates width to 0 when closed, releasing space to main */}
       <motion.aside
         initial={false}
@@ -95,13 +96,7 @@ export function AppShell() {
             <Logo />
           </div>
 
-          <button className="mx-3 flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-surface/40 px-2.5 py-2 text-left text-sm transition-colors hover:bg-accent">
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="h-6 w-6 shrink-0 rounded-md bg-gradient-to-br from-brand to-violet" />
-              <span className="truncate font-medium">Acme Workspace</span>
-            </span>
-            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          </button>
+          <WorkspaceSwitcher />
 
           <nav className="mt-4 flex-1 space-y-0.5 px-2">
             {nav.map((n) => {
@@ -213,18 +208,62 @@ function timeAgo(iso: string): string {
   return `${Math.floor(ms / 86_400_000)}d ago`;
 }
 
+const DISMISSED_KEY = "echobrief-dismissed-notifications";
+
+function loadDismissed(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed.filter((v): v is string => typeof v === "string")) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissed(set: Set<string>) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(DISMISSED_KEY, JSON.stringify(Array.from(set)));
+}
+
 function NotificationsBell() {
   const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const meetings = useMeetings({ limit: 10 });
-  const items = meetings.data?.items ?? [];
+  const allItems = meetings.data?.items ?? [];
 
-  // Unread = meetings that finished (complete or failed) in the last 24h.
+  useEffect(() => {
+    setDismissed(loadDismissed());
+  }, []);
+
+  const items = allItems.filter((m) => !dismissed.has(m.id));
+
+  // Unread = meetings that finished (complete or failed) in the last 24h, and not dismissed.
   const since = Date.now() - 24 * 60 * 60 * 1000;
   const unreadCount = items.filter((m) => {
     if (m.status !== "complete" && m.status !== "failed") return false;
     const t = new Date(m.created_at).getTime();
     return t > since;
   }).length;
+
+  const dismissOne = (id: string) => {
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      saveDismissed(next);
+      return next;
+    });
+  };
+
+  const clearAll = () => {
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      for (const m of allItems) next.add(m.id);
+      saveDismissed(next);
+      return next;
+    });
+  };
 
   return (
     <div className="relative">
@@ -255,16 +294,27 @@ function NotificationsBell() {
             >
               <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
                 <p className="text-sm font-medium">Activity</p>
-                {unreadCount > 0 && (
-                  <span className="rounded-full bg-brand/15 px-1.5 py-0.5 font-mono text-[10px] text-brand">
-                    {unreadCount} new today
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <span className="rounded-full bg-brand/15 px-1.5 py-0.5 font-mono text-[10px] text-brand">
+                      {unreadCount} new today
+                    </span>
+                  )}
+                  {items.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearAll}
+                      className="rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {items.length === 0 ? (
                   <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                    No activity yet. Upload a meeting to get started.
+                    You're all caught up.
                   </p>
                 ) : (
                   items.map((m) => {
@@ -281,21 +331,36 @@ function NotificationsBell() {
                       m.status === "failed" ? "processing failed" :
                       `processing · ${m.status}`;
                     return (
-                      <Link
+                      <div
                         key={m.id}
-                        to="/app/meetings/$id"
-                        params={{ id: m.id }}
-                        onClick={() => setOpen(false)}
-                        className="flex items-start gap-3 border-b border-border/40 px-3 py-2.5 text-sm transition-colors last:border-b-0 hover:bg-accent/50"
+                        className="group relative flex items-start gap-3 border-b border-border/40 px-3 py-2.5 text-sm transition-colors last:border-b-0 hover:bg-accent/50"
                       >
-                        <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${colorClass}`} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate">{m.title}</p>
-                          <p className="truncate font-mono text-[10px] text-muted-foreground">
-                            {label} · {timeAgo(m.created_at)}
-                          </p>
-                        </div>
-                      </Link>
+                        <Link
+                          to="/app/meetings/$id"
+                          params={{ id: m.id }}
+                          onClick={() => setOpen(false)}
+                          className="flex min-w-0 flex-1 items-start gap-3"
+                        >
+                          <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${colorClass}`} />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate pr-6">{m.title}</p>
+                            <p className="truncate font-mono text-[10px] text-muted-foreground">
+                              {label} · {timeAgo(m.created_at)}
+                            </p>
+                          </div>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dismissOne(m.id);
+                          }}
+                          aria-label="Dismiss notification"
+                          className="absolute right-2 top-2 inline-flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
                     );
                   })
                 )}
@@ -330,7 +395,7 @@ function ProfileMenu() {
 
   const signOut = () => {
     setAuthToken(null);
-    navigate({ to: "/login", replace: true });
+    navigate({ to: "/", replace: true });
   };
 
   if (!me) {
@@ -363,6 +428,15 @@ function ProfileMenu() {
               <div className="border-b border-border/60 px-3 py-2.5">
                 <p className="text-sm font-medium">{me.name ?? "Account"}</p>
                 <p className="truncate text-xs text-muted-foreground">{me.email}</p>
+              </div>
+              <div className="border-t border-border/60 py-1 text-sm">
+                <Link
+                  to="/app/settings"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <Settings className="h-3.5 w-3.5" /> Settings
+                </Link>
               </div>
               {me.is_admin && (
                 <div className="border-t border-border/60 py-1 text-sm">

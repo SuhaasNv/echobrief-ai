@@ -1,14 +1,34 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle, ShieldCheck, User, KeyRound, Trash2, LogOut } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Loader2,
+  AlertTriangle,
+  ShieldCheck,
+  User,
+  KeyRound,
+  Trash2,
+  LogOut,
+  Layers,
+  Check,
+  Plus,
+  Pencil,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   useMe,
   useUpdateProfile,
   useChangePassword,
   useDeleteAccount,
+  useWorkspaces,
+  useCreateWorkspace,
+  useUpdateWorkspace,
+  useDeleteWorkspace,
+  type Workspace,
+  type WorkspaceColor,
 } from "@/lib/api/hooks";
 import { setAuthToken } from "@/lib/api/client";
+import { setActiveWorkspace, useActiveWorkspaceId } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/settings")({
   head: () => ({ meta: [{ title: "Settings — EchoBrief" }] }),
@@ -38,8 +58,271 @@ function SettingsPage() {
         <PasswordSection />
       </div>
       <div className="mt-8">
+        <WorkspacesSection />
+      </div>
+      <div className="mt-8">
         <DangerSection />
       </div>
+    </div>
+  );
+}
+
+const COLOR_BG: Record<WorkspaceColor, string> = {
+  brand: "from-brand to-violet",
+  violet: "from-violet to-fuchsia-500",
+  emerald: "from-emerald-400 to-teal-500",
+  amber: "from-amber-400 to-orange-500",
+  rose: "from-rose-400 to-pink-500",
+  slate: "from-slate-400 to-slate-600",
+};
+const COLOR_OPTIONS: WorkspaceColor[] = ["brand", "violet", "emerald", "amber", "rose", "slate"];
+
+function workspaceInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+function WorkspacesSection() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useWorkspaces();
+  const activeId = useActiveWorkspaceId();
+  const create = useCreateWorkspace();
+  const update = useUpdateWorkspace();
+  const del = useDeleteWorkspace();
+
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState<WorkspaceColor>("brand");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editColor, setEditColor] = useState<WorkspaceColor>("brand");
+
+  const workspaces = data?.items ?? [];
+
+  async function submitCreate(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newName.trim();
+    if (!name) return;
+    try {
+      const w = await create.mutateAsync({ name, color: newColor });
+      toast.success(`Created ${w.name}`);
+      setNewName("");
+      setNewColor("brand");
+      setCreating(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't create workspace");
+    }
+  }
+
+  function beginEdit(w: Workspace) {
+    setEditingId(w.id);
+    setEditName(w.name);
+    setEditColor(w.color);
+  }
+
+  async function submitEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingId) return;
+    const name = editName.trim();
+    if (!name) return;
+    try {
+      await update.mutateAsync({ id: editingId, name, color: editColor });
+      setEditingId(null);
+      toast.success("Workspace updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't update workspace");
+    }
+  }
+
+  async function deleteWorkspace(w: Workspace) {
+    if (!confirm(`Delete workspace "${w.name}"? This can't be undone.`)) return;
+    try {
+      await del.mutateAsync(w.id);
+      // If we just deleted the active one, fall back to the first remaining.
+      if (activeId === w.id) {
+        const remaining = workspaces.filter((x) => x.id !== w.id);
+        if (remaining.length > 0) setActiveWorkspace(remaining[0].id);
+      }
+      qc.invalidateQueries();
+      toast.success("Workspace deleted");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't delete");
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <SectionHeader
+        icon={Layers}
+        title="Workspaces"
+        subtitle="Separate spaces for separate teams or projects. Each has its own meetings and AI memory."
+      />
+
+      <div className="rounded-xl border border-border/70 bg-surface">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <ul className="divide-y divide-border/50">
+            {workspaces.map((w) => {
+              const isActive = w.id === activeId;
+              if (editingId === w.id) {
+                return (
+                  <li key={w.id} className="px-4 py-3">
+                    <form onSubmit={submitEdit} className="flex flex-wrap items-center gap-2">
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 py-1 text-sm outline-none focus:border-brand"
+                        autoFocus
+                        maxLength={60}
+                      />
+                      <ColorPicker value={editColor} onChange={setEditColor} />
+                      <button
+                        type="submit"
+                        disabled={update.isPending}
+                        className="rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                        className="text-xs text-muted-foreground"
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  </li>
+                );
+              }
+              return (
+                <li key={w.id} className="flex items-center gap-3 px-4 py-3">
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br text-xs font-medium text-white ${COLOR_BG[w.color]}`}
+                  >
+                    {workspaceInitials(w.name)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="truncate font-medium">{w.name}</span>
+                      {isActive && (
+                        <span className="rounded-full bg-brand/15 px-1.5 py-0.5 font-mono text-[10px] text-brand">
+                          active
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-mono text-[10px] text-muted-foreground">
+                      Created {new Date(w.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {!isActive && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveWorkspace(w.id);
+                          qc.invalidateQueries();
+                          toast.success(`Switched to ${w.name}`);
+                        }}
+                        className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        Switch
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => beginEdit(w)}
+                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      aria-label="Edit workspace"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteWorkspace(w)}
+                      disabled={workspaces.length <= 1}
+                      title={workspaces.length <= 1 ? "Can't delete your only workspace" : "Delete workspace"}
+                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                      aria-label="Delete workspace"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+            <li className="px-4 py-3">
+              {creating ? (
+                <form onSubmit={submitCreate} className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Workspace name"
+                    className="min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 py-1 text-sm outline-none focus:border-brand"
+                    autoFocus
+                    maxLength={60}
+                  />
+                  <ColorPicker value={newColor} onChange={setNewColor} />
+                  <button
+                    type="submit"
+                    disabled={create.isPending || !newName.trim()}
+                    className="rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                  >
+                    {create.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Create"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreating(false);
+                      setNewName("");
+                    }}
+                    className="text-xs text-muted-foreground"
+                  >
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCreating(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-md py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <Plus className="h-3.5 w-3.5" /> New workspace
+                </button>
+              )}
+            </li>
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ColorPicker({
+  value,
+  onChange,
+}: {
+  value: WorkspaceColor;
+  onChange: (c: WorkspaceColor) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {COLOR_OPTIONS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onChange(c)}
+          aria-label={`${c} color`}
+          className={`flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br ring-offset-2 ring-offset-surface transition-all ${COLOR_BG[c]} ${
+            value === c ? "ring-2 ring-foreground" : "ring-0"
+          }`}
+        >
+          {value === c && <Check className="h-2.5 w-2.5 text-white" />}
+        </button>
+      ))}
     </div>
   );
 }
@@ -243,7 +526,7 @@ function DangerSection() {
 
   function signOut() {
     setAuthToken(null);
-    navigate({ to: "/login", replace: true });
+    navigate({ to: "/", replace: true });
   }
 
   async function destroy() {

@@ -10,6 +10,7 @@ import { cors } from "hono/cors";
 import { requestId } from "./middleware/request-id";
 import { errorHandler } from "./middleware/error";
 import { requireAuth } from "./middleware/auth";
+import { requireWorkspace } from "./middleware/workspace";
 import { rateLimit } from "./middleware/rate-limit";
 import { getEnv } from "../env";
 
@@ -23,6 +24,7 @@ import integrationsRoutes from "./routes/integrations";
 import accountRoutes from "./routes/account";
 import generateRoutes from "./routes/generate";
 import shareRoutes from "./routes/share";
+import workspacesRoutes from "./routes/workspaces";
 
 import type { AppBindings } from "./types";
 
@@ -40,7 +42,7 @@ api.use(
     },
     credentials: true,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["content-type", "authorization", "x-request-id"],
+    allowHeaders: ["content-type", "authorization", "x-request-id", "x-workspace-id"],
   }),
 );
 
@@ -64,6 +66,14 @@ protectedApi.use("/integrations/*", rateLimit("general"));
 protectedApi.use("/search", rateLimit("ai"));
 protectedApi.use("/generate/*", rateLimit("ai"));
 protectedApi.use("/meetings/:id/chat", rateLimit("ai"));
+
+// Workspaces CRUD is workspace-agnostic (you need to list them to switch).
+protectedApi.route("/workspaces", workspacesRoutes);
+
+// Everything below this line operates inside an active workspace.
+protectedApi.use("/meetings/*", requireWorkspace);
+protectedApi.use("/action-items/*", requireWorkspace);
+protectedApi.use("/search", requireWorkspace);
 
 protectedApi.route("/meetings", meetingsRoutes);
 protectedApi.route("/meetings", chatRoutes);

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Clock, FileAudio, Sparkles, CheckSquare, Upload, ArrowRight, Loader2 } from "lucide-react";
@@ -6,6 +7,7 @@ import {
   Area,
   ResponsiveContainer,
   XAxis,
+  YAxis,
   Tooltip,
 } from "recharts";
 import { useMe, useMeetings, useActionItems } from "@/lib/api/hooks";
@@ -14,13 +16,6 @@ export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "Dashboard — EchoBrief" }] }),
   component: Dashboard,
 });
-
-// Hardcoded chart sample — there's no aggregate endpoint yet. Replace with
-// real `/account/usage` (or similar) once that endpoint exists.
-const chartData = [
-  { d: "Mon", h: 1.2 }, { d: "Tue", h: 3.1 }, { d: "Wed", h: 2.4 },
-  { d: "Thu", h: 4.6 }, { d: "Fri", h: 3.2 }, { d: "Sat", h: 0.4 }, { d: "Sun", h: 2.1 },
-];
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -43,9 +38,35 @@ function firstName(name: string | null | undefined, email: string): string {
 function Dashboard() {
   const meQuery = useMe();
   const meetingsQuery = useMeetings({ limit: 5 });
+  const allMeetingsQuery = useMeetings({ limit: 100 });
   const openActionsQuery = useActionItems({ completed: false });
 
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+  // Compute hours-transcribed-per-day for the last 7 days from real meetings.
+  const { chartData, totalHours } = useMemo(() => {
+    const items = allMeetingsQuery.data?.items ?? [];
+    const days: Array<{ d: string; key: string; h: number }> = [];
+    const today0 = new Date();
+    today0.setHours(0, 0, 0, 0);
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today0);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      days.push({ d: d.toLocaleDateString(undefined, { weekday: "short" }), key, h: 0 });
+    }
+    let totalSec = 0;
+    for (const m of items) {
+      const sec = m.duration_sec ?? 0;
+      totalSec += sec;
+      const dayKey = new Date(m.created_at).toISOString().slice(0, 10);
+      const bucket = days.find((b) => b.key === dayKey);
+      if (bucket) bucket.h += sec / 3600;
+    }
+    return { chartData: days, totalHours: totalSec / 3600 };
+  }, [allMeetingsQuery.data]);
+
+  const weekHours = chartData.reduce((s, b) => s + b.h, 0);
 
   const stats = [
     {
@@ -60,7 +81,7 @@ function Dashboard() {
       delta: null,
       icon: CheckSquare,
     },
-    { label: "Hours transcribed", value: "—", delta: null, icon: Clock },
+    { label: "Hours transcribed", value: totalHours > 0 ? totalHours.toFixed(1) : "—", delta: null, icon: Clock },
     { label: "AI summaries", value: "—", delta: null, icon: Sparkles },
   ];
 
@@ -130,9 +151,9 @@ function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-medium">Activity</h3>
-              <p className="text-xs text-muted-foreground">Hours transcribed · last 7 days (placeholder)</p>
+              <p className="text-xs text-muted-foreground">Hours transcribed · last 7 days</p>
             </div>
-            <span className="rounded-full bg-accent px-2.5 py-1 font-mono text-[10px] text-muted-foreground">17.0 hrs</span>
+            <span className="rounded-full bg-accent px-2.5 py-1 font-mono text-[10px] text-muted-foreground">{weekHours.toFixed(1)} hrs</span>
           </div>
           <div className="mt-6 h-56">
             <ResponsiveContainer width="100%" height="100%">
@@ -144,7 +165,9 @@ function Dashboard() {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="d" tickLine={false} axisLine={false} stroke="oklch(0.62 0.012 264)" tick={{ fontSize: 11 }} />
+                <YAxis hide />
                 <Tooltip
+                  formatter={(v) => [`${typeof v === "number" ? v.toFixed(2) : v} hrs`, "transcribed"]}
                   cursor={{ stroke: "oklch(1 0 0 / 0.1)" }}
                   contentStyle={{
                     background: "oklch(0.17 0.009 264)",

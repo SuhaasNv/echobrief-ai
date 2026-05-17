@@ -23,6 +23,7 @@ const app = new Hono<AppBindings>();
 app.post("/", zValidator("json", SearchRequest), async (c) => {
   const { query, history, limit } = c.req.valid("json");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const embedding = await embedQuery(query);
@@ -32,12 +33,21 @@ app.post("/", zValidator("json", SearchRequest), async (c) => {
   const vecLiteral = `[${embedding.join(",")}]`;
 
   const matches = await sql<MatchedChunkRow[]>`
-    SELECT * FROM match_transcript_chunks(
-      ${vecLiteral}::vector,
-      ${user.id}::uuid,
-      ${limit}::int,
-      0.5::real
-    )
+    SELECT
+      c.id,
+      c.meeting_id,
+      m.title AS meeting_title,
+      c.content,
+      c.start_sec,
+      c.end_sec,
+      (1 - (c.embedding <=> ${vecLiteral}::vector))::real AS similarity
+    FROM transcript_chunks c
+    JOIN meetings m ON m.id = c.meeting_id
+    WHERE c.user_id = ${user.id}
+      AND c.workspace_id = ${workspaceId}
+      AND (1 - (c.embedding <=> ${vecLiteral}::vector)) > 0.5
+    ORDER BY c.embedding <=> ${vecLiteral}::vector
+    LIMIT ${limit}
   `;
 
   if (matches.length === 0) {

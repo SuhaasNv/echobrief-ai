@@ -26,7 +26,7 @@ import { Route as AppMeetingsRouteImport } from './routes/app.meetings'
 import { Route as AppChatRouteImport } from './routes/app.chat'
 import { Route as AppAnalyticsRouteImport } from './routes/app.analytics'
 import { Route as AppActionItemsRouteImport } from './routes/app.action-items'
-import { Route as AppMeetingsIdRouteImport } from './routes/app.meetings.$id'
+import { Route as AppMeetingsIdRouteImport } from './routes/app.meetings_.$id'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -114,9 +114,9 @@ const AppActionItemsRoute = AppActionItemsRouteImport.update({
   getParentRoute: () => AppRoute,
 } as any)
 const AppMeetingsIdRoute = AppMeetingsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AppMeetingsRoute,
+  id: '/meetings_/$id',
+  path: '/meetings/$id',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -132,7 +132,7 @@ export interface FileRoutesByFullPath {
   '/app/action-items': typeof AppActionItemsRoute
   '/app/analytics': typeof AppAnalyticsRoute
   '/app/chat': typeof AppChatRoute
-  '/app/meetings': typeof AppMeetingsRouteWithChildren
+  '/app/meetings': typeof AppMeetingsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/shared': typeof AppSharedRoute
   '/app/upload': typeof AppUploadRoute
@@ -151,7 +151,7 @@ export interface FileRoutesByTo {
   '/app/action-items': typeof AppActionItemsRoute
   '/app/analytics': typeof AppAnalyticsRoute
   '/app/chat': typeof AppChatRoute
-  '/app/meetings': typeof AppMeetingsRouteWithChildren
+  '/app/meetings': typeof AppMeetingsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/shared': typeof AppSharedRoute
   '/app/upload': typeof AppUploadRoute
@@ -172,12 +172,12 @@ export interface FileRoutesById {
   '/app/action-items': typeof AppActionItemsRoute
   '/app/analytics': typeof AppAnalyticsRoute
   '/app/chat': typeof AppChatRoute
-  '/app/meetings': typeof AppMeetingsRouteWithChildren
+  '/app/meetings': typeof AppMeetingsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/shared': typeof AppSharedRoute
   '/app/upload': typeof AppUploadRoute
   '/app/': typeof AppIndexRoute
-  '/app/meetings/$id': typeof AppMeetingsIdRoute
+  '/app/meetings_/$id': typeof AppMeetingsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -238,7 +238,7 @@ export interface FileRouteTypes {
     | '/app/shared'
     | '/app/upload'
     | '/app/'
-    | '/app/meetings/$id'
+    | '/app/meetings_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -374,48 +374,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppActionItemsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/meetings/$id': {
-      id: '/app/meetings/$id'
-      path: '/$id'
+    '/app/meetings_/$id': {
+      id: '/app/meetings_/$id'
+      path: '/meetings/$id'
       fullPath: '/app/meetings/$id'
       preLoaderRoute: typeof AppMeetingsIdRouteImport
-      parentRoute: typeof AppMeetingsRoute
+      parentRoute: typeof AppRoute
     }
   }
 }
-
-interface AppMeetingsRouteChildren {
-  AppMeetingsIdRoute: typeof AppMeetingsIdRoute
-}
-
-const AppMeetingsRouteChildren: AppMeetingsRouteChildren = {
-  AppMeetingsIdRoute: AppMeetingsIdRoute,
-}
-
-const AppMeetingsRouteWithChildren = AppMeetingsRoute._addFileChildren(
-  AppMeetingsRouteChildren,
-)
 
 interface AppRouteChildren {
   AppActionItemsRoute: typeof AppActionItemsRoute
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppChatRoute: typeof AppChatRoute
-  AppMeetingsRoute: typeof AppMeetingsRouteWithChildren
+  AppMeetingsRoute: typeof AppMeetingsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSharedRoute: typeof AppSharedRoute
   AppUploadRoute: typeof AppUploadRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppMeetingsIdRoute: typeof AppMeetingsIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppActionItemsRoute: AppActionItemsRoute,
   AppAnalyticsRoute: AppAnalyticsRoute,
   AppChatRoute: AppChatRoute,
-  AppMeetingsRoute: AppMeetingsRouteWithChildren,
+  AppMeetingsRoute: AppMeetingsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSharedRoute: AppSharedRoute,
   AppUploadRoute: AppUploadRoute,
   AppIndexRoute: AppIndexRoute,
+  AppMeetingsIdRoute: AppMeetingsIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

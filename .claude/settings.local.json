@@ -79,7 +79,31 @@
       "Bash(grep -nA 10 \"MeetingListQuery\\\\s*=\" src/lib/schemas.ts)",
       "Bash(npm test *)",
       "Bash(grep -nA 5 \"UpdateProfileRequest\\\\s*=\" src/lib/schemas.ts)",
-      "Bash(node --env-file=.env -e ' *Also, there should be one more option in action items: select all at the top or somewhere I can just delete the action items. Something event or select all, then clear, after selecting all, clear, or mark as done or mark as undone, those options kind of thing. Also, place them in a creative manner for action items. Also, one more thing: the action items rate. It's all in between the same thing. The same goes with no notes library and analytics, which is quite extended, I mean it's using the whole page kind of thing. The same with settings: settings is in the middle. Notes library is in the middle. Action items are in the middle, so yeah, make them be spread throughout the page. Make use of the canvas.)"
+      "Bash(node --env-file=.env -e ' *Also, there should be one more option in action items: select all at the top or somewhere I can just delete the action items. Something event or select all, then clear, after selecting all, clear, or mark as done or mark as undone, those options kind of thing. Also, place them in a creative manner for action items. Also, one more thing: the action items rate. It's all in between the same thing. The same goes with no notes library and analytics, which is quite extended, I mean it's using the whole page kind of thing. The same with settings: settings is in the middle. Notes library is in the middle. Action items are in the middle, so yeah, make them be spread throughout the page. Make use of the canvas.)",
+      "Bash(grep -E 'app/meetings/\\\\$id|app\\\\.meetings\\\\.\\\\$id' src/routeTree.gen.ts)",
+      "Bash(grep -nA 8 \"<Tooltip\" src/routes/app.index.tsx)",
+      "Bash(ps -eo pid,ppid,command)",
+      "Bash(kill 25016)",
+      "Bash(awk '{print \"remaining processes:\", $1}')",
+      "Bash(echo \"spawned bg pid: $!\")",
+      "Bash(/usr/bin/curl -sS http://localhost:4000/api/v1/health)",
+      "Bash(/usr/bin/curl -sS http://localhost:8080/login)",
+      "Bash(/usr/bin/curl -sS http://localhost:8080/app/meetings)",
+      "Bash(awk '{print $1, \"dev processes alive\"}')",
+      "Bash(curl -s http://localhost:8080/app/meetings)",
+      "Bash(curl *)",
+      "Bash(git mv *)",
+      "Bash(npx tsc *)",
+      "Bash(grep -oE \"<body[^>]*>.{0,800}\")",
+      "Bash(python3 -c \"import sys; d=sys.stdin.read\\(\\); i=d.find\\('<body'\\); print\\(d[i:i+1500] if i>=0 else 'no body'\\)\")",
+      "Bash(pkill -f \"vite\")",
+      "Bash(lsof -ti:8080,4000)",
+      "Bash(xargs kill -9)",
+      "Bash(pg_dump --version)",
+      "Read(//opt/homebrew/opt/**)",
+      "Read(//Applications/**)",
+      "Bash(brew list *)",
+      "Bash(brew install *)"
     ]
   }
 }

@@ -20,7 +20,9 @@ import { DashboardPreview } from "@/components/marketing/dashboard-preview";
 import { StatsStrip } from "@/components/marketing/stats-strip";
 import { Typewriter } from "@/components/marketing/typewriter";
 import { AmbientBackground } from "@/components/marketing/ambient-background";
+import { ScrollFollowLine } from "@/components/marketing/scroll-follow-line";
 import { Button } from "@/components/ui/button";
+import { CircularTestimonials } from "@/components/ui/circular-testimonials";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -53,6 +55,7 @@ function Landing() {
   return (
     <div className="relative min-h-screen overflow-x-clip">
       <AmbientBackground />
+      <ScrollFollowLine />
 
       <SiteHeader />
 
@@ -359,40 +362,66 @@ function Landing() {
       {/* Testimonials */}
       <section id="testimonials" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="grid gap-6 md:grid-cols-3">
-            {[
-              {
-                q: "We replaced four tools with EchoBrief. Our weekly leadership meeting now writes its own follow-up.",
-                a: "Sarah Lin",
-                r: "Head of Operations, Vertex",
-              },
-              {
-                q: "The cross-meeting search is genuinely magical. It feels like having a chief of staff.",
-                a: "Marcus Webb",
-                r: "Founder, Helix",
-              },
-              {
-                q: "Action items used to vanish. Now they appear in Linear before the call ends.",
-                a: "Anika Roy",
-                r: "VP Product, Northwind",
-              },
-            ].map((t) => (
-              <motion.figure
-                key={t.a}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, ease }}
-                className="rounded-xl border border-border/70 bg-surface p-7"
-              >
-                <blockquote className="text-[15px] leading-relaxed text-foreground/95">"{t.q}"</blockquote>
-                <figcaption className="mt-6 text-sm">
-                  <div className="font-medium">{t.a}</div>
-                  <div className="text-muted-foreground">{t.r}</div>
-                </figcaption>
-              </motion.figure>
-            ))}
-          </div>
+          <motion.div
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={fadeUp}
+            className="mx-auto max-w-2xl text-center"
+          >
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">Loved by teams</p>
+            <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
+              The teams that ship fastest run on EchoBrief.
+            </h2>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, ease }}
+            className="mt-14 flex justify-center"
+          >
+            <CircularTestimonials
+              testimonials={[
+                {
+                  quote:
+                    "We replaced four tools with EchoBrief. Our weekly leadership meeting now writes its own follow-up.",
+                  name: "Sarah Lin",
+                  designation: "Head of Operations, Vertex",
+                  src: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1200&auto=format&fit=crop",
+                },
+                {
+                  quote:
+                    "The cross-meeting search is genuinely magical. It feels like having a chief of staff.",
+                  name: "Marcus Webb",
+                  designation: "Founder, Helix",
+                  src: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?q=80&w=1200&auto=format&fit=crop",
+                },
+                {
+                  quote:
+                    "Action items used to vanish. Now they appear in Linear before the call ends.",
+                  name: "Anika Roy",
+                  designation: "VP Product, Northwind",
+                  src: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=1200&auto=format&fit=crop",
+                },
+              ]}
+              autoplay
+              colors={{
+                name: "var(--foreground)",
+                designation: "var(--muted-foreground)",
+                testimony: "color-mix(in oklab, var(--foreground) 95%, transparent)",
+                arrowBackground: "var(--surface-elevated)",
+                arrowForeground: "var(--foreground)",
+                arrowHoverBackground: "var(--brand)",
+              }}
+              fontSizes={{
+                name: "1.5rem",
+                designation: "0.95rem",
+                quote: "1.05rem",
+              }}
+            />
+          </motion.div>
         </div>
       </section>
 

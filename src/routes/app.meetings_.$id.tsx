@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
@@ -17,12 +17,15 @@ import {
   X,
   Pencil,
   Check,
+  Copy,
+  Link2,
+  Link2Off,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useMeeting, useMeetingStatus, useActionItems, useRetryMeeting, useDeleteMeeting, usePatchMeeting, useMeetingAudioUrl } from "@/lib/api/hooks";
+import { useMeeting, useMeetingStatus, useActionItems, useRetryMeeting, useDeleteMeeting, usePatchMeeting, useMeetingAudioUrl, useShareMeeting } from "@/lib/api/hooks";
 import type { MeetingDetail, MeetingStatusResponse } from "@/lib/schemas";
 
-export const Route = createFileRoute("/app/meetings/$id")({
+export const Route = createFileRoute("/app/meetings_/$id")({
   head: () => ({ meta: [{ title: "Meeting — EchoBrief" }] }),
   component: MeetingDetailPage,
 });
@@ -47,7 +50,7 @@ function formatDate(iso: string): string {
 }
 
 function MeetingDetailPage() {
-  const { id } = useParams({ from: "/app/meetings/$id" });
+  const { id } = useParams({ from: "/app/meetings_/$id" });
   const navigate = useNavigate();
   const meetingQuery = useMeeting(id);
   const statusQuery = useMeetingStatus(id, meetingQuery.data?.status !== "complete");
@@ -128,9 +131,7 @@ function MeetingDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs hover:bg-accent">
-                <Share2 className="h-3 w-3" /> Share
-              </button>
+              <ShareMenu meetingId={meeting.id} shareToken={meeting.share_token} />
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}
@@ -243,6 +244,122 @@ function EditableTitle({ id, title }: { id: string; title: string }) {
       >
         <Pencil className="h-3.5 w-3.5" />
       </button>
+    </div>
+  );
+}
+
+function ShareMenu({ meetingId, shareToken }: { meetingId: string; shareToken: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const share = useShareMeeting(meetingId);
+
+  const shareUrl =
+    shareToken && typeof window !== "undefined"
+      ? `${window.location.origin}/share/${shareToken}`
+      : null;
+
+  const handleCreate = async () => {
+    try {
+      await share.mutateAsync(true);
+      toast.success("Public link created");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't create link");
+    }
+  };
+
+  const handleDisable = async () => {
+    try {
+      await share.mutateAsync(false);
+      toast.success("Sharing disabled");
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't disable sharing");
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      toast.success("Link copied");
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Copy failed — select the link manually");
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label="Share meeting"
+        className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs hover:bg-accent"
+      >
+        <Share2 className="h-3 w-3" /> Share
+      </button>
+      {open && (
+        <>
+          <div role="presentation" onClick={() => setOpen(false)} className="fixed inset-0 z-40" />
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-10 z-50 w-80 overflow-hidden rounded-xl border border-border/70 bg-popover shadow-elegant"
+          >
+            <div className="border-b border-border/60 px-3 py-2.5">
+              <p className="text-sm font-medium">Share this meeting</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Anyone with the link can view the transcript and summary.
+              </p>
+            </div>
+            <div className="p-3">
+              {shareUrl ? (
+                <>
+                  <div className="flex items-center gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
+                    <Link2 className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <input
+                      readOnly
+                      value={shareUrl}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-foreground focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopy}
+                      aria-label="Copy link"
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDisable}
+                    disabled={share.isPending}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60"
+                  >
+                    {share.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2Off className="h-3 w-3" />}
+                    Disable sharing
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  disabled={share.isPending}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  {share.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                  Create public link
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
     </div>
   );
 }
@@ -439,6 +556,16 @@ function CompleteBody({
   const segments = meeting.transcript?.segments ?? [];
   const chapters = meeting.summary?.chapters ?? [];
   const audio = useMeetingAudioUrl(meeting.id);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const seekTo = (seconds: number) => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.currentTime = seconds;
+    // play() can reject under autoplay policy — fine if user hasn't unmuted yet.
+    void el.play().catch(() => {});
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
 
   return (
     <>
@@ -452,6 +579,7 @@ function CompleteBody({
               </p>
             </div>
             <audio
+              ref={audioRef}
               controls
               preload="metadata"
               className="mt-3 w-full"
@@ -473,9 +601,12 @@ function CompleteBody({
             chapters.map((c) => (
               <button
                 key={c.start_sec}
-                className="group flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+                type="button"
+                onClick={() => seekTo(c.start_sec)}
+                disabled={!audio.data?.url}
+                className="group flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <span className="mt-0.5 font-mono text-[10px] text-muted-foreground">{formatTimestamp(c.start_sec)}</span>
+                <span className="mt-0.5 font-mono text-[10px] text-muted-foreground group-hover:text-brand">{formatTimestamp(c.start_sec)}</span>
                 <span className="text-foreground/90">{c.title}</span>
               </button>
             ))
@@ -501,7 +632,13 @@ function CompleteBody({
                 transition={{ delay: Math.min(i * 0.02, 0.4) }}
                 className="group flex gap-4"
               >
-                <button className="mt-0.5 shrink-0 font-mono text-[11px] text-muted-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={() => seekTo(seg.start_sec)}
+                  disabled={!audio.data?.url}
+                  title={audio.data?.url ? "Play from here" : "No audio available"}
+                  className="mt-0.5 shrink-0 font-mono text-[11px] text-muted-foreground transition-colors hover:text-brand disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-muted-foreground"
+                >
                   {formatTimestamp(seg.start_sec)}
                 </button>
                 <div className="min-w-0">

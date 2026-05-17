@@ -37,6 +37,7 @@ const app = new Hono<AppBindings>();
 app.post("/upload-url", zValidator("json", UploadUrlRequest), async (c) => {
   const body = c.req.valid("json");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const meetingId = randomUUID();
@@ -45,11 +46,12 @@ app.post("/upload-url", zValidator("json", UploadUrlRequest), async (c) => {
 
   await sql`
     INSERT INTO meetings (
-      id, user_id, title, audio_key, audio_size, audio_mime,
+      id, user_id, workspace_id, title, audio_key, audio_size, audio_mime,
       duration_sec, language, tags, status
     ) VALUES (
       ${meetingId},
       ${user.id},
+      ${workspaceId},
       ${body.title ?? body.filename.replace(/\.[^.]+$/, "")},
       ${audioKey},
       ${body.size},
@@ -83,6 +85,7 @@ app.post("/upload-url", zValidator("json", UploadUrlRequest), async (c) => {
 app.post("/from-transcript", zValidator("json", TranscriptUploadRequest), async (c) => {
   const body = c.req.valid("json");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const meetingId = randomUUID();
@@ -92,10 +95,11 @@ app.post("/from-transcript", zValidator("json", TranscriptUploadRequest), async 
 
   await sql.begin(async (tx) => {
     await tx`
-      INSERT INTO meetings (id, user_id, title, duration_sec, language, tags, status)
+      INSERT INTO meetings (id, user_id, workspace_id, title, duration_sec, language, tags, status)
       VALUES (
         ${meetingId},
         ${user.id},
+        ${workspaceId},
         ${body.title},
         ${estimatedSec},
         ${body.language},
@@ -135,12 +139,13 @@ app.post("/from-transcript", zValidator("json", TranscriptUploadRequest), async 
 app.post("/", zValidator("json", ConfirmUploadRequest), async (c) => {
   const { meeting_id } = c.req.valid("json");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const rows = await sql<MeetingRow[]>`
     SELECT id, user_id, audio_key, language, status
     FROM meetings
-    WHERE id = ${meeting_id} AND user_id = ${user.id}
+    WHERE id = ${meeting_id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
   `;
   const meeting = rows[0];
   if (!meeting) throw new HTTPException(404, { message: "Meeting not found" });
@@ -163,12 +168,13 @@ app.post("/", zValidator("json", ConfirmUploadRequest), async (c) => {
 app.get("/", zValidator("query", MeetingListQuery), async (c) => {
   const q = c.req.valid("query");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const offset = (q.page - 1) * q.limit;
 
   // Build dynamic conditions via postgres.js helper composability.
-  const conditions = [sql`user_id = ${user.id}`];
+  const conditions = [sql`user_id = ${user.id}`, sql`workspace_id = ${workspaceId}`];
   if (q.status) conditions.push(sql`status = ${q.status}`);
   if (q.tag) conditions.push(sql`${q.tag} = ANY(tags)`);
   if (q.from) conditions.push(sql`created_at >= ${q.from}`);
@@ -238,35 +244,145 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
 app.get("/:id", async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const meetings = await sql<MeetingRow[]>`
-    SELECT * FROM meetings WHERE id = ${id} AND user_id = ${user.id}
+    SELECT * FROM meetings WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
   `;
   const meeting = meetings[0];
   if (!meeting) throw new HTTPException(404, { message: "Meeting not found" });
 
-  const [transcript] = await sql<
+  const [transcriptRow] = await sql<
     Array<{
       raw_text: string;
-      content: Record<string, unknown>;
+      content: unknown;
       speakers: Array<{ id: string; label: string; talk_time_sec: number; word_count: number }>;
     }>
   >`SELECT raw_text, content, speakers FROM transcripts WHERE meeting_id = ${id}`;
 
-  const [summary] = await sql<
+  const [summaryRow] = await sql<
     Array<{
       executive: string | null;
-      key_topics: string[];
-      decisions: string[];
-      open_questions: string[];
-      chapters: Array<{ title: string; start_sec: number; end_sec: number; summary: string }>;
+      key_topics: unknown;
+      decisions: unknown;
+      open_questions: unknown;
+      chapters: unknown;
     }>
   >`SELECT executive, key_topics, decisions, open_questions, chapters
     FROM summaries WHERE meeting_id = ${id}`;
 
-  return c.json({ ...meeting, transcript: transcript ?? null, summary: summary ?? null });
+  const transcript = transcriptRow ? buildTranscriptResponse(transcriptRow) : null;
+  const summary = summaryRow
+    ? {
+        executive: summaryRow.executive,
+        key_topics: coerceJsonArray<string>(summaryRow.key_topics),
+        decisions: coerceJsonArray<string>(summaryRow.decisions),
+        open_questions: coerceJsonArray<string>(summaryRow.open_questions),
+        chapters: coerceJsonArray<{ title: string; start_sec: number; end_sec: number; summary: string }>(summaryRow.chapters),
+      }
+    : null;
+  return c.json({
+    ...meeting,
+    meeting_score: coerceJsonObject<Record<string, unknown>>(meeting.meeting_score),
+    transcript,
+    summary,
+  });
 });
+
+// Older rows were inserted with sql.json(), which double-encodes — reads come
+// back as JSON-encoded strings instead of arrays/objects. Normalize both.
+function coerceJsonArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as T[]) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function coerceJsonObject<T>(value: unknown): T | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as T;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as T) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+interface WordEntry {
+  word: string;
+  start: number;
+  end: number;
+  speaker?: string | null;
+}
+
+interface SegmentOut { speaker: string | null; start_sec: number; end_sec: number; text: string }
+
+function buildTranscriptResponse(row: {
+  raw_text: string;
+  content: unknown;
+  speakers: Array<{ id: string; label: string; talk_time_sec: number; word_count: number }>;
+}): { raw_text: string; segments: SegmentOut[]; speakers: typeof row.speakers } {
+  // `content` may be a real JSONB object OR a JSON-encoded string (older
+  // meetings inserted before the sql.json fix). Normalize both forms.
+  let content: { words?: WordEntry[]; paragraphs?: Array<{ start: number; end: number; speaker?: string | null; text: string }> } = {};
+  try {
+    if (typeof row.content === "string") content = JSON.parse(row.content) as typeof content;
+    else if (row.content && typeof row.content === "object") content = row.content as typeof content;
+  } catch {
+    /* leave content empty — segments will be empty too */
+  }
+
+  const segments: SegmentOut[] = [];
+
+  // Prefer paragraphs if present (cleaner segmentation).
+  if (Array.isArray(content.paragraphs) && content.paragraphs.length > 0) {
+    for (const p of content.paragraphs) {
+      segments.push({
+        speaker: p.speaker ?? null,
+        start_sec: Math.floor(p.start),
+        end_sec: Math.ceil(p.end),
+        text: p.text,
+      });
+    }
+  } else if (Array.isArray(content.words) && content.words.length > 0) {
+    // Group consecutive words by speaker into segments.
+    let cur: { speaker: string | null; words: WordEntry[] } | null = null;
+    for (const w of content.words) {
+      const sp = w.speaker ?? null;
+      if (!cur || cur.speaker !== sp) {
+        if (cur) segments.push(toSegment(cur));
+        cur = { speaker: sp, words: [w] };
+      } else {
+        cur.words.push(w);
+      }
+    }
+    if (cur) segments.push(toSegment(cur));
+  } else if (row.raw_text) {
+    // Fallback for transcript-only uploads with no word-level data.
+    segments.push({ speaker: null, start_sec: 0, end_sec: 0, text: row.raw_text });
+  }
+
+  return { raw_text: row.raw_text, segments, speakers: row.speakers ?? [] };
+}
+
+function toSegment(group: { speaker: string | null; words: WordEntry[] }): SegmentOut {
+  return {
+    speaker: group.speaker,
+    start_sec: Math.floor(group.words[0].start),
+    end_sec: Math.ceil(group.words[group.words.length - 1].end),
+    text: group.words.map((w) => w.word).join(" "),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // PATCH /:id — update title/tags/visibility
@@ -275,6 +391,7 @@ app.patch("/:id", zValidator("json", MeetingPatchRequest), async (c) => {
   const id = c.req.param("id");
   const patch = c.req.valid("json");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const sets = [];
@@ -286,7 +403,7 @@ app.patch("/:id", zValidator("json", MeetingPatchRequest), async (c) => {
 
   const setClause = sets.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc}, ${cur}`));
 
-  await sql`UPDATE meetings SET ${setClause} WHERE id = ${id} AND user_id = ${user.id}`;
+  await sql`UPDATE meetings SET ${setClause} WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}`;
   return c.json({ ok: true });
 });
 
@@ -296,18 +413,19 @@ app.patch("/:id", zValidator("json", MeetingPatchRequest), async (c) => {
 app.delete("/:id", async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const rows = await sql<
     Array<{ audio_key: string | null }>
-  >`SELECT audio_key FROM meetings WHERE id = ${id} AND user_id = ${user.id}`;
+  >`SELECT audio_key FROM meetings WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}`;
   const row = rows[0];
   if (!row) throw new HTTPException(404, { message: "Meeting not found" });
 
   if (row.audio_key) {
     await deleteAudioObject(row.audio_key).catch((e) => console.error("[r2-delete]", e));
   }
-  await sql`DELETE FROM meetings WHERE id = ${id} AND user_id = ${user.id}`;
+  await sql`DELETE FROM meetings WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}`;
   return c.json({ ok: true });
 });
 
@@ -320,9 +438,10 @@ app.delete("/:id", async (c) => {
 app.get("/:id/audio-url", async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
   const rows = await sql<Array<{ audio_key: string | null; audio_mime: string | null }>>`
-    SELECT audio_key, audio_mime FROM meetings WHERE id = ${id} AND user_id = ${user.id}
+    SELECT audio_key, audio_mime FROM meetings WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
   `;
   const meeting = rows[0];
   if (!meeting) throw new HTTPException(404, { message: "Meeting not found" });
@@ -340,6 +459,7 @@ app.get("/:id/audio-url", async (c) => {
 app.get("/:id/status", async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const rows = await sql<
@@ -352,7 +472,7 @@ app.get("/:id/status", async (c) => {
     }>
   >`
     SELECT id, status, failure_reason, duration_sec, audio_key
-    FROM meetings WHERE id = ${id} AND user_id = ${user.id}
+    FROM meetings WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
   `;
   const data = rows[0];
   if (!data) throw new HTTPException(404, { message: "Meeting not found" });
@@ -388,11 +508,12 @@ app.get("/:id/status", async (c) => {
 app.post("/:id/retry", async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const rows = await sql<MeetingRow[]>`
     SELECT id, user_id, audio_key, language, status, retry_count
-    FROM meetings WHERE id = ${id} AND user_id = ${user.id}
+    FROM meetings WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
   `;
   const meeting = rows[0];
   if (!meeting) throw new HTTPException(404, { message: "Meeting not found" });
@@ -427,11 +548,12 @@ app.post("/:id/share", zValidator("json", ShareBody), async (c) => {
   const id = c.req.param("id");
   const { enabled } = c.req.valid("json");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const share_token = enabled ? randomBytes(16).toString("hex") : null;
 
-  await sql`UPDATE meetings SET share_token = ${share_token} WHERE id = ${id} AND user_id = ${user.id}`;
+  await sql`UPDATE meetings SET share_token = ${share_token} WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}`;
 
   const env = await import("../../env").then((m) => m.getEnv());
   return c.json({

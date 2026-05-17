@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Search, Filter, Plus, Clock, Loader2, Users } from "lucide-react";
-import { useMeetings } from "@/lib/api/hooks";
+import { Search, Filter, Plus, Clock, Loader2, Users, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { useMeetings, useDeleteMeeting } from "@/lib/api/hooks";
 
 // Map server status string → progress percent for the inline bar.
 const STATUS_PERCENT: Record<string, number> = {
@@ -42,6 +43,19 @@ function formatDuration(sec: number | null): string {
 function MeetingsPage() {
   const [q, setQ] = useState("");
   const { data, isLoading, isError, refetch } = useMeetings({ q: q || undefined, limit: 50 });
+  const del = useDeleteMeeting();
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    try {
+      await del.mutateAsync(confirmDelete.id);
+      toast.success(`Deleted "${confirmDelete.title}"`);
+      setConfirmDelete(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    }
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
@@ -100,12 +114,23 @@ function MeetingsPage() {
       ) : (
         <div className="mt-6 grid gap-3">
           {data?.items.map((m) => (
-            <Link
-              key={m.id}
-              to="/app/meetings/$id"
-              params={{ id: m.id }}
-              className="group rounded-xl border border-border/70 bg-surface p-5 transition-colors hover:bg-surface-elevated"
-            >
+            <div key={m.id} className="group relative">
+              {/* Delete button as a SIBLING of the link — nesting a <button>
+                  inside an <a> is invalid HTML and breaks card-body clicks. */}
+              <button
+                type="button"
+                onClick={() => setConfirmDelete({ id: m.id, title: m.title })}
+                aria-label={`Delete ${m.title}`}
+                title="Delete meeting"
+                className="absolute right-3 top-3 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+              <Link
+                to="/app/meetings/$id"
+                params={{ id: m.id }}
+                className="block rounded-xl border border-border/70 bg-surface p-5 transition-colors hover:bg-surface-elevated"
+              >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -168,8 +193,48 @@ function MeetingsPage() {
                   </div>
                 </div>
               </div>
-            </Link>
+              </Link>
+            </div>
           ))}
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 px-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.18 }}
+            className="w-full max-w-sm rounded-xl border border-border/70 bg-popover p-5 shadow-elegant"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/15">
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </div>
+            <h3 className="mt-4 text-base font-semibold">Delete this meeting?</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              &ldquo;{confirmDelete.title}&rdquo; and all its transcript, summary, and action items will be
+              removed. This can&apos;t be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                disabled={del.isPending}
+                className="rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={del.isPending}
+                className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {del.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                {del.isPending ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

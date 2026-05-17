@@ -26,9 +26,10 @@ const ListQuery = z.object({
 app.get("/", zValidator("query", ListQuery), async (c) => {
   const q = c.req.valid("query");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
-  const conditions = [sql`ai.user_id = ${user.id}`];
+  const conditions = [sql`ai.user_id = ${user.id}`, sql`ai.workspace_id = ${workspaceId}`];
   if (q.completed !== undefined) conditions.push(sql`ai.completed = ${q.completed}`);
   if (q.meeting_id) conditions.push(sql`ai.meeting_id = ${q.meeting_id}`);
   if (q.assignee) conditions.push(sql`ai.assignee_name ILIKE ${`%${q.assignee}%`}`);
@@ -68,6 +69,7 @@ app.patch("/:id", zValidator("json", ActionItemPatchRequest), async (c) => {
   const id = c.req.param("id");
   const patch = c.req.valid("json");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const sets = [];
@@ -81,7 +83,7 @@ app.patch("/:id", zValidator("json", ActionItemPatchRequest), async (c) => {
   if (sets.length === 0) return c.json({ ok: true });
 
   const setClause = sets.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc}, ${cur}`));
-  await sql`UPDATE action_items SET ${setClause} WHERE id = ${id} AND user_id = ${user.id}`;
+  await sql`UPDATE action_items SET ${setClause} WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}`;
 
   return c.json({ ok: true });
 });
@@ -89,9 +91,10 @@ app.patch("/:id", zValidator("json", ActionItemPatchRequest), async (c) => {
 app.delete("/:id", async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
   const result = await sql`
-    DELETE FROM action_items WHERE id = ${id} AND user_id = ${user.id}
+    DELETE FROM action_items WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
   `;
   if (result.count === 0) throw new HTTPException(404, { message: "Action item not found" });
   return c.json({ ok: true });
@@ -101,13 +104,14 @@ app.post("/:id/export", zValidator("json", ActionItemExportRequest), async (c) =
   const id = c.req.param("id");
   const { provider } = c.req.valid("json");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const items = await sql<
     Array<{ id: string; description: string; export_refs: Record<string, string> }>
   >`
     SELECT id, description, export_refs FROM action_items
-    WHERE id = ${id} AND user_id = ${user.id}
+    WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
   `;
   const item = items[0];
   if (!item) throw new HTTPException(404, { message: "Action item not found" });

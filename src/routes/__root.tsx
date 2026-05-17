@@ -101,14 +101,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
+  // suppressHydrationWarning: the inline themeBootScript mutates the
+  // <html> className before React hydrates. Without this flag, React detects
+  // the mismatch and stops attaching event listeners — every click on the
+  // page becomes a no-op. This was the silent killer.
   return (
-    <html lang="en" className="dark" style={{ colorScheme: "dark" }}>
+    <html lang="en" className="dark" style={{ colorScheme: "dark" }} suppressHydrationWarning>
       <head>
         <HeadContent />
         {/* No-flash theme boot. Runs before React hydrates. */}
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         <Scripts />
       </body>

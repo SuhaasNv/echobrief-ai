@@ -11,6 +11,7 @@ const API_BASE_URL =
   "/api/v1";
 
 const TOKEN_STORAGE_KEY = "echobrief-auth-token";
+const WORKSPACE_STORAGE_KEY = "echobrief-active-workspace";
 
 export function setAuthToken(token: string | null): void {
   if (typeof window === "undefined") return;
@@ -21,6 +22,17 @@ export function setAuthToken(token: string | null): void {
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setActiveWorkspaceId(id: string | null): void {
+  if (typeof window === "undefined") return;
+  if (id) localStorage.setItem(WORKSPACE_STORAGE_KEY, id);
+  else localStorage.removeItem(WORKSPACE_STORAGE_KEY);
+}
+
+export function getActiveWorkspaceId(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(WORKSPACE_STORAGE_KEY);
 }
 
 export class ApiError extends Error {
@@ -57,6 +69,8 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
   };
   const token = getAuthToken();
   if (token) headers.authorization = `Bearer ${token}`;
+  const workspaceId = getActiveWorkspaceId();
+  if (workspaceId) headers["x-workspace-id"] = workspaceId;
 
   const response = await fetch(url.toString(), {
     method: opts.method ?? "GET",

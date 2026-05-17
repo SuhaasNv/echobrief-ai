@@ -1,4 +1,4 @@
-/* reload tick */
+/* reload tick — harden logStep */
 /**
  * Processing pipeline (BullMQ job handler).
  *
@@ -30,6 +30,16 @@ interface SpeakerStat { label: string; talk_time_sec: number; word_count: number
 export async function processMeeting(job: ProcessingJob): Promise<void> {
   const sql = getSql();
 
+  // Resolve the meeting's workspace once — child inserts (action_items,
+  // transcript_chunks) need workspace_id and the BullMQ payload doesn't carry it.
+  const meetingRows = await sql<Array<{ workspace_id: string }>>`
+    SELECT workspace_id FROM meetings WHERE id = ${job.meeting_id} LIMIT 1
+  `;
+  if (meetingRows.length === 0) {
+    throw new Error(`Meeting ${job.meeting_id} not found`);
+  }
+  const workspaceId = meetingRows[0].workspace_id;
+
   // ---- 1. Transcribe (or skip if user uploaded text directly) -----------
   // For transcript-only uploads, a `transcripts` row already exists and
   // `audio_key` is empty. Skip the AssemblyAI step entirely.
@@ -59,6 +69,11 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
     const transcribeStart = Date.now();
     const result = await transcribeAudioUrl(audioUrl, job.language ?? "en");
 
+    // postgres.js double-encodes objects when bound as text+::jsonb, storing
+    // the value as a JSONB string scalar instead of an object. Reads are
+    // normalized in src/server/api/routes/meetings.ts (buildTranscriptResponse
+    // parses the string back into segments) so this stays compatible with the
+    // many already-inserted rows in production.
     await sql`
       INSERT INTO transcripts (meeting_id, raw_text, content, speakers, language, provider)
       VALUES (
@@ -129,6 +144,7 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
         analysis.action_items.map((item) => ({
           meeting_id: job.meeting_id,
           user_id: job.user_id,
+          workspace_id: workspaceId,
           description: item.description,
           assignee_name: item.assignee_name,
           due_date: item.due_date,
@@ -163,6 +179,7 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
         chunks.map((chunk, i) => ({
           meeting_id: job.meeting_id,
           user_id: job.user_id,
+          workspace_id: workspaceId,
           chunk_index: chunk.index,
           content: chunk.content,
           start_sec: chunk.start_sec,
@@ -277,14 +294,21 @@ async function logStep(
   },
 ): Promise<void> {
   const sql = getSql();
-  await sql`
-    INSERT INTO pipeline_logs (
-      meeting_id, user_id, step, provider, model, duration_ms, cost_usd, status, error
-    ) VALUES (
-      ${job.meeting_id}, ${job.user_id}, ${entry.step},
-      ${entry.provider ?? null}, ${entry.model ?? null},
-      ${entry.duration_ms ?? null}, ${entry.cost_usd ?? null},
-      ${entry.status}, ${entry.error ?? null}
-    )
-  `;
+  try {
+    await sql`
+      INSERT INTO pipeline_logs (
+        meeting_id, user_id, step, provider, model, duration_ms, cost_usd, status, error
+      ) VALUES (
+        ${job.meeting_id}, ${job.user_id}, ${entry.step},
+        ${entry.provider ?? null}, ${entry.model ?? null},
+        ${entry.duration_ms ?? null}, ${entry.cost_usd ?? null},
+        ${entry.status}, ${entry.error ?? null}
+      )
+    `;
+  } catch (err) {
+    // The meeting (or user) may have been deleted between job enqueue and the
+    // log write — FK violation 23503 lands here. Logging is best-effort; never
+    // let it crash the worker.
+    console.warn("[log-step-failed]", job.meeting_id, entry.step, err instanceof Error ? err.message : err);
+  }
 }

@@ -36,6 +36,13 @@ const ACCEPT_MIMES: ReadonlyArray<UploadUrlRequest["content_type"]> = [
 const ACCEPT_ATTR = ACCEPT_MIMES.join(",");
 const MAX_BYTES = 500 * 1024 * 1024;
 
+// Pre-computed waveform bar heights (avoids any chance of SSR/client
+// float-precision hydration mismatch).
+const WAVEFORM_HEIGHTS: string[] = Array.from(
+  { length: 60 },
+  (_, i) => `${(20 + Math.abs(Math.sin(i * 0.6)) * 70).toFixed(4)}%`,
+);
+
 type Phase = "idle" | "ready" | "presigning" | "uploading" | "confirming" | "redirecting" | "error";
 
 function formatSize(bytes: number): string {
@@ -192,7 +199,7 @@ function UploadPage() {
   const transcriptWordCount = transcriptText.trim() ? transcriptText.trim().split(/\s+/).length : 0;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 md:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-10 md:px-8">
       <h1 className="text-3xl font-semibold tracking-tight">Upload a meeting</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Drop audio for end-to-end transcription, or paste an existing transcript to skip straight to
@@ -371,13 +378,13 @@ function UploadPage() {
                 </div>
                 {/* Waveform progress */}
                 <div className="mt-2 flex h-6 items-center gap-[2px]">
-                  {Array.from({ length: 60 }).map((_, i) => {
+                  {WAVEFORM_HEIGHTS.map((h, i) => {
                     const reached = (i / 60) * 100 < progress;
                     return (
                       <span
                         key={i}
                         className={`w-[3px] rounded-full transition-colors ${reached ? "bg-brand" : "bg-foreground/15"}`}
-                        style={{ height: `${20 + Math.abs(Math.sin(i * 0.6)) * 70}%` }}
+                        style={{ height: h }}
                       />
                     );
                   })}

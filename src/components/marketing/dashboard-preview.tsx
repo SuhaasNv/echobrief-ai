@@ -41,6 +41,18 @@ const transcript = [
   { t: "01:14", who: "Priya Rao", text: "I'll own the partner outreach by next Friday.", color: "success" },
 ];
 
+// Pre-compute the waveform bars at module load (runs identically in Node
+// SSR and the browser since Math.sin is deterministic with the same input).
+// Storing as strings ensures React's CSS serializer produces identical
+// markup on both sides — no hydration mismatch.
+const WAVEFORM_BARS: Array<{ height: string; opacity: string }> = Array.from(
+  { length: 64 },
+  (_, i) => ({
+    height: `${(20 + Math.abs(Math.sin(i * 0.6)) * 70).toFixed(4)}%`,
+    opacity: i < 22 ? "1" : "0.35",
+  }),
+);
+
 const meetingList = [
   { title: "Q3 Planning Sync", date: "Aug 14", duration: "47m", tags: ["#planning"], participants: 6 },
   { title: "Pricing Page Review", date: "Aug 13", duration: "32m", tags: ["#product"], participants: 4 },
@@ -217,14 +229,14 @@ function MeetingView() {
       </div>
       {/* waveform */}
       <div className="mb-5 flex h-12 items-center gap-[3px] rounded-lg bg-accent/40 px-3">
-        {Array.from({ length: 64 }).map((_, i) => (
+        {WAVEFORM_BARS.map((b, i) => (
           <span
             key={i}
             className="w-[3px] rounded-full bg-foreground/30"
-            style={{
-              height: `${20 + Math.abs(Math.sin(i * 0.6)) * 70}%`,
-              opacity: i < 22 ? 1 : 0.35,
-            }}
+            // Pre-computed strings — ensures Node SSR and browser client
+            // produce byte-identical markup, avoiding React hydration mismatch
+            // (which silently disables every event handler on the page).
+            style={{ height: b.height, opacity: b.opacity }}
           />
         ))}
       </div>
