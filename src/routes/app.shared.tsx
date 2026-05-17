@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Users, FileText, Loader2 } from "lucide-react";
 import { useMeetings } from "@/lib/api/hooks";
+import { useLabels } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/shared")({
   head: () => ({ meta: [{ title: "Notes library — EchoBrief" }] }),
@@ -16,13 +17,14 @@ function formatDate(iso: string): string {
 function NotesLibrary() {
   const { data, isLoading, isError, refetch } = useMeetings({ status: "complete", limit: 50 });
   const items = data?.items ?? [];
+  const labels = useLabels();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
-      <h1 className="text-3xl font-semibold tracking-tight">Notes library</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">{labels.notes.library}</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Every processed meeting becomes a searchable, citable note. Click any card to open the full
-        transcript, summary, and action items.
+        Every processed {labels.meeting.singular.toLowerCase()} becomes a searchable, citable note. Click any card
+        to open the full transcript, summary, and action items.
       </p>
 
       {isLoading ? (

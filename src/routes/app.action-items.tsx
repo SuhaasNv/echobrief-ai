@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import type { ActionItem } from "@/lib/schemas";
 import { useActionItems, usePatchActionItem, useDeleteActionItem } from "@/lib/api/hooks";
+import { useLabels, useActiveWorkspaceKind } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/action-items")({
   head: () => ({ meta: [{ title: "Action Items — EchoBrief" }] }),
@@ -38,6 +39,8 @@ function ActionItemsPage() {
   const patch = usePatchActionItem();
   const del = useDeleteActionItem();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const labels = useLabels();
+  const kind = useActiveWorkspaceKind();
 
   const items = useMemo(() => data?.items ?? [], [data]);
   const open = useMemo(() => items.filter((i) => !i.completed), [items]);
@@ -102,9 +105,9 @@ function ActionItemsPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Action items</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">{labels.actions.plural}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Extracted from every meeting · {items.length} total · {overdue > 0 && (
+            {kind === "student" ? "From your lectures" : "Extracted from every meeting"} · {items.length} total · {overdue > 0 && (
               <span className="text-destructive">{overdue} overdue · </span>
             )}{open.length} open · {done.length} completed
           </p>

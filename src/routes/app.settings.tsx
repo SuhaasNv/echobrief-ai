@@ -13,6 +13,8 @@ import {
   Check,
   Plus,
   Pencil,
+  GraduationCap,
+  Briefcase,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -26,6 +28,7 @@ import {
   useDeleteWorkspace,
   type Workspace,
   type WorkspaceColor,
+  type WorkspaceKind,
 } from "@/lib/api/hooks";
 import { setAuthToken } from "@/lib/api/client";
 import { setActiveWorkspace, useActiveWorkspaceId } from "@/lib/workspace-store";
@@ -94,9 +97,11 @@ function WorkspacesSection() {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState<WorkspaceColor>("brand");
+  const [newKind, setNewKind] = useState<WorkspaceKind>("professional");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState<WorkspaceColor>("brand");
+  const [editKind, setEditKind] = useState<WorkspaceKind>("professional");
 
   const workspaces = data?.items ?? [];
 
@@ -105,10 +110,11 @@ function WorkspacesSection() {
     const name = newName.trim();
     if (!name) return;
     try {
-      const w = await create.mutateAsync({ name, color: newColor });
+      const w = await create.mutateAsync({ name, color: newColor, kind: newKind });
       toast.success(`Created ${w.name}`);
       setNewName("");
       setNewColor("brand");
+      setNewKind("professional");
       setCreating(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't create workspace");
@@ -119,6 +125,7 @@ function WorkspacesSection() {
     setEditingId(w.id);
     setEditName(w.name);
     setEditColor(w.color);
+    setEditKind(w.kind);
   }
 
   async function submitEdit(e: React.FormEvent) {
@@ -127,8 +134,9 @@ function WorkspacesSection() {
     const name = editName.trim();
     if (!name) return;
     try {
-      await update.mutateAsync({ id: editingId, name, color: editColor });
+      await update.mutateAsync({ id: editingId, name, color: editColor, kind: editKind });
       setEditingId(null);
+      qc.invalidateQueries();
       toast.success("Workspace updated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't update workspace");
@@ -171,29 +179,39 @@ function WorkspacesSection() {
               if (editingId === w.id) {
                 return (
                   <li key={w.id} className="px-4 py-3">
-                    <form onSubmit={submitEdit} className="flex flex-wrap items-center gap-2">
-                      <input
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 py-1 text-sm outline-none focus:border-brand"
-                        autoFocus
-                        maxLength={60}
-                      />
-                      <ColorPicker value={editColor} onChange={setEditColor} />
-                      <button
-                        type="submit"
-                        disabled={update.isPending}
-                        className="rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(null)}
-                        className="text-xs text-muted-foreground"
-                      >
-                        Cancel
-                      </button>
+                    <form onSubmit={submitEdit} className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 py-1 text-sm outline-none focus:border-brand"
+                          autoFocus
+                          maxLength={60}
+                        />
+                        <ColorPicker value={editColor} onChange={setEditColor} />
+                      </div>
+                      <KindToggle value={editKind} onChange={setEditKind} />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={update.isPending}
+                          className="rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(null)}
+                          className="text-xs text-muted-foreground"
+                        >
+                          Cancel
+                        </button>
+                        {w.kind !== editKind && (
+                          <span className="text-[10px] text-amber-500">
+                            Changing kind flips the UX (vocabulary, nav, features).
+                          </span>
+                        )}
+                      </div>
                     </form>
                   </li>
                 );
@@ -208,6 +226,15 @@ function WorkspacesSection() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-sm">
                       <span className="truncate font-medium">{w.name}</span>
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide ${
+                          w.kind === "student"
+                            ? "bg-violet/15 text-violet"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {w.kind === "student" ? "Student" : "Professional"}
+                      </span>
                       {isActive && (
                         <span className="rounded-full bg-brand/15 px-1.5 py-0.5 font-mono text-[10px] text-brand">
                           active
@@ -256,33 +283,39 @@ function WorkspacesSection() {
             })}
             <li className="px-4 py-3">
               {creating ? (
-                <form onSubmit={submitCreate} className="flex flex-wrap items-center gap-2">
-                  <input
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="Workspace name"
-                    className="min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 py-1 text-sm outline-none focus:border-brand"
-                    autoFocus
-                    maxLength={60}
-                  />
-                  <ColorPicker value={newColor} onChange={setNewColor} />
-                  <button
-                    type="submit"
-                    disabled={create.isPending || !newName.trim()}
-                    className="rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-                  >
-                    {create.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Create"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCreating(false);
-                      setNewName("");
-                    }}
-                    className="text-xs text-muted-foreground"
-                  >
-                    Cancel
-                  </button>
+                <form onSubmit={submitCreate} className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      placeholder={newKind === "student" ? "Class name" : "Workspace name"}
+                      className="min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 py-1 text-sm outline-none focus:border-brand"
+                      autoFocus
+                      maxLength={60}
+                    />
+                    <ColorPicker value={newColor} onChange={setNewColor} />
+                  </div>
+                  <KindToggle value={newKind} onChange={setNewKind} />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="submit"
+                      disabled={create.isPending || !newName.trim()}
+                      className="rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                    >
+                      {create.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Create"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreating(false);
+                        setNewName("");
+                        setNewKind("professional");
+                      }}
+                      className="text-xs text-muted-foreground"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </form>
               ) : (
                 <button
@@ -323,6 +356,37 @@ function ColorPicker({
           {value === c && <Check className="h-2.5 w-2.5 text-white" />}
         </button>
       ))}
+    </div>
+  );
+}
+
+function KindToggle({
+  value,
+  onChange,
+}: {
+  value: WorkspaceKind;
+  onChange: (k: WorkspaceKind) => void;
+}) {
+  return (
+    <div className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-background p-0.5">
+      <button
+        type="button"
+        onClick={() => onChange("student")}
+        className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
+          value === "student" ? "bg-violet/15 text-violet" : "text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        <GraduationCap className="h-3 w-3" /> Student
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("professional")}
+        className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
+          value === "professional" ? "bg-brand/15 text-brand" : "text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        <Briefcase className="h-3 w-3" /> Professional
+      </button>
     </div>
   );
 }
@@ -519,6 +583,7 @@ function PasswordSection() {
 
 function DangerSection() {
   const navigate = useNavigate();
+  const qcDanger = useQueryClient();
   const del = useDeleteAccount();
   const [confirmText, setConfirmText] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -526,6 +591,8 @@ function DangerSection() {
 
   function signOut() {
     setAuthToken(null);
+    setActiveWorkspace(null);
+    qcDanger.clear();
     navigate({ to: "/", replace: true });
   }
 
@@ -534,6 +601,8 @@ function DangerSection() {
       await del.mutateAsync();
       toast.success("Account deleted");
       setAuthToken(null);
+      setActiveWorkspace(null);
+      qcDanger.clear();
       navigate({ to: "/", replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not delete account");

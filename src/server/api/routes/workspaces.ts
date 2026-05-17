@@ -17,21 +17,25 @@ const app = new Hono<AppBindings>();
 
 const WORKSPACE_COLORS = ["brand", "violet", "emerald", "amber", "rose", "slate"] as const;
 const WorkspaceColor = z.enum(WORKSPACE_COLORS);
+const WorkspaceKind = z.enum(["student", "professional"]);
 
 const CreateBody = z.object({
   name: z.string().trim().min(1).max(60),
   color: WorkspaceColor.default("brand"),
+  kind: WorkspaceKind.default("professional"),
 });
 
 const UpdateBody = z.object({
   name: z.string().trim().min(1).max(60).optional(),
   color: WorkspaceColor.optional(),
+  kind: WorkspaceKind.optional(),
 });
 
 interface WorkspaceRow {
   id: string;
   name: string;
   color: string;
+  kind: "student" | "professional";
   owner_id: string;
   created_at: string;
 }
@@ -42,7 +46,7 @@ app.get("/", async (c) => {
   const sql = getSql();
 
   const rows = await sql<WorkspaceRow[]>`
-    SELECT w.id, w.name, w.color, w.owner_id, w.created_at
+    SELECT w.id, w.name, w.color, w.kind, w.owner_id, w.created_at
     FROM workspaces w
     JOIN workspace_members m ON m.workspace_id = w.id AND m.user_id = ${user.id}
     ORDER BY w.created_at ASC
@@ -53,15 +57,15 @@ app.get("/", async (c) => {
 
 // POST / — create a new workspace
 app.post("/", zValidator("json", CreateBody), async (c) => {
-  const { name, color } = c.req.valid("json");
+  const { name, color, kind } = c.req.valid("json");
   const user = c.get("user");
   const sql = getSql();
 
   const row = await sql.begin(async (tx) => {
     const inserted = await tx<WorkspaceRow[]>`
-      INSERT INTO workspaces (name, color, owner_id)
-      VALUES (${name}, ${color}, ${user.id})
-      RETURNING id, name, color, owner_id, created_at
+      INSERT INTO workspaces (name, color, kind, owner_id)
+      VALUES (${name}, ${color}, ${kind}, ${user.id})
+      RETURNING id, name, color, kind, owner_id, created_at
     `;
     await tx`
       INSERT INTO workspace_members (workspace_id, user_id, role)
@@ -73,7 +77,7 @@ app.post("/", zValidator("json", CreateBody), async (c) => {
   return c.json(row, 201);
 });
 
-// PATCH /:id — rename / recolor (owner only)
+// PATCH /:id — rename / recolor / change kind (owner only)
 app.patch("/:id", zValidator("json", UpdateBody), async (c) => {
   const id = c.req.param("id");
   const patch = c.req.valid("json");
@@ -90,6 +94,7 @@ app.patch("/:id", zValidator("json", UpdateBody), async (c) => {
   const sets: ReturnType<typeof sql>[] = [];
   if (patch.name !== undefined) sets.push(sql`name = ${patch.name}`);
   if (patch.color !== undefined) sets.push(sql`color = ${patch.color}`);
+  if (patch.kind !== undefined) sets.push(sql`kind = ${patch.kind}`);
   if (sets.length === 0) return c.json({ ok: true });
 
   const setClause = sets.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc}, ${cur}`));

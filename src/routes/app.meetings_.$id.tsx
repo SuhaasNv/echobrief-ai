@@ -22,8 +22,10 @@ import {
   Link2Off,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useMeeting, useMeetingStatus, useActionItems, useRetryMeeting, useDeleteMeeting, usePatchMeeting, useMeetingAudioUrl, useShareMeeting } from "@/lib/api/hooks";
+import { useMeeting, useMeetingStatus, useActionItems, useRetryMeeting, useDeleteMeeting, usePatchMeeting, useMeetingAudioUrl, useShareMeeting, useFlashcards, useGenerateFlashcards, useDeleteFlashcard } from "@/lib/api/hooks";
 import type { MeetingDetail, MeetingStatusResponse } from "@/lib/schemas";
+import { useActiveWorkspaceKind, useLabels } from "@/lib/workspace-store";
+import { Brain, Sparkle, GraduationCap } from "lucide-react";
 
 export const Route = createFileRoute("/app/meetings_/$id")({
   head: () => ({ meta: [{ title: "Meeting — EchoBrief" }] }),
@@ -697,18 +699,126 @@ function CompleteBody({
           </div>
         )}
 
-        {meeting.meeting_score && (
-          <div className="rounded-xl border border-border/70 bg-surface p-5">
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Meeting score</p>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-semibold tracking-tight">{meeting.meeting_score.total.toFixed(0)}</span>
-              <span className="text-xs text-muted-foreground">/ 100</span>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">{meeting.meeting_score.explanation}</p>
-          </div>
-        )}
+        <FlashcardsPanel meetingId={meeting.id} />
+
+        {meeting.meeting_score && <MeetingScorePanel score={meeting.meeting_score} />}
       </aside>
     </div>
     </>
+  );
+}
+
+function MeetingScorePanel({ score }: { score: { total: number; explanation?: string } }) {
+  const labels = useLabels();
+  return (
+    <div className="rounded-xl border border-border/70 bg-surface p-5">
+      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+        {labels.meeting.score}
+      </p>
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="text-2xl font-semibold tracking-tight">{score.total.toFixed(0)}</span>
+        <span className="text-xs text-muted-foreground">/ 100</span>
+      </div>
+      {score.explanation && <p className="mt-2 text-xs text-muted-foreground">{score.explanation}</p>}
+    </div>
+  );
+}
+
+function FlashcardsPanel({ meetingId }: { meetingId: string }) {
+  const kind = useActiveWorkspaceKind();
+  const flashcards = useFlashcards(kind === "student" ? meetingId : undefined);
+  const generate = useGenerateFlashcards();
+  const del = useDeleteFlashcard();
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+
+  if (kind !== "student") return null;
+
+  const items = flashcards.data?.items ?? [];
+
+  const toggleReveal = (id: string) => {
+    setRevealed((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleGenerate = async () => {
+    try {
+      await generate.mutateAsync(meetingId);
+      toast.success("Flashcards ready");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't generate flashcards");
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border/70 bg-surface p-5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+          <GraduationCap className="h-3.5 w-3.5 text-violet" /> Flashcards
+        </p>
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={generate.isPending}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-background px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+        >
+          {generate.isPending ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Generating…
+            </>
+          ) : (
+            <>
+              <Sparkle className="h-3 w-3" /> {items.length > 0 ? "Regenerate" : "Generate"}
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {items.length === 0 && !flashcards.isLoading && (
+          <p className="rounded-md border border-dashed border-border/60 bg-background/40 p-3 text-xs text-muted-foreground">
+            <Brain className="mb-1 inline h-3.5 w-3.5 text-muted-foreground" />
+            <br />
+            Generate flashcards to turn this lecture into study material.
+          </p>
+        )}
+        {items.map((card) => {
+          const shown = revealed.has(card.id);
+          return (
+            <div
+              key={card.id}
+              className="group rounded-md border border-border/60 bg-background/40 p-3 text-xs"
+            >
+              <p className="font-medium">{card.question}</p>
+              {shown ? (
+                <p className="mt-2 text-muted-foreground">{card.answer}</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => toggleReveal(card.id)}
+                  className="mt-2 text-[11px] text-brand hover:underline"
+                >
+                  Reveal answer
+                </button>
+              )}
+              <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+                <span className="font-mono uppercase">{card.difficulty ?? "—"}</span>
+                <button
+                  type="button"
+                  onClick={() => del.mutate(card.id)}
+                  className="opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                  aria-label="Delete flashcard"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

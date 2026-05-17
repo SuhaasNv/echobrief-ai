@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { LogOut, ShieldCheck, CheckCircle2, AlertTriangle, FileAudio, X } from "lucide-react";
 import { setAuthToken } from "@/lib/api/client";
@@ -18,22 +19,39 @@ import {
   Plus,
   Menu,
   Command,
+  GraduationCap,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { useCommandPalette } from "@/components/command-palette";
 import { WorkspaceSwitcher } from "@/components/app/workspace-switcher";
 import { FirstWorkspaceModal } from "@/components/app/first-workspace-modal";
+import { setActiveWorkspace, useActiveWorkspaceKind, useLabels } from "@/lib/workspace-store";
+import type { LabelSet } from "@/lib/copy/labels";
 
-const nav = [
-  { to: "/app", label: "Dashboard", icon: LayoutGrid, exact: true },
-  { to: "/app/meetings", label: "Meetings", icon: Mic },
-  { to: "/app/upload", label: "Upload", icon: Upload },
-  { to: "/app/chat", label: "AI Chat", icon: MessageSquare },
-  { to: "/app/action-items", label: "Action Items", icon: CheckSquare },
-  { to: "/app/shared", label: "Notes library", icon: Users },
-  { to: "/app/analytics", label: "Analytics", icon: BarChart3 },
-];
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutGrid;
+  exact?: boolean;
+};
+
+function buildNav(labels: LabelSet, kind: "student" | "professional"): NavItem[] {
+  const base: NavItem[] = [
+    { to: "/app", label: labels.nav.dashboard, icon: LayoutGrid, exact: true },
+    { to: "/app/meetings", label: labels.nav.meetings, icon: Mic },
+    { to: "/app/upload", label: labels.nav.upload, icon: Upload },
+    { to: "/app/chat", label: labels.nav.chat, icon: MessageSquare },
+    { to: "/app/action-items", label: labels.nav.actions, icon: CheckSquare },
+    { to: "/app/shared", label: labels.nav.notes, icon: Users },
+  ];
+  if (kind === "student") {
+    base.push({ to: "/app/study", label: labels.nav.study, icon: GraduationCap });
+  } else {
+    base.push({ to: "/app/analytics", label: labels.nav.analytics, icon: BarChart3 });
+  }
+  return base;
+}
 
 const SIDEBAR_WIDTH = 248;
 const STORAGE_KEY = "echobrief-sidebar-open";
@@ -44,6 +62,9 @@ export function AppShell() {
   const [open, setOpen] = useState(true);
   const path = useRouterState({ select: (s) => s.location.pathname });
   const palette = useCommandPalette();
+  const kind = useActiveWorkspaceKind();
+  const labels = useLabels();
+  const nav = buildNav(labels, kind);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -391,10 +412,13 @@ function initials(name: string | null, email: string): string {
 function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data: me } = useMe();
 
   const signOut = () => {
     setAuthToken(null);
+    setActiveWorkspace(null);
+    qc.clear();
     navigate({ to: "/", replace: true });
   };
 

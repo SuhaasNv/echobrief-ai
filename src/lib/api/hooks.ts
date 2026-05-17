@@ -44,11 +44,13 @@ export const qk = {
 // Workspaces
 // ---------------------------------------------------------------------------
 export type WorkspaceColor = "brand" | "violet" | "emerald" | "amber" | "rose" | "slate";
+export type WorkspaceKind = "student" | "professional";
 
 export interface Workspace {
   id: string;
   name: string;
   color: WorkspaceColor;
+  kind: WorkspaceKind;
   owner_id: string;
   created_at: string;
 }
@@ -63,7 +65,7 @@ export function useWorkspaces() {
 export function useCreateWorkspace() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; color?: WorkspaceColor }) =>
+    mutationFn: (body: { name: string; color?: WorkspaceColor; kind?: WorkspaceKind }) =>
       apiRequest<Workspace>("/workspaces", { method: "POST", body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.workspaces }),
   });
@@ -72,8 +74,15 @@ export function useCreateWorkspace() {
 export function useUpdateWorkspace() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...patch }: { id: string; name?: string; color?: WorkspaceColor }) =>
-      apiRequest<{ ok: true }>(`/workspaces/${id}`, { method: "PATCH", body: patch }),
+    mutationFn: ({
+      id,
+      ...patch
+    }: {
+      id: string;
+      name?: string;
+      color?: WorkspaceColor;
+      kind?: WorkspaceKind;
+    }) => apiRequest<{ ok: true }>(`/workspaces/${id}`, { method: "PATCH", body: patch }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.workspaces }),
   });
 }
@@ -84,6 +93,90 @@ export function useDeleteWorkspace() {
     mutationFn: (id: string) =>
       apiRequest<{ ok: true }>(`/workspaces/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.workspaces }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Flashcards (student workspaces only)
+// ---------------------------------------------------------------------------
+export interface Flashcard {
+  id: string;
+  meeting_id: string;
+  workspace_id: string;
+  user_id: string;
+  question: string;
+  answer: string;
+  difficulty: "easy" | "medium" | "hard" | null;
+  last_reviewed_at: string | null;
+  review_count: number;
+  created_at: string;
+}
+
+export interface FlashcardWithMeeting extends Flashcard {
+  meeting_title: string;
+}
+
+export function useFlashcards(meetingId: string | undefined) {
+  return useQuery({
+    queryKey: ["flashcards", "meeting", meetingId] as const,
+    queryFn: () =>
+      apiRequest<{ items: Flashcard[] }>(`/meetings/${meetingId}/flashcards`),
+    enabled: !!meetingId,
+  });
+}
+
+export function useGenerateFlashcards() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (meetingId: string) =>
+      apiRequest<{ items: Flashcard[]; cost_usd: number }>(
+        `/meetings/${meetingId}/flashcards/generate`,
+        { method: "POST", body: {} },
+      ),
+    onSuccess: (_data, meetingId) => {
+      qc.invalidateQueries({ queryKey: ["flashcards", "meeting", meetingId] });
+      qc.invalidateQueries({ queryKey: ["flashcards", "review"] });
+    },
+  });
+}
+
+export function useReviewQueue(limit = 30) {
+  return useQuery({
+    queryKey: ["flashcards", "review", limit] as const,
+    queryFn: () =>
+      apiRequest<{ items: FlashcardWithMeeting[] }>(`/flashcards/review`, {
+        query: { limit },
+      }),
+  });
+}
+
+export function useUpdateFlashcard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string;
+      question?: string;
+      answer?: string;
+      difficulty?: "easy" | "medium" | "hard";
+      mark_reviewed?: boolean;
+    }) => apiRequest<{ ok: true }>(`/flashcards/${id}`, { method: "PATCH", body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["flashcards"] });
+    },
+  });
+}
+
+export function useDeleteFlashcard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiRequest<{ ok: true }>(`/flashcards/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["flashcards"] });
+    },
   });
 }
 

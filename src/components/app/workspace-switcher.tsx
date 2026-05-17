@@ -3,14 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronsUpDown, Check, Plus, Loader2 } from "lucide-react";
+import { ChevronsUpDown, Check, Plus, Loader2, GraduationCap, Briefcase } from "lucide-react";
 import {
   useWorkspaces,
   useCreateWorkspace,
   type Workspace,
   type WorkspaceColor,
+  type WorkspaceKind,
 } from "@/lib/api/hooks";
-import { setActiveWorkspace, useActiveWorkspaceId } from "@/lib/workspace-store";
+import { setActiveWorkspace, useActiveWorkspaceId, useLabels } from "@/lib/workspace-store";
 import { toast } from "sonner";
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -34,12 +35,14 @@ export function WorkspaceSwitcher() {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newKind, setNewKind] = useState<WorkspaceKind>("professional");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const qc = useQueryClient();
   const { data } = useWorkspaces();
   const activeId = useActiveWorkspaceId();
   const createMutation = useCreateWorkspace();
+  const labels = useLabels();
 
   const workspaces = data?.items ?? [];
   const active = workspaces.find((w) => w.id === activeId) ?? workspaces[0];
@@ -73,10 +76,11 @@ export function WorkspaceSwitcher() {
     const name = newName.trim();
     if (!name) return;
     try {
-      const created = await createMutation.mutateAsync({ name });
+      const created = await createMutation.mutateAsync({ name, kind: newKind });
       setActiveWorkspace(created.id);
       qc.invalidateQueries();
       setNewName("");
+      setNewKind("professional");
       setCreating(false);
       setOpen(false);
       toast.success(`Created ${created.name}`);
@@ -119,7 +123,7 @@ export function WorkspaceSwitcher() {
             >
               <div className="border-b border-border/60 px-3 py-2">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Workspaces
+                  {labels.workspace.plural}
                 </p>
               </div>
               <ul className="max-h-64 overflow-y-auto py-1">
@@ -141,6 +145,16 @@ export function WorkspaceSwitcher() {
                           {initials(w.name)}
                         </span>
                         <span className="flex-1 truncate">{w.name}</span>
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide ${
+                            w.kind === "student"
+                              ? "bg-violet/15 text-violet"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                          title={w.kind === "student" ? "Student" : "Professional"}
+                        >
+                          {w.kind === "student" ? "STU" : "PRO"}
+                        </span>
                         {isActive && <Check className="h-3.5 w-3.5 text-brand" />}
                       </button>
                     </li>
@@ -155,10 +169,34 @@ export function WorkspaceSwitcher() {
                       ref={inputRef}
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
-                      placeholder="Workspace name"
+                      placeholder={newKind === "student" ? "Class name" : "Workspace name"}
                       className="w-full rounded-md border border-border/70 bg-background px-2.5 py-1.5 text-sm outline-none focus:border-brand"
                       maxLength={60}
                     />
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setNewKind("student")}
+                        className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                          newKind === "student"
+                            ? "border-brand/50 bg-brand/10 text-foreground"
+                            : "border-border/70 text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        <GraduationCap className="h-3 w-3" /> Student
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewKind("professional")}
+                        className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                          newKind === "professional"
+                            ? "border-brand/50 bg-brand/10 text-foreground"
+                            : "border-border/70 text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        <Briefcase className="h-3 w-3" /> Professional
+                      </button>
+                    </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="submit"
@@ -176,6 +214,7 @@ export function WorkspaceSwitcher() {
                         onClick={() => {
                           setCreating(false);
                           setNewName("");
+                          setNewKind("professional");
                         }}
                         className="h-7 rounded-md px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       >
@@ -189,7 +228,7 @@ export function WorkspaceSwitcher() {
                     onClick={() => setCreating(true)}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
                   >
-                    <Plus className="h-3.5 w-3.5" /> Create workspace
+                    <Plus className="h-3.5 w-3.5" /> {labels.workspace.create_cta}
                   </button>
                 )}
               </div>

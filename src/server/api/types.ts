@@ -18,6 +18,7 @@ export interface AppVariables {
   user: AuthenticatedUser;
   requestId: string;
   workspaceId: string;
+  workspaceKind: "student" | "professional";
 }
 
 export type AppBindings = {

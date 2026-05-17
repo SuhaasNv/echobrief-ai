@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { useUploadUrl, useConfirmUpload, useUploadTranscript } from "@/lib/api/hooks";
 import type { UploadUrlRequest } from "@/lib/schemas";
+import { useLabels, useActiveWorkspaceKind } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/upload")({
   head: () => ({ meta: [{ title: "Upload — EchoBrief" }] }),
@@ -90,6 +91,8 @@ type Mode = "audio" | "transcript";
 function UploadPage() {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const labels = useLabels();
+  const kind = useActiveWorkspaceKind();
   const [mode, setMode] = useState<Mode>("audio");
   const [drag, setDrag] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -200,10 +203,11 @@ function UploadPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 md:px-8">
-      <h1 className="text-3xl font-semibold tracking-tight">Upload a meeting</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">{labels.meeting.upload_cta}</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Drop audio for end-to-end transcription, or paste an existing transcript to skip straight to
-        AI analysis.
+        {kind === "student"
+          ? "Drop a lecture recording for transcription + AI summary + flashcards, or paste a transcript."
+          : "Drop audio for end-to-end transcription, or paste an existing transcript to skip straight to AI analysis."}
       </p>
 
       {/* Tab selector */}

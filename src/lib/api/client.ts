@@ -57,6 +57,14 @@ interface RequestOptions {
 }
 
 export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  return apiRequestInternal<T>(path, opts, false);
+}
+
+async function apiRequestInternal<T>(
+  path: string,
+  opts: RequestOptions,
+  isRetry: boolean,
+): Promise<T> {
   const url = new URL(`${API_BASE_URL}${path}`, typeof window !== "undefined" ? window.location.origin : "http://localhost");
   if (opts.query) {
     for (const [k, v] of Object.entries(opts.query)) {
@@ -88,6 +96,26 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
     } catch {
       /* response not JSON */
     }
+
+    // Self-heal stale workspace ID: if the middleware says we're not a member
+    // of the workspace we're asking about, our localStorage is from a previous
+    // session. Clear it, notify listeners, and retry once — the next request
+    // omits the header and the server falls back to the user's first workspace.
+    if (
+      !isRetry &&
+      response.status === 403 &&
+      workspaceId &&
+      typeof payload.message === "string" &&
+      /not a member of this workspace/i.test(payload.message)
+    ) {
+      setAuthToken(getAuthToken()); // no-op, kept for clarity
+      setActiveWorkspaceId(null);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("echobrief:workspace-changed", { detail: null }));
+      }
+      return apiRequestInternal<T>(path, opts, true);
+    }
+
     throw new ApiError(
       response.status,
       payload.error ?? "http_error",

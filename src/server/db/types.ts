@@ -19,6 +19,8 @@ export type IntegrationProvider =
   | "google_calendar"
   | "trello";
 
+export type AccountType = "student" | "professional";
+
 export interface UserRow {
   id: string;
   email: string;
@@ -26,8 +28,22 @@ export interface UserRow {
   avatar_url: string | null;
   password_hash: string | null;
   is_admin: boolean;
+  default_account_type: AccountType | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface FlashcardRow {
+  id: string;
+  meeting_id: string;
+  workspace_id: string;
+  user_id: string;
+  question: string;
+  answer: string;
+  difficulty: "easy" | "medium" | "hard" | null;
+  last_reviewed_at: string | null;
+  review_count: number;
+  created_at: string;
 }
 
 export interface MeetingRow {

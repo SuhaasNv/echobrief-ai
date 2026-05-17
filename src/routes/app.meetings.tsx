@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Search, Filter, Plus, Clock, Loader2, Users, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useMeetings, useDeleteMeeting } from "@/lib/api/hooks";
+import { useLabels } from "@/lib/workspace-store";
 
 // Map server status string → progress percent for the inline bar.
 const STATUS_PERCENT: Record<string, number> = {
@@ -45,6 +46,7 @@ function MeetingsPage() {
   const { data, isLoading, isError, refetch } = useMeetings({ q: q || undefined, limit: 50 });
   const del = useDeleteMeeting();
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
+  const labels = useLabels();
 
   const handleDelete = async () => {
     if (!confirmDelete) return;
@@ -61,16 +63,16 @@ function MeetingsPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Meetings</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">{labels.meeting.plural}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {data ? `${data.total} indexed conversation${data.total === 1 ? "" : "s"}.` : "Loading…"}
+            {data ? `${data.total} indexed ${labels.meeting.plural.toLowerCase()}.` : "Loading…"}
           </p>
         </div>
         <Link
           to="/app/upload"
           className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background"
         >
-          <Plus className="h-3.5 w-3.5" /> New meeting
+          <Plus className="h-3.5 w-3.5" /> {labels.meeting.upload_cta}
         </Link>
       </div>
 
@@ -95,20 +97,20 @@ function MeetingsPage() {
         </div>
       ) : isError ? (
         <div className="mt-12 rounded-xl border border-border/70 bg-surface p-10 text-center">
-          <p className="text-sm font-medium">Could not load meetings.</p>
+          <p className="text-sm font-medium">Could not load {labels.meeting.plural.toLowerCase()}.</p>
           <button onClick={() => refetch()} className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:underline">
             Try again
           </button>
         </div>
       ) : data && data.items.length === 0 ? (
         <div className="mt-12 rounded-xl border border-dashed border-border/70 bg-surface/40 py-16 text-center">
-          <p className="text-sm font-medium">No meetings yet.</p>
+          <p className="text-sm font-medium">No {labels.meeting.plural.toLowerCase()} yet.</p>
           <p className="mt-1 text-xs text-muted-foreground">Upload your first recording to get started.</p>
           <Link
             to="/app/upload"
             className="mt-4 inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background"
           >
-            <Plus className="h-3.5 w-3.5" /> Upload meeting
+            <Plus className="h-3.5 w-3.5" /> {labels.meeting.upload_cta}
           </Link>
         </div>
       ) : (

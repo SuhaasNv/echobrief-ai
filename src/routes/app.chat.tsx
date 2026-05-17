@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { streamMeetingChat, useMeetings } from "@/lib/api/hooks";
 import { ApiError } from "@/lib/api/client";
+import { useLabels } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/chat")({
   head: () => ({ meta: [{ title: "AI Chat — EchoBrief" }] }),
@@ -38,6 +39,7 @@ function ChatPage() {
   const meetings = useMeetings({ status: "complete", limit: 50 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const labels = useLabels();
   // One thread per meeting — keep them in memory so switching meetings doesn't wipe context.
   const [threads, setThreads] = useState<Record<string, Msg[]>>({});
   const [input, setInput] = useState("");
@@ -252,10 +254,10 @@ function ChatPage() {
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-violet shadow-glow">
                   <Sparkles className="h-5 w-5 text-white" />
                 </div>
-                <h1 className="mt-6 text-2xl font-semibold tracking-tight">Pick a meeting to chat with.</h1>
+                <h1 className="mt-6 text-2xl font-semibold tracking-tight">Pick a {labels.meeting.singular.toLowerCase()} to chat with.</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Select a meeting from the left and ask the AI anything about it — decisions, action
-                  items, who said what, follow-ups for next time.
+                  Select a {labels.meeting.singular.toLowerCase()} from the left and ask the AI anything about it —
+                  decisions, key topics, who said what, follow-ups for next time.
                 </p>
               </div>
             ) : messages.length === 0 ? (

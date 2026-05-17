@@ -10,8 +10,9 @@ import { cors } from "hono/cors";
 import { requestId } from "./middleware/request-id";
 import { errorHandler } from "./middleware/error";
 import { requireAuth } from "./middleware/auth";
-import { requireWorkspace } from "./middleware/workspace";
+import { requireWorkspace, requireProfessionalWorkspace } from "./middleware/workspace";
 import { rateLimit } from "./middleware/rate-limit";
+import { securityHeaders } from "./middleware/security-headers";
 import { getEnv } from "../env";
 
 import adminRoutes from "./routes/admin";
@@ -25,12 +26,14 @@ import accountRoutes from "./routes/account";
 import generateRoutes from "./routes/generate";
 import shareRoutes from "./routes/share";
 import workspacesRoutes from "./routes/workspaces";
+import flashcardsRoutes from "./routes/flashcards";
 
 import type { AppBindings } from "./types";
 
 const api = new Hono<AppBindings>();
 
 api.use("*", requestId);
+api.use("*", securityHeaders);
 api.use(
   "*",
   cors({
@@ -62,10 +65,14 @@ protectedApi.use("/meetings/*", rateLimit("general"));
 protectedApi.use("/action-items/*", rateLimit("general"));
 protectedApi.use("/account/*", rateLimit("general"));
 protectedApi.use("/integrations/*", rateLimit("general"));
+protectedApi.use("/workspaces/*", rateLimit("general"));
+protectedApi.use("/flashcards/*", rateLimit("general"));
 
 protectedApi.use("/search", rateLimit("ai"));
 protectedApi.use("/generate/*", rateLimit("ai"));
 protectedApi.use("/meetings/:id/chat", rateLimit("ai"));
+// Flashcard generation is an LLM call — gate it under the AI bucket too.
+protectedApi.use("/meetings/:id/flashcards/generate", rateLimit("ai"));
 
 // Workspaces CRUD is workspace-agnostic (you need to list them to switch).
 protectedApi.route("/workspaces", workspacesRoutes);
@@ -74,9 +81,18 @@ protectedApi.route("/workspaces", workspacesRoutes);
 protectedApi.use("/meetings/*", requireWorkspace);
 protectedApi.use("/action-items/*", requireWorkspace);
 protectedApi.use("/search", requireWorkspace);
+protectedApi.use("/flashcards/*", requireWorkspace);
+protectedApi.use("/integrations/*", requireWorkspace);
+protectedApi.use("/generate/*", requireWorkspace);
+
+// Pro-only carve-outs (server-side enforcement, not just UI-hide).
+protectedApi.use("/integrations/*", requireProfessionalWorkspace());
+protectedApi.use("/generate/email", requireProfessionalWorkspace());
+protectedApi.use("/action-items/:id/export", requireProfessionalWorkspace());
 
 protectedApi.route("/meetings", meetingsRoutes);
 protectedApi.route("/meetings", chatRoutes);
+protectedApi.route("/", flashcardsRoutes);
 protectedApi.route("/action-items", actionItemsRoutes);
 protectedApi.route("/search", searchRoutes);
 protectedApi.route("/integrations", integrationsRoutes);

@@ -1,17 +1,25 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { motion } from "framer-motion";
-import { Loader2, ArrowRight, Check } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, ArrowRight, Check, GraduationCap, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { apiRequest, ApiError, setAuthToken } from "@/lib/api/client";
+import { setActiveWorkspace } from "@/lib/workspace-store";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SignupResponse {
-  token: string;
-  user: { id: string; email: string; name: string | null; is_admin: boolean };
+  // Token is absent when the server suppressed email enumeration (e.g. the
+  // email is already registered). Client must treat missing token as a
+  // non-success case.
+  token?: string;
+  user?: { id: string; email: string; name: string | null; is_admin: boolean };
+  status?: "ok";
+  message?: string;
 }
 
 export const Route = createFileRoute("/signup")({
@@ -35,8 +43,12 @@ function scorePassword(pw: string): { score: 0 | 1 | 2 | 3 | 4; label: string; c
   return { score: s as 0 | 1 | 2 | 3 | 4, ...map[s] };
 }
 
+type AccountType = "student" | "professional";
+
 function SignupPage() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
   const [email, setEmail] = useState("");
@@ -47,6 +59,10 @@ function SignupPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!accountType) {
+      toast.error("Pick student or professional first");
+      return;
+    }
     if (!first.trim() || !email || !password) {
       toast.error("Name, email, and password are all required");
       return;
@@ -64,9 +80,22 @@ function SignupPage() {
       const name = [first.trim(), last.trim()].filter(Boolean).join(" ");
       const res = await apiRequest<SignupResponse>("/auth/signup", {
         method: "POST",
-        body: { email, password, name },
+        body: { email, password, name, account_type: accountType },
       });
+      if (!res.token) {
+        // Server suppressed details to prevent email enumeration. Show the
+        // generic message and stay on the page — let the user try signing in.
+        toast.message(
+          res.message ?? "If this email is new, your account has been created.",
+          { duration: 6000 },
+        );
+        return;
+      }
       setAuthToken(res.token);
+      // Clear any stale active-workspace from a previous session so the
+      // middleware falls back to the user's brand-new first workspace.
+      setActiveWorkspace(null);
+      qc.clear();
       toast.success("Welcome to EchoBrief");
       navigate({ to: "/app" });
     } catch (err) {
@@ -79,8 +108,12 @@ function SignupPage() {
 
   return (
     <AuthShell
-      title="Create your workspace."
-      subtitle="Free tier, no card. Upgrade when you outgrow it."
+      title={accountType === "student" ? "Start learning smarter." : "Create your workspace."}
+      subtitle={
+        accountType === "student"
+          ? "Lectures, notes, flashcards — all searchable."
+          : "Free tier, no card. Upgrade when you outgrow it."
+      }
       footer={
         <>
           Already have an account?{" "}
@@ -90,7 +123,40 @@ function SignupPage() {
         </>
       }
     >
-      <form className="space-y-4" onSubmit={handleSubmit}>
+      <div className="space-y-4">
+        <div>
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            What brings you here?
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <TypeCard
+              icon={GraduationCap}
+              label="I'm a student"
+              hint="Lectures · Flashcards · Study"
+              active={accountType === "student"}
+              onClick={() => setAccountType("student")}
+            />
+            <TypeCard
+              icon={Briefcase}
+              label="I'm a professional"
+              hint="Meetings · Action items · Integrations"
+              active={accountType === "professional"}
+              onClick={() => setAccountType("professional")}
+            />
+          </div>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {accountType && (
+            <motion.form
+              key="signup-form"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-4"
+              onSubmit={handleSubmit}
+            >
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="first">First name</Label>
@@ -117,9 +183,8 @@ function SignupPage() {
 
         <div className="space-y-1.5">
           <Label htmlFor="password">Password</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             placeholder="At least 8 characters"
             autoComplete="new-password"
             value={password}
@@ -181,7 +246,40 @@ function SignupPage() {
           <Link to="/terms" className="underline-offset-4 hover:underline">terms</Link> and{" "}
           <Link to="/privacy" className="underline-offset-4 hover:underline">privacy policy</Link>.
         </p>
-      </form>
+            </motion.form>
+          )}
+        </AnimatePresence>
+      </div>
     </AuthShell>
+  );
+}
+
+function TypeCard({
+  icon: Icon,
+  label,
+  hint,
+  active,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string;
+  hint: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all ${
+        active
+          ? "border-brand/60 bg-brand/5 ring-2 ring-brand/30"
+          : "border-border/70 bg-surface/40 hover:border-border hover:bg-surface"
+      }`}
+    >
+      <Icon className={`h-4 w-4 ${active ? "text-brand" : "text-muted-foreground"}`} strokeWidth={1.6} />
+      <span className="text-sm font-medium">{label}</span>
+      <span className="text-[11px] text-muted-foreground">{hint}</span>
+    </button>
   );
 }

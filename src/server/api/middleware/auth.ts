@@ -47,7 +47,7 @@ export const requireAuth: MiddlewareHandler<AppBindings> = async (c, next) => {
 
   const sql = getSql();
   const rows = await sql<UserRow[]>`
-    SELECT id, email, name, avatar_url, password_hash, is_admin, created_at, updated_at
+    SELECT id, email, name, avatar_url, password_hash, is_admin, default_account_type, created_at, updated_at
     FROM users WHERE id = ${userId} LIMIT 1
   `;
   const user = rows[0];

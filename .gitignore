@@ -26,6 +26,9 @@ dist-ssr
 .env.*.local
 dist-api/
 
+# Database backups — contain PII (emails, password hashes). Never commit.
+backups/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

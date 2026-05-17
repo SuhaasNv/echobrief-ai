@@ -3,11 +3,14 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { apiRequest, ApiError, setAuthToken } from "@/lib/api/client";
+import { setActiveWorkspace } from "@/lib/workspace-store";
 
 interface LoginResponse {
   token: string;
@@ -21,6 +24,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -38,6 +42,12 @@ function LoginPage() {
         body: { email, password },
       });
       setAuthToken(res.token);
+      // Clear any workspace from a previous session so the middleware falls
+      // back to the freshly signed-in user's own first workspace.
+      setActiveWorkspace(null);
+      // Drop the React Query cache so we don't flash the previous user's
+      // workspaces / meetings / me before the new fetch resolves.
+      qc.clear();
       toast.success("Signed in");
       // Admins land on the ops console; regular users land on the app dashboard.
       navigate({ to: res.user.is_admin ? "/admin" : "/app" });
@@ -87,9 +97,8 @@ function LoginPage() {
               Forgot?
             </Link>
           </div>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             placeholder="••••••••"
             autoComplete="current-password"
             value={password}

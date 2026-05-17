@@ -20,6 +20,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppUploadRouteImport } from './routes/app.upload'
+import { Route as AppStudyRouteImport } from './routes/app.study'
 import { Route as AppSharedRouteImport } from './routes/app.shared'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppMeetingsRouteImport } from './routes/app.meetings'
@@ -83,6 +84,11 @@ const AppUploadRoute = AppUploadRouteImport.update({
   path: '/upload',
   getParentRoute: () => AppRoute,
 } as any)
+const AppStudyRoute = AppStudyRouteImport.update({
+  id: '/study',
+  path: '/study',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSharedRoute = AppSharedRouteImport.update({
   id: '/shared',
   path: '/shared',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/app/meetings': typeof AppMeetingsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/shared': typeof AppSharedRoute
+  '/app/study': typeof AppStudyRoute
   '/app/upload': typeof AppUploadRoute
   '/app/': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/app/meetings': typeof AppMeetingsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/shared': typeof AppSharedRoute
+  '/app/study': typeof AppStudyRoute
   '/app/upload': typeof AppUploadRoute
   '/app': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/app/meetings': typeof AppMeetingsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/shared': typeof AppSharedRoute
+  '/app/study': typeof AppStudyRoute
   '/app/upload': typeof AppUploadRoute
   '/app/': typeof AppIndexRoute
   '/app/meetings_/$id': typeof AppMeetingsIdRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/app/meetings'
     | '/app/settings'
     | '/app/shared'
+    | '/app/study'
     | '/app/upload'
     | '/app/'
     | '/app/meetings/$id'
@@ -216,6 +226,7 @@ export interface FileRouteTypes {
     | '/app/meetings'
     | '/app/settings'
     | '/app/shared'
+    | '/app/study'
     | '/app/upload'
     | '/app'
     | '/app/meetings/$id'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '/app/meetings'
     | '/app/settings'
     | '/app/shared'
+    | '/app/study'
     | '/app/upload'
     | '/app/'
     | '/app/meetings_/$id'
@@ -332,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppUploadRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/study': {
+      id: '/app/study'
+      path: '/study'
+      fullPath: '/app/study'
+      preLoaderRoute: typeof AppStudyRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/shared': {
       id: '/app/shared'
       path: '/shared'
@@ -391,6 +410,7 @@ interface AppRouteChildren {
   AppMeetingsRoute: typeof AppMeetingsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSharedRoute: typeof AppSharedRoute
+  AppStudyRoute: typeof AppStudyRoute
   AppUploadRoute: typeof AppUploadRoute
   AppIndexRoute: typeof AppIndexRoute
   AppMeetingsIdRoute: typeof AppMeetingsIdRoute
@@ -403,6 +423,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppMeetingsRoute: AppMeetingsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSharedRoute: AppSharedRoute,
+  AppStudyRoute: AppStudyRoute,
   AppUploadRoute: AppUploadRoute,
   AppIndexRoute: AppIndexRoute,
   AppMeetingsIdRoute: AppMeetingsIdRoute,

@@ -85,6 +85,45 @@ export const ANALYSIS_SCHEMA = {
   },
 } as const;
 
+export const FLASHCARDS_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["cards"],
+  properties: {
+    cards: {
+      type: "array",
+      description: "8–15 flashcards covering the main concepts from the lecture.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["question", "answer", "difficulty"],
+        properties: {
+          question: {
+            type: "string",
+            description: "A concept-recall question. Not yes/no. Specific enough to test understanding.",
+          },
+          answer: {
+            type: "string",
+            description: "1–3 sentence answer. Self-contained — the student should not need the lecture to confirm.",
+          },
+          difficulty: {
+            type: "string",
+            enum: ["easy", "medium", "hard"],
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+export interface FlashcardsStructured {
+  cards: Array<{
+    question: string;
+    answer: string;
+    difficulty: "easy" | "medium" | "hard";
+  }>;
+}
+
 export const SCORE_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -148,6 +187,24 @@ export interface ScoreStructured {
 // ----------------------------------------------------------------------------
 
 export const PROMPTS = {
+  FLASHCARDS_SYSTEM: `You are EchoBrief's study assistant. You read lecture transcripts and produce flashcards to help a student learn the material.
+
+  Rules:
+  - Generate 8–15 cards. Skip filler and small talk.
+  - Cover the MAIN concepts, definitions, formulas, and key claims — not trivia.
+  - Questions test understanding ("Why does X cause Y?"), not just recall ("What did the professor mention?").
+  - Answers are self-contained: a student should be able to confirm correctness without re-watching.
+  - Distribute difficulty roughly: ~40% easy, ~40% medium, ~20% hard.
+  - If the transcript is too short or off-topic, return fewer cards rather than padding.`,
+
+  flashcardsUser: (transcript: string, title: string) => `Lecture: "${title}"
+
+  <transcript>
+  ${transcript}
+  </transcript>
+
+  Generate flashcards that cover the key concepts a student should learn from this lecture.`,
+
   MEETING_ANALYSIS_SYSTEM: `You are EchoBrief's meeting analyst. You read meeting transcripts and produce:
   1. A structured summary with executive overview, key topics, decisions, and open questions
   2. A list of action items with assignees and deadlines where mentioned

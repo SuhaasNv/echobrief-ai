@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo } from "react";
 import {
   AreaChart,
   Area,
@@ -15,11 +15,24 @@ import {
 } from "recharts";
 import { Loader2 } from "lucide-react";
 import { useMeetings, useActionItems } from "@/lib/api/hooks";
+import { useActiveWorkspaceKind } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/analytics")({
   head: () => ({ meta: [{ title: "Analytics — EchoBrief" }] }),
-  component: AnalyticsPage,
+  component: AnalyticsGate,
 });
+
+function AnalyticsGate() {
+  const kind = useActiveWorkspaceKind();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (kind === "student") {
+      navigate({ to: "/app", replace: true });
+    }
+  }, [kind, navigate]);
+  if (kind === "student") return null;
+  return <AnalyticsPage />;
+}
 
 const tooltipStyle = {
   background: "oklch(0.17 0.009 264)",

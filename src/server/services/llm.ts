@@ -18,9 +18,11 @@ import { getEnv } from "../env";
 import {
   ANALYSIS_SCHEMA,
   SCORE_SCHEMA,
+  FLASHCARDS_SCHEMA,
   PROMPTS,
   type AnalysisStructured,
   type ScoreStructured,
+  type FlashcardsStructured,
 } from "../lib/prompts";
 
 let _client: OpenAI | null = null;
@@ -92,6 +94,70 @@ export async function analyzeMeeting(transcript: string): Promise<AnalysisResult
     summary: parsed.summary,
     action_items: parsed.action_items,
     cost_usd,
+  };
+}
+
+// ----------------------------------------------------------------------------
+// Flashcards (student-only, single call, structured output)
+// ----------------------------------------------------------------------------
+
+export interface FlashcardOutput {
+  question: string;
+  answer: string;
+  difficulty: "easy" | "medium" | "hard";
+}
+
+export interface FlashcardsResult {
+  cards: FlashcardOutput[];
+  cost_usd: number;
+}
+
+export async function generateFlashcards(
+  transcript: string,
+  title: string,
+): Promise<FlashcardsResult> {
+  const env = getEnv();
+  if (!env.OPENAI_API_KEY) return stubFlashcards();
+
+  const client = getClient();
+  const response = await client.chat.completions.create({
+    model: env.OPENAI_MODEL_PRIMARY,
+    messages: [
+      { role: "system", content: PROMPTS.FLASHCARDS_SYSTEM },
+      { role: "user", content: PROMPTS.flashcardsUser(transcript, title) },
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "flashcards",
+        strict: true,
+        schema: FLASHCARDS_SCHEMA,
+      },
+    },
+  });
+
+  const raw = response.choices[0]?.message.content;
+  if (!raw) throw new Error("OpenAI returned no content");
+  const parsed = JSON.parse(raw) as FlashcardsStructured;
+
+  const usage = response.usage;
+  const cost_usd = usage
+    ? (usage.prompt_tokens / 1_000_000) * 5 + (usage.completion_tokens / 1_000_000) * 15
+    : 0;
+
+  return { cards: parsed.cards, cost_usd };
+}
+
+function stubFlashcards(): FlashcardsResult {
+  return {
+    cards: [
+      {
+        question: "What is the main argument of this lecture? (stub)",
+        answer: "OPENAI_API_KEY is not configured. Set it in .env to generate real flashcards.",
+        difficulty: "easy",
+      },
+    ],
+    cost_usd: 0,
   };
 }
 

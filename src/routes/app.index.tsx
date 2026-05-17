@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import { useMe, useMeetings, useActionItems } from "@/lib/api/hooks";
+import { useLabels } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "Dashboard — EchoBrief" }] }),
@@ -40,6 +41,7 @@ function Dashboard() {
   const meetingsQuery = useMeetings({ limit: 5 });
   const allMeetingsQuery = useMeetings({ limit: 100 });
   const openActionsQuery = useActionItems({ completed: false });
+  const labels = useLabels();
 
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
@@ -70,13 +72,13 @@ function Dashboard() {
 
   const stats = [
     {
-      label: "Meetings indexed",
+      label: `${labels.meeting.plural} indexed`,
       value: meetingsQuery.data ? String(meetingsQuery.data.total) : "—",
       delta: null as string | null,
       icon: FileAudio,
     },
     {
-      label: "Actions pending",
+      label: `${labels.actions.plural} pending`,
       value: openActionsQuery.data ? String(openActionsQuery.data.items.length) : "—",
       delta: null,
       icon: CheckSquare,
@@ -102,9 +104,9 @@ function Dashboard() {
               "Loading your workspace…"
             ) : (
               <>
-                You have <span className="text-foreground">{meetingsReady} meeting{meetingsReady === 1 ? "" : "s"} ready</span> and{" "}
+                You have <span className="text-foreground">{meetingsReady} {labels.meeting.singular.toLowerCase()}{meetingsReady === 1 ? "" : "s"} ready</span> and{" "}
                 <span className="text-foreground">
-                  {openActions.length} action item{openActions.length === 1 ? "" : "s"}
+                  {openActions.length} {labels.actions.singular.toLowerCase()}{openActions.length === 1 ? "" : "s"}
                 </span>{" "}
                 waiting.
               </>
@@ -115,7 +117,7 @@ function Dashboard() {
           to="/app/upload"
           className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
         >
-          <Upload className="h-3.5 w-3.5" /> Upload meeting
+          <Upload className="h-3.5 w-3.5" /> {labels.meeting.upload_cta}
         </Link>
       </div>
 
@@ -184,7 +186,7 @@ function Dashboard() {
 
         <div className="rounded-xl border border-border/70 bg-surface p-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-medium">Action items</h3>
+            <h3 className="text-base font-medium">{labels.actions.plural}</h3>
             <Link to="/app/action-items" className="text-xs text-muted-foreground hover:text-foreground">
               View all →
             </Link>
@@ -215,16 +217,16 @@ function Dashboard() {
       {/* Recent meetings */}
       <div className="mt-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-medium">Recent meetings</h3>
+          <h3 className="text-base font-medium">Recent {labels.meeting.plural.toLowerCase()}</h3>
           <Link to="/app/meetings" className="text-xs text-muted-foreground hover:text-foreground">
-            All meetings →
+            All {labels.meeting.plural.toLowerCase()} →
           </Link>
         </div>
         {meetingsQuery.isLoading ? (
           <div className="mt-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : recentMeetings.length === 0 ? (
           <div className="mt-4 rounded-xl border border-dashed border-border/70 bg-surface/40 py-12 text-center">
-            <p className="text-sm font-medium">No meetings yet.</p>
+            <p className="text-sm font-medium">No {labels.meeting.plural.toLowerCase()} yet.</p>
             <p className="mt-1 text-xs text-muted-foreground">Upload your first recording to get started.</p>
           </div>
         ) : (

@@ -103,7 +103,11 @@
       "Read(//opt/homebrew/opt/**)",
       "Read(//Applications/**)",
       "Bash(brew list *)",
-      "Bash(brew install *)"
+      "Bash(brew install *)",
+      "Bash(python3 -m json.tool)",
+      "WebSearch",
+      "Bash(gh repo *)",
+      "Bash(git rm *)"
     ]
   }
 }
