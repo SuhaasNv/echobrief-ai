@@ -434,9 +434,18 @@ function ProfileMenu() {
         aria-label="Account menu"
         className="flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-accent"
       >
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-brand to-violet text-xs font-medium text-white">
-          {initials(me.name, me.email)}
-        </div>
+        {me.avatar_url ? (
+          <img
+            src={me.avatar_url}
+            alt={me.name ?? me.email}
+            className="h-7 w-7 rounded-full object-cover"
+            draggable={false}
+          />
+        ) : (
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-brand to-violet text-xs font-medium text-white">
+            {initials(me.name, me.email)}
+          </div>
+        )}
       </button>
       <AnimatePresence>
         {open && (
