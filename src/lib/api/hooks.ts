@@ -181,6 +181,51 @@ export function useDeleteFlashcard() {
 }
 
 // ---------------------------------------------------------------------------
+// Live streaming (Universal-Streaming token broker + live meeting save)
+// ---------------------------------------------------------------------------
+export interface StreamingTokenResponse {
+  token: string;
+  ws_url: string;
+  expires_at: string;
+}
+
+/**
+ * Fetch a short-lived AssemblyAI streaming token. The browser uses this to
+ * open a WebSocket directly to AssemblyAI without ever seeing the API key.
+ */
+export async function fetchStreamingToken(): Promise<StreamingTokenResponse> {
+  return apiRequest<StreamingTokenResponse>("/streaming/token", {
+    method: "POST",
+    body: {},
+  });
+}
+
+export interface CreateLiveMeetingBody {
+  title: string;
+  transcript_text: string;
+  audio_key: string;
+  audio_size: number;
+  audio_mime: string;
+  duration_sec: number;
+  language?: string;
+  tags?: string[];
+}
+
+export function useCreateLiveMeeting() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateLiveMeetingBody) =>
+      apiRequest<{ meeting_id: string; status: "queued" }>("/meetings/from-live", {
+        method: "POST",
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["meetings"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Account
 // ---------------------------------------------------------------------------
 export interface AccountMe {
@@ -189,6 +234,7 @@ export interface AccountMe {
   name: string | null;
   avatar_url: string | null;
   is_admin: boolean;
+  default_account_type: "student" | "professional" | null;
   created_at: string;
 }
 

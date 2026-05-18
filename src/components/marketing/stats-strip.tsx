@@ -92,10 +92,13 @@ function CountUp({
       : display.toFixed(2);
 
   return (
-    <p className="font-mono text-4xl font-semibold tracking-tight text-foreground tabular-nums md:text-5xl">
+    <p
+      className="font-display text-5xl font-bold leading-none tracking-tighter text-foreground tabular-nums md:text-6xl"
+      style={{ fontFeatureSettings: '"ss01", "cv01", "cv11"' }}
+    >
       {stat.prefix}
       {formatted}
-      <span className="text-brand">{stat.suffix}</span>
+      <span className="ml-0.5 text-brand">{stat.suffix}</span>
     </p>
   );
 }

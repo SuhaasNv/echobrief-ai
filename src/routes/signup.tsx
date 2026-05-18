@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { apiRequest, ApiError, setAuthToken } from "@/lib/api/client";
 import { setActiveWorkspace } from "@/lib/workspace-store";
 import { useQueryClient } from "@tanstack/react-query";
+import { qk, type AccountMe, type Workspace } from "@/lib/api/hooks";
 
 interface SignupResponse {
   // Token is absent when the server suppressed email enumeration (e.g. the
@@ -96,6 +97,26 @@ function SignupPage() {
       // middleware falls back to the user's brand-new first workspace.
       setActiveWorkspace(null);
       qc.clear();
+
+      // Pre-fetch me + workspaces so /app renders correctly on first paint.
+      // Signup just created exactly one workspace of the right kind, but we
+      // still need both queries in the cache before navigation to avoid the
+      // "first render with no data" → "second render with data" double-paint.
+      try {
+        const [meData, wsData] = await Promise.all([
+          apiRequest<AccountMe>("/account/me"),
+          apiRequest<{ items: Workspace[] }>("/workspaces"),
+        ]);
+        qc.setQueryData(qk.account, meData);
+        qc.setQueryData(qk.workspaces, wsData);
+        const preferred = meData.default_account_type
+          ? wsData.items.find((w) => w.kind === meData.default_account_type) ?? wsData.items[0]
+          : wsData.items[0];
+        if (preferred) setActiveWorkspace(preferred.id);
+      } catch {
+        // Best-effort. Fall through to AppShell's own fetching.
+      }
+
       toast.success("Welcome to EchoBrief");
       navigate({ to: "/app" });
     } catch (err) {

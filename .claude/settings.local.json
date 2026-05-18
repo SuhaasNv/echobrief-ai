@@ -107,7 +107,10 @@
       "Bash(python3 -m json.tool)",
       "WebSearch",
       "Bash(gh repo *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "WebFetch(domain:www.assemblyai.com)",
+      "WebFetch(domain:assemblyai.com)",
+      "Bash(pkill -f \"concurrently.*npm:dev\")"
     ]
   }
 }

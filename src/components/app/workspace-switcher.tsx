@@ -7,6 +7,7 @@ import { ChevronsUpDown, Check, Plus, Loader2, GraduationCap, Briefcase } from "
 import {
   useWorkspaces,
   useCreateWorkspace,
+  useMe,
   type Workspace,
   type WorkspaceColor,
   type WorkspaceKind,
@@ -40,20 +41,32 @@ export function WorkspaceSwitcher() {
 
   const qc = useQueryClient();
   const { data } = useWorkspaces();
+  const { data: me } = useMe();
   const activeId = useActiveWorkspaceId();
   const createMutation = useCreateWorkspace();
   const labels = useLabels();
 
   const workspaces = data?.items ?? [];
-  const active = workspaces.find((w) => w.id === activeId) ?? workspaces[0];
+  const preferredKind = me?.default_account_type ?? null;
+
+  // Choose the "default" workspace for this user. If they have one matching
+  // their signup type (student/professional), prefer it — otherwise fall back
+  // to the oldest workspace. Used both for active-state display and for the
+  // auto-select on first paint.
+  const defaultWorkspace = preferredKind
+    ? workspaces.find((w) => w.kind === preferredKind) ?? workspaces[0]
+    : workspaces[0];
+  const active = workspaces.find((w) => w.id === activeId) ?? defaultWorkspace;
   const activeColor = (active?.color ?? "brand") as WorkspaceColor;
 
-  // On first load, if no active workspace is set but workspaces exist, pick first.
+  // On first load with no active workspace, pick the one matching the user's
+  // signup type. This stops the "flash of wrong workspace" on login when the
+  // user has multiple workspaces of different kinds.
   useEffect(() => {
-    if (!activeId && workspaces.length > 0) {
-      setActiveWorkspace(workspaces[0].id);
+    if (!activeId && defaultWorkspace) {
+      setActiveWorkspace(defaultWorkspace.id);
     }
-  }, [activeId, workspaces]);
+  }, [activeId, defaultWorkspace]);
 
   useEffect(() => {
     if (creating) inputRef.current?.focus();
@@ -65,8 +78,15 @@ export function WorkspaceSwitcher() {
       return;
     }
     setActiveWorkspace(w.id);
-    // Invalidate all workspace-scoped data so it refetches with the new header.
-    qc.invalidateQueries();
+    // REMOVE workspace-scoped data from the cache so the next render shows
+    // a loading state instead of flashing the previous workspace's meetings
+    // / action items / flashcards. We KEEP /workspaces and /account/me in
+    // the cache since they're workspace-agnostic — re-fetching them would
+    // cause an unnecessary flash of the switcher itself.
+    qc.removeQueries({ queryKey: ["meetings"] });
+    qc.removeQueries({ queryKey: ["meeting"] });
+    qc.removeQueries({ queryKey: ["action-items"] });
+    qc.removeQueries({ queryKey: ["flashcards"] });
     setOpen(false);
     toast.success(`Switched to ${w.name}`);
   };

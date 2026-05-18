@@ -14,6 +14,7 @@ import {
   ConfirmUploadRequest,
   TranscriptUploadRequest,
   TranscriptUploadResponse,
+  LiveUploadRequest,
   MeetingListQuery,
   MeetingPatchRequest,
   MeetingStatusResponse,
@@ -124,6 +125,68 @@ app.post("/from-transcript", zValidator("json", TranscriptUploadRequest), async 
     meeting_id: meetingId,
     user_id: user.id,
     audio_key: "", // sentinel: empty audio_key + existing transcript row triggers the skip-transcription path in the worker
+    language: body.language,
+    retry_count: 0,
+  });
+
+  return c.json(
+    TranscriptUploadResponse.parse({ meeting_id: meetingId, status: "queued" }),
+  );
+});
+
+// ---------------------------------------------------------------------------
+// POST /from-live — live-recording: client already has the AssemblyAI
+// transcript AND has uploaded the audio blob to R2. We just need to persist
+// the meeting + transcript rows, then kick off analyze/embed (no transcribe).
+// ---------------------------------------------------------------------------
+app.post("/from-live", zValidator("json", LiveUploadRequest), async (c) => {
+  const body = c.req.valid("json");
+  const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
+  const sql = getSql();
+
+  const meetingId = randomUUID();
+
+  await sql.begin(async (tx) => {
+    await tx`
+      INSERT INTO meetings (
+        id, user_id, workspace_id, title, audio_key, audio_size, audio_mime,
+        duration_sec, language, tags, status
+      ) VALUES (
+        ${meetingId},
+        ${user.id},
+        ${workspaceId},
+        ${body.title},
+        ${body.audio_key},
+        ${body.audio_size},
+        ${body.audio_mime},
+        ${body.duration_sec},
+        ${body.language},
+        ${tx.array(body.tags)},
+        'queued'
+      )
+    `;
+    await tx`
+      INSERT INTO transcripts (meeting_id, raw_text, content, speakers, language, provider)
+      VALUES (
+        ${meetingId},
+        ${body.transcript_text},
+        '{}'::jsonb,
+        '[]'::jsonb,
+        ${body.language},
+        'assemblyai-streaming'
+      )
+    `;
+  });
+
+  // Same skip-transcribe sentinel as /from-transcript: the worker sees an
+  // existing transcript row and an empty audio_key in the job payload, and
+  // jumps straight to analyze/embed/score. The meeting row still carries the
+  // real audio_key so the user can play back the recording.
+  await enqueueProcessingJob({
+    meeting_id: meetingId,
+    user_id: user.id,
+    audio_key: "",
     language: body.language,
     retry_count: 0,
   });
@@ -282,8 +345,26 @@ app.get("/:id", async (c) => {
         chapters: coerceJsonArray<{ title: string; start_sec: number; end_sec: number; summary: string }>(summaryRow.chapters),
       }
     : null;
+
+  // Source-of-truth flags so the client can render the right processing
+  // steps without leaking the underlying audio_key / transcripts.provider.
+  const hasAudio = meeting.audio_key !== null && meeting.audio_key !== "";
+  // `transcripts.provider` is 'user' for paste-uploads, 'assemblyai-streaming'
+  // for live recordings — both mean the client supplied the transcript and
+  // the worker should skip transcription. We surface this so the processing
+  // UI can hide the "Transcribed" step.
+  const transcriptProvider = transcriptRow
+    ? await sql<Array<{ provider: string }>>`
+        SELECT provider FROM transcripts WHERE meeting_id = ${id} LIMIT 1
+      `.then((r) => r[0]?.provider ?? null)
+    : null;
+  const transcriptProvided =
+    transcriptProvider === "user" || transcriptProvider === "assemblyai-streaming";
+
   return c.json({
     ...meeting,
+    has_audio: hasAudio,
+    transcript_provided: transcriptProvided,
     meeting_score: coerceJsonObject<Record<string, unknown>>(meeting.meeting_score),
     transcript,
     summary,

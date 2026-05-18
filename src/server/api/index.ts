@@ -27,6 +27,7 @@ import generateRoutes from "./routes/generate";
 import shareRoutes from "./routes/share";
 import workspacesRoutes from "./routes/workspaces";
 import flashcardsRoutes from "./routes/flashcards";
+import streamingRoutes from "./routes/streaming";
 
 import type { AppBindings } from "./types";
 
@@ -73,6 +74,8 @@ protectedApi.use("/generate/*", rateLimit("ai"));
 protectedApi.use("/meetings/:id/chat", rateLimit("ai"));
 // Flashcard generation is an LLM call — gate it under the AI bucket too.
 protectedApi.use("/meetings/:id/flashcards/generate", rateLimit("ai"));
+// Each streaming token maps to a paid live transcription session.
+protectedApi.use("/streaming/*", rateLimit("ai"));
 
 // Workspaces CRUD is workspace-agnostic (you need to list them to switch).
 protectedApi.route("/workspaces", workspacesRoutes);
@@ -84,6 +87,7 @@ protectedApi.use("/search", requireWorkspace);
 protectedApi.use("/flashcards/*", requireWorkspace);
 protectedApi.use("/integrations/*", requireWorkspace);
 protectedApi.use("/generate/*", requireWorkspace);
+protectedApi.use("/streaming/*", requireWorkspace);
 
 // Pro-only carve-outs (server-side enforcement, not just UI-hide).
 protectedApi.use("/integrations/*", requireProfessionalWorkspace());
@@ -93,6 +97,7 @@ protectedApi.use("/action-items/:id/export", requireProfessionalWorkspace());
 protectedApi.route("/meetings", meetingsRoutes);
 protectedApi.route("/meetings", chatRoutes);
 protectedApi.route("/", flashcardsRoutes);
+protectedApi.route("/streaming", streamingRoutes);
 protectedApi.route("/action-items", actionItemsRoutes);
 protectedApi.route("/search", searchRoutes);
 protectedApi.route("/integrations", integrationsRoutes);

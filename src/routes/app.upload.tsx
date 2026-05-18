@@ -13,9 +13,15 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useUploadUrl, useConfirmUpload, useUploadTranscript } from "@/lib/api/hooks";
+import {
+  useUploadUrl,
+  useConfirmUpload,
+  useUploadTranscript,
+  useCreateLiveMeeting,
+} from "@/lib/api/hooks";
 import type { UploadUrlRequest } from "@/lib/schemas";
 import { useLabels, useActiveWorkspaceKind } from "@/lib/workspace-store";
+import { LiveRecorderPanel, type LiveRecorderCompletePayload } from "@/components/app/live-recorder";
 
 export const Route = createFileRoute("/app/upload")({
   head: () => ({ meta: [{ title: "Upload — EchoBrief" }] }),
@@ -86,7 +92,7 @@ function uploadToR2(url: string, file: File, onProgress: (pct: number) => void):
   });
 }
 
-type Mode = "audio" | "transcript";
+type Mode = "audio" | "transcript" | "live";
 
 function UploadPage() {
   const navigate = useNavigate();
@@ -110,6 +116,70 @@ function UploadPage() {
   const uploadUrl = useUploadUrl();
   const confirmUpload = useConfirmUpload();
   const uploadTranscript = useUploadTranscript();
+  const createLiveMeeting = useCreateLiveMeeting();
+
+  /**
+   * After a live recording stops we have an in-memory audio blob + the
+   * AssemblyAI transcript. Two-step save:
+   *   1. presign + PUT the blob to R2 (reusing the existing upload path)
+   *   2. POST /meetings/from-live with the audio_key + transcript text
+   * Then navigate to the meeting detail page so the user sees the
+   * pipeline-in-progress UI (analyze → embed → score).
+   */
+  async function handleLiveComplete(payload: LiveRecorderCompletePayload) {
+    try {
+      // 1. Request presigned URL. We synthesize a filename from the blob's
+      //    MIME so the R2 key carries a sensible extension.
+      const extMatch = /\/(webm|ogg|mp4|wav|mpeg)/.exec(payload.mime);
+      const ext = extMatch ? extMatch[1] : "webm";
+      const filename = `live-${Date.now()}.${ext === "mpeg" ? "mp3" : ext}`;
+
+      const presign = await uploadUrl.mutateAsync({
+        filename,
+        size: payload.blob.size,
+        content_type: payload.mime.split(";")[0] as UploadUrlRequest["content_type"],
+        duration_sec: payload.durationSec,
+        language: "en",
+        tags: [],
+        title: payload.title,
+      });
+
+      // 2. PUT the blob directly to R2.
+      const xhr = new XMLHttpRequest();
+      await new Promise<void>((resolve, reject) => {
+        xhr.open("PUT", presign.upload_url);
+        xhr.setRequestHeader(
+          "Content-Type",
+          payload.mime.split(";")[0] || "audio/webm",
+        );
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`R2 upload failed: ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(payload.blob);
+      });
+
+      // 3. Persist the meeting + transcript and kick off analysis.
+      const result = await createLiveMeeting.mutateAsync({
+        title: payload.title,
+        transcript_text: payload.transcript,
+        audio_key: presign.audio_key,
+        audio_size: payload.blob.size,
+        audio_mime: payload.mime.split(";")[0] || "audio/webm",
+        duration_sec: payload.durationSec,
+        language: "en",
+        tags: [],
+      });
+
+      toast.success("Saved — running analysis");
+      navigate({ to: "/app/meetings/$id", params: { id: result.meeting_id } });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Couldn't save the recording";
+      toast.error(msg);
+      throw err; // propagate so the recorder panel can surface the error
+    }
+  }
 
   const openPicker = () => inputRef.current?.click();
 
@@ -220,7 +290,20 @@ function UploadPage() {
             mode === "audio" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Mic className="h-3.5 w-3.5" /> Audio / video
+          <FileAudio className="h-3.5 w-3.5" /> Audio / video
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("live")}
+          disabled={inProgress}
+          className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
+            mode === "live" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Mic className="h-3.5 w-3.5" /> Record live
+          <span className="rounded-full bg-brand/15 px-1.5 py-0 font-mono text-[9px] uppercase tracking-wide text-brand">
+            New
+          </span>
         </button>
         <button
           type="button"
@@ -234,7 +317,11 @@ function UploadPage() {
         </button>
       </div>
 
-      {mode === "transcript" ? (
+      {mode === "live" ? (
+        <div className="mt-8">
+          <LiveRecorderPanel onComplete={handleLiveComplete} />
+        </div>
+      ) : mode === "transcript" ? (
         <TranscriptForm
           title={transcriptTitle}
           setTitle={setTranscriptTitle}

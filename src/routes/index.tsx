@@ -387,23 +387,23 @@ function Landing() {
                 {
                   quote:
                     "We replaced four tools with EchoBrief. Our weekly leadership meeting now writes its own follow-up.",
-                  name: "Sarah Lin",
+                  name: "Priya Iyer",
                   designation: "Head of Operations, Vertex",
-                  src: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1200&auto=format&fit=crop",
+                  src: "https://images.unsplash.com/photo-1592621385612-4d7129426394?q=80&w=1200&auto=format&fit=crop",
                 },
                 {
                   quote:
                     "The cross-meeting search is genuinely magical. It feels like having a chief of staff.",
-                  name: "Marcus Webb",
+                  name: "Arjun Sharma",
                   designation: "Founder, Helix",
-                  src: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?q=80&w=1200&auto=format&fit=crop",
+                  src: "https://images.unsplash.com/photo-1564564321837-a57b7070ac4f?q=80&w=1200&auto=format&fit=crop",
                 },
                 {
                   quote:
                     "Action items used to vanish. Now they appear in Linear before the call ends.",
                   name: "Anika Roy",
                   designation: "VP Product, Northwind",
-                  src: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=1200&auto=format&fit=crop",
+                  src: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=1200&auto=format&fit=crop",
                 },
               ]}
               autoplay

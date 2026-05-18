@@ -11,6 +11,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { apiRequest, ApiError, setAuthToken } from "@/lib/api/client";
 import { setActiveWorkspace } from "@/lib/workspace-store";
+import { qk, type AccountMe, type Workspace } from "@/lib/api/hooks";
 
 interface LoginResponse {
   token: string;
@@ -48,6 +49,33 @@ function LoginPage() {
       // Drop the React Query cache so we don't flash the previous user's
       // workspaces / meetings / me before the new fetch resolves.
       qc.clear();
+
+      // Pre-fetch /account/me + /workspaces IN PARALLEL before navigation.
+      // Without this, the AppShell mounts with both queries pending, and
+      // whichever resolves first triggers a render — usually causing a flash
+      // of the wrong-default workspace ("Office" before "My class") until
+      // both finally settle. Pre-fetching populates the cache so the very
+      // first render of /app already has the right data.
+      try {
+        const [meData, wsData] = await Promise.all([
+          apiRequest<AccountMe>("/account/me"),
+          apiRequest<{ items: Workspace[] }>("/workspaces"),
+        ]);
+        qc.setQueryData(qk.account, meData);
+        qc.setQueryData(qk.workspaces, wsData);
+        // Choose the default workspace: prefer one matching the user's signup
+        // type so a student account with both "Office" and "My class" lands
+        // on "My class" by default. Fall back to the oldest workspace if
+        // there's no match (or the user predates the student/pro fork).
+        const preferred = meData.default_account_type
+          ? wsData.items.find((w) => w.kind === meData.default_account_type) ?? wsData.items[0]
+          : wsData.items[0];
+        if (preferred) setActiveWorkspace(preferred.id);
+      } catch {
+        // Best-effort. If prefetch fails the AppShell will refetch — worst
+        // case the user sees the original flash, which is the prior behavior.
+      }
+
       toast.success("Signed in");
       // Admins land on the ops console; regular users land on the app dashboard.
       navigate({ to: res.user.is_admin ? "/admin" : "/app" });

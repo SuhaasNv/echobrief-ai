@@ -61,6 +61,87 @@ function getClient(): AssemblyAI {
 }
 
 /**
+ * Universal-Streaming token broker. Mints a single-use, short-lived token
+ * that the browser can use to open a WebSocket directly to AssemblyAI without
+ * ever seeing our API key.
+ *
+ * Endpoint: GET https://streaming.assemblyai.com/v3/token
+ *   - Authorization: <api_key>
+ *   - expires_in_seconds: 1-600 (single-use TTL for the token itself)
+ *   - max_session_duration_seconds: 60-10800 (full session length cap)
+ *
+ * Each token is single-use. For sessions longer than 10 minutes the client
+ * needs to fetch a new token before its old one expires. We don't manage
+ * that here — the recorder UI will request a fresh token mid-session.
+ */
+export interface StreamingTokenResult {
+  token: string;
+  ws_url: string;
+  expires_at: string;
+}
+
+const STREAMING_WS_URL = "wss://streaming.assemblyai.com/v3/ws";
+
+export async function createStreamingToken(opts: {
+  expiresInSeconds?: number;
+  maxSessionDurationSeconds?: number;
+} = {}): Promise<StreamingTokenResult> {
+  const env = getEnv();
+  if (!env.ASSEMBLYAI_API_KEY) {
+    return stubStreamingToken();
+  }
+
+  // expires_in_seconds is the window in which the token can OPEN the WS.
+  // max_session_duration_seconds is how long the open session stays live.
+  // 300s opening window covers normal latency; 3-hour session covers the
+  // longest reasonable lecture without forcing a mid-recording reconnect.
+  const expiresIn = Math.min(Math.max(opts.expiresInSeconds ?? 300, 1), 600);
+  const maxSession = Math.min(
+    Math.max(opts.maxSessionDurationSeconds ?? 3 * 60 * 60, 60),
+    10_800,
+  );
+
+  const params = new URLSearchParams({
+    expires_in_seconds: String(expiresIn),
+    max_session_duration_seconds: String(maxSession),
+  });
+
+  const response = await fetch(
+    `https://streaming.assemblyai.com/v3/token?${params}`,
+    {
+      method: "GET",
+      headers: { Authorization: env.ASSEMBLYAI_API_KEY },
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `AssemblyAI token request failed (${response.status}): ${text.slice(0, 200)}`,
+    );
+  }
+
+  const data = (await response.json()) as { token?: string };
+  if (!data.token) {
+    throw new Error("AssemblyAI returned no token");
+  }
+
+  return {
+    token: data.token,
+    ws_url: STREAMING_WS_URL,
+    expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+  };
+}
+
+function stubStreamingToken(): StreamingTokenResult {
+  return {
+    token: "stub-streaming-token",
+    ws_url: STREAMING_WS_URL,
+    expires_at: new Date(Date.now() + 300_000).toISOString(),
+  };
+}
+
+/**
  * Transcribe an audio file by URL. AssemblyAI polls internally and waits for
  * completion; we don't have to manage the job state.
  */

@@ -129,6 +129,27 @@ export const TranscriptUploadResponse = z.object({
 });
 export type TranscriptUploadResponse = z.infer<typeof TranscriptUploadResponse>;
 
+/**
+ * Live-recording upload — sibling of TranscriptUpload that also includes the
+ * R2 audio_key from the parallel MediaRecorder blob upload. The worker uses
+ * the same "transcript already present" skip-AssemblyAI path.
+ */
+export const LiveUploadRequest = z.object({
+  title: z.string().trim().min(1).max(200),
+  transcript_text: z
+    .string()
+    .trim()
+    .min(1, "Transcript is empty")
+    .max(500_000, "Transcript too large (500k char max)"),
+  audio_key: z.string().trim().min(1).max(500),
+  audio_size: z.number().int().positive().max(500 * 1024 * 1024),
+  audio_mime: z.string().trim().min(1).max(100),
+  duration_sec: z.number().int().nonnegative().max(60 * 60 * 6),
+  language: z.string().min(2).max(10).default("en"),
+  tags: z.array(z.string().trim().max(50)).max(10).default([]),
+});
+export type LiveUploadRequest = z.infer<typeof LiveUploadRequest>;
+
 export const MeetingPatchRequest = z
   .object({
     title: z.string().trim().min(1).max(200).optional(),
@@ -154,6 +175,11 @@ export const MeetingDetail = z.object({
   tags: z.array(z.string()),
   visibility: MeetingVisibility,
   share_token: z.string().nullable(),
+  /** True if the meeting has an audio file in R2. False for pasted-transcript meetings. */
+  has_audio: z.boolean(),
+  /** True if the transcript was supplied by the client (paste OR live recording).
+   *  Lets the UI hide the "Transcribed" processing step that never ran. */
+  transcript_provided: z.boolean(),
   meeting_score: z
     .object({
       total: z.number(),
@@ -317,10 +343,29 @@ export type EmailGenerationRequest = z.infer<typeof EmailGenerationRequest>;
 // ----------------------------------------------------------------------------
 // Account
 // ----------------------------------------------------------------------------
+/**
+ * Avatar URLs accept three shapes:
+ *   - A regular https:// URL (legacy / external avatars)
+ *   - A `data:image/...;base64,...` data URL (client-side uploaded + resized)
+ *   - `null` to clear the avatar back to initials
+ *
+ * Hard size cap is ~100KB on the request body — well above the typical
+ * 15-30KB our client-side resize produces for a 256×256 JPEG.
+ */
+const AvatarUrlSchema = z
+  .union([
+    z.string().url(),
+    z.string().regex(/^data:image\/(jpeg|png|webp|gif);base64,/i, "Invalid data URL"),
+    z.null(),
+  ])
+  .refine((v) => v === null || v.length <= 100_000, {
+    message: "Avatar image too large (max ~100KB after resize)",
+  });
+
 export const UpdateProfileRequest = z
   .object({
     name: z.string().trim().min(1).max(100).optional(),
-    avatar_url: z.string().url().optional(),
+    avatar_url: AvatarUrlSchema.optional(),
   })
   .strict();
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;

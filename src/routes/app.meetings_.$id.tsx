@@ -151,7 +151,11 @@ function MeetingDetailPage() {
       {isFailed ? (
         <FailedState meeting={meeting} onRetry={() => retry.mutate()} retrying={retry.isPending} />
       ) : !isComplete ? (
-        <ProcessingState status={status} />
+        <ProcessingState
+          status={status}
+          hasAudio={meeting.has_audio}
+          transcriptProvided={meeting.transcript_provided}
+        />
       ) : (
         <CompleteBody
           meeting={meeting}
@@ -425,13 +429,50 @@ function DeleteConfirm({
   );
 }
 
-function ProcessingState({ status }: { status: MeetingStatusResponse | undefined }) {
-  const steps = [
-    { key: "uploaded", label: "Uploaded to storage", detail: "Audio safely landed in encrypted bucket" },
-    { key: "transcribed", label: "Transcribed", detail: "Speech-to-text with speaker diarization" },
-    { key: "analyzed", label: "Analyzed", detail: "Summary, decisions, and action items extracted" },
-    { key: "indexed", label: "Indexed", detail: "Embeddings written for cross-meeting search" },
-  ] as const;
+function ProcessingState({
+  status,
+  hasAudio,
+  transcriptProvided,
+}: {
+  status: MeetingStatusResponse | undefined;
+  hasAudio: boolean;
+  transcriptProvided: boolean;
+}) {
+  // Three meeting shapes:
+  //  1. Audio upload (hasAudio=true, transcriptProvided=false): 4 steps.
+  //  2. Pasted transcript (hasAudio=false, transcriptProvided=true): only
+  //     analyze + index. No audio was uploaded, no transcription ran.
+  //  3. Live recording (hasAudio=true, transcriptProvided=true): audio went
+  //     to R2, but transcription already happened in the browser via
+  //     AssemblyAI streaming. Skip the "Transcribed" step's description
+  //     about diarization (live mode is single-speaker).
+  type StepKey = "uploaded" | "transcribed" | "analyzed" | "indexed";
+  type Step = { key: StepKey; label: string; detail: string };
+  const steps: Step[] = [];
+  if (hasAudio) {
+    steps.push({
+      key: "uploaded",
+      label: "Uploaded to storage",
+      detail: "Audio safely landed in encrypted bucket",
+    });
+  }
+  if (!transcriptProvided) {
+    steps.push({
+      key: "transcribed",
+      label: "Transcribed",
+      detail: "Speech-to-text with speaker diarization",
+    });
+  }
+  steps.push({
+    key: "analyzed",
+    label: "Analyzed",
+    detail: "Summary, decisions, and action items extracted",
+  });
+  steps.push({
+    key: "indexed",
+    label: "Indexed",
+    detail: "Embeddings written for cross-meeting search",
+  });
 
   const doneCount = steps.filter((s) => status?.progress?.[s.key]).length;
   const percent = Math.round((doneCount / steps.length) * 100);

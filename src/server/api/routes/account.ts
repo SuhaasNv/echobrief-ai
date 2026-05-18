@@ -29,9 +29,10 @@ app.get("/me", async (c) => {
       name: string | null;
       avatar_url: string | null;
       is_admin: boolean;
+      default_account_type: "student" | "professional" | null;
       created_at: string;
     }>
-  >`SELECT id, email, name, avatar_url, is_admin, created_at FROM users WHERE id = ${user.id}`;
+  >`SELECT id, email, name, avatar_url, is_admin, default_account_type, created_at FROM users WHERE id = ${user.id}`;
 
   const me = rows[0];
   if (!me) throw new HTTPException(404, { message: "User not found" });

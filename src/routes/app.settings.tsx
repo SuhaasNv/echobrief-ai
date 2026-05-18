@@ -32,6 +32,7 @@ import {
 } from "@/lib/api/hooks";
 import { setAuthToken } from "@/lib/api/client";
 import { setActiveWorkspace, useActiveWorkspaceId } from "@/lib/workspace-store";
+import { AvatarUpload } from "@/components/app/avatar-upload";
 
 export const Route = createFileRoute("/app/settings")({
   head: () => ({ meta: [{ title: "Settings — EchoBrief" }] }),
@@ -251,7 +252,12 @@ function WorkspacesSection() {
                         type="button"
                         onClick={() => {
                           setActiveWorkspace(w.id);
-                          qc.invalidateQueries();
+                          // Drop workspace-scoped data so the next view loads
+                          // fresh instead of flashing the prior workspace.
+                          qc.removeQueries({ queryKey: ["meetings"] });
+                          qc.removeQueries({ queryKey: ["meeting"] });
+                          qc.removeQueries({ queryKey: ["action-items"] });
+                          qc.removeQueries({ queryKey: ["flashcards"] });
                           toast.success(`Switched to ${w.name}`);
                         }}
                         className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -420,32 +426,66 @@ function ProfileSection({
 }) {
   const update = useUpdateProfile();
   const [name, setName] = useState(me.name ?? "");
-  const [avatarUrl, setAvatarUrl] = useState(me.avatar_url ?? "");
 
   useEffect(() => {
     setName(me.name ?? "");
-    setAvatarUrl(me.avatar_url ?? "");
-  }, [me.name, me.avatar_url]);
+  }, [me.name]);
 
-  const dirty = name !== (me.name ?? "") || avatarUrl !== (me.avatar_url ?? "");
+  const nameDirty = name !== (me.name ?? "");
 
-  async function save() {
+  // Avatar mutations save immediately (no separate "Save" click). This is
+  // the right UX for image picks — user expects the change to stick the
+  // moment they pick a file.
+  async function saveAvatar(dataUrl: string) {
     try {
-      await update.mutateAsync({
-        ...(name.trim() ? { name: name.trim() } : {}),
-        ...(avatarUrl.trim() ? { avatar_url: avatarUrl.trim() } : {}),
-      });
+      await update.mutateAsync({ avatar_url: dataUrl });
+      toast.success("Profile photo updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save photo");
+      throw err;
+    }
+  }
+
+  async function removeAvatar() {
+    try {
+      await update.mutateAsync({ avatar_url: null });
+      toast.success("Profile photo removed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't remove photo");
+    }
+  }
+
+  async function saveName() {
+    try {
+      await update.mutateAsync({ ...(name.trim() ? { name: name.trim() } : {}) });
       toast.success("Profile updated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Update failed");
     }
   }
 
+  // Initials for the avatar placeholder.
+  const initials = (() => {
+    if (me.name && me.name.trim()) {
+      const parts = me.name.trim().split(/\s+/);
+      return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
+    }
+    return me.email.slice(0, 2).toUpperCase();
+  })();
+
   return (
     <section className="rounded-xl border border-border/70 bg-surface p-6">
       <SectionHeader icon={User} title="Profile" subtitle="How you show up in EchoBrief." />
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-6">
+        <AvatarUpload
+          currentUrl={me.avatar_url}
+          initials={initials}
+          onChange={saveAvatar}
+          onRemove={removeAvatar}
+          disabled={update.isPending}
+        />
+
         <div className="grid gap-1.5">
           <label htmlFor="settings-email" className="text-sm font-medium">Email</label>
           <input
@@ -473,29 +513,15 @@ function ProfileSection({
           />
         </div>
 
-        <div className="grid gap-1.5">
-          <label htmlFor="settings-avatar" className="text-sm font-medium">Avatar URL</label>
-          <input
-            id="settings-avatar"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="https://…"
-            className="rounded-md border border-border/70 bg-background px-3 py-2 text-sm focus:border-border focus:outline-none"
-          />
-          <p className="font-mono text-[10px] text-muted-foreground">
-            Direct image URL (we'll fetch on the client).
-          </p>
-        </div>
-
         <div className="flex justify-end pt-2">
           <button
             type="button"
-            onClick={save}
-            disabled={!dirty || update.isPending}
+            onClick={saveName}
+            disabled={!nameDirty || update.isPending}
             className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             {update.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-            Save profile
+            Save name
           </button>
         </div>
       </div>
