@@ -110,7 +110,8 @@
       "Bash(git rm *)",
       "WebFetch(domain:www.assemblyai.com)",
       "WebFetch(domain:assemblyai.com)",
-      "Bash(pkill -f \"concurrently.*npm:dev\")"
+      "Bash(pkill -f \"concurrently.*npm:dev\")",
+      "Bash(kill 10820 10839 10841 10842 10904 10906 10920 13549)"
     ]
   }
 }
