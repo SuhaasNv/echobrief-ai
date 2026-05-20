@@ -15,6 +15,7 @@ import {
   Pencil,
   GraduationCap,
   Briefcase,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -33,6 +34,9 @@ import {
 import { setAuthToken } from "@/lib/api/client";
 import { setActiveWorkspace, useActiveWorkspaceId } from "@/lib/workspace-store";
 import { AvatarUpload } from "@/components/app/avatar-upload";
+import { formatDate } from "@/lib/date-utils";
+import { useSubscription } from "@/lib/api/use-subscription";
+import { UpgradeModal } from "@/components/upgrade-modal";
 
 export const Route = createFileRoute("/app/settings")({
   head: () => ({ meta: [{ title: "Settings — EchoBrief" }] }),
@@ -90,6 +94,7 @@ function workspaceInitials(name: string): string {
 function WorkspacesSection() {
   const qc = useQueryClient();
   const { data, isLoading } = useWorkspaces();
+  const { data: subscription } = useSubscription();
   const activeId = useActiveWorkspaceId();
   const create = useCreateWorkspace();
   const update = useUpdateWorkspace();
@@ -103,8 +108,22 @@ function WorkspacesSection() {
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState<WorkspaceColor>("brand");
   const [editKind, setEditKind] = useState<WorkspaceKind>("professional");
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const workspaces = data?.items ?? [];
+
+  // Check if user can create more workspaces
+  const workspaceCount = workspaces.length;
+  const workspaceLimit = subscription?.limits.workspaces;
+  const canCreateWorkspace = workspaceLimit === null || workspaceCount < workspaceLimit;
+
+  function handleNewWorkspaceClick() {
+    if (!canCreateWorkspace) {
+      setShowUpgrade(true);
+      return;
+    }
+    setCreating(true);
+  }
 
   async function submitCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -243,7 +262,7 @@ function WorkspacesSection() {
                       )}
                     </div>
                     <p className="font-mono text-[10px] text-muted-foreground">
-                      Created {new Date(w.created_at).toLocaleDateString()}
+                      Created {formatDate(w.created_at, true)}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
@@ -326,16 +345,33 @@ function WorkspacesSection() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setCreating(true)}
+                  onClick={handleNewWorkspaceClick}
                   className="flex w-full items-center justify-center gap-2 rounded-md py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
-                  <Plus className="h-3.5 w-3.5" /> New workspace
+                  <Plus className="h-3.5 w-3.5" />
+                  New workspace
+                  {!canCreateWorkspace && (
+                    <>
+                      <span className="text-[10px]">
+                        ({workspaceCount}/{workspaceLimit} used)
+                      </span>
+                      <Zap className="h-3 w-3 text-brand" />
+                    </>
+                  )}
                 </button>
               )}
             </li>
           </ul>
         )}
       </div>
+
+      {/* Upgrade modal for workspace quota */}
+      <UpgradeModal
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        reason={`Free tier allows ${workspaceLimit} workspace. Upgrade to create more.`}
+        currentTier={subscription?.subscription.tier}
+      />
     </div>
   );
 }

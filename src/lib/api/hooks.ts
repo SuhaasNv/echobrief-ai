@@ -246,6 +246,12 @@ export interface AdminUserRow {
   has_password: boolean;
   meeting_count: number;
   created_at: string;
+  tier: string | null;
+  subscription_status: string | null;
+  stripe_customer_id: string | null;
+  billing_interval: string | null;
+  current_period_end: Date | null;
+  price_usd: number | null;
 }
 
 export interface AdminMeetingRow {
@@ -314,6 +320,41 @@ export function useAdminSystem() {
     queryKey: ["admin", "system"] as const,
     queryFn: () => apiRequest<AdminSystemResponse>("/admin/system"),
     refetchInterval: 10000,
+  });
+}
+
+export function useUpdateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, updates }: { userId: string; updates: { name?: string; is_admin?: boolean } }) =>
+      apiRequest<{ ok: true }>(`/admin/users/${userId}`, { method: "PATCH", body: updates }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
+  });
+}
+
+export function useUpdateUserSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ 
+      userId, 
+      updates 
+    }: { 
+      userId: string; 
+      updates: { tier: "free" | "student" | "pro" | "team"; status?: "active" | "cancelled" | "past_due" | "trialing" } 
+    }) =>
+      apiRequest<{ ok: true }>(`/admin/users/${userId}/subscription`, { method: "PATCH", body: updates }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
+  });
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, confirm = false }: { userId: string; confirm?: boolean }) =>
+      apiRequest<{ ok: true; deleted_email: string }>(`/admin/users/${userId}${confirm ? "?confirm=true" : ""}`, { 
+        method: "DELETE" 
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
 }
 

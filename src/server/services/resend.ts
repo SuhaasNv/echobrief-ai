@@ -81,6 +81,59 @@ export async function sendWorkspaceInvite(
   });
 }
 
+export async function sendAccountExportEmail(
+  to: string,
+  downloadUrl: string,
+  expiresAt: string,
+): Promise<void> {
+  const client = getClient();
+  if (!client) {
+    console.log(`[resend stub] account export email to ${to}`);
+    return;
+  }
+
+  const expiryDate = new Date(expiresAt).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  await client.emails.send({
+    from: FROM_ADDRESS,
+    to,
+    subject: "Your EchoBrief data export is ready",
+    html: `
+      <h2>Your Data Export is Ready</h2>
+      <p>We've prepared a complete export of your EchoBrief account data.</p>
+      
+      <p style="margin: 24px 0;">
+        <a href="${downloadUrl}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+          Download Your Data
+        </a>
+      </p>
+
+      <p><strong>What's included:</strong></p>
+      <ul>
+        <li>All meeting metadata and transcripts</li>
+        <li>AI-generated summaries and action items</li>
+        <li>Processing logs and workspace memberships</li>
+        <li>Account information and statistics</li>
+      </ul>
+
+      <p><strong>Important:</strong></p>
+      <ul>
+        <li>This download link expires on <strong>${escapeHtml(expiryDate)}</strong> (7 days)</li>
+        <li>Audio files are not included due to size constraints</li>
+        <li>All data is provided in JSON format inside a ZIP archive</li>
+      </ul>
+
+      <p style="color: #666; font-size: 14px; margin-top: 32px;">
+        If you have questions about your data export, please contact our support team.
+      </p>
+    `,
+  });
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")

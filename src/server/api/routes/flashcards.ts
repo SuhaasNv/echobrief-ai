@@ -21,6 +21,7 @@ import { getSql } from "../../db";
 import { generateFlashcards } from "../../services/llm";
 import type { AppBindings } from "../types";
 import type { FlashcardRow } from "../../db/types";
+import { logFlashcardGeneration } from "../../services/usage-tracker";
 
 const app = new Hono<AppBindings>();
 
@@ -80,6 +81,9 @@ app.post("/meetings/:id/flashcards/generate", async (c) => {
     WHERE meeting_id = ${id} AND workspace_id = ${workspaceId}
     ORDER BY created_at ASC
   `;
+
+  // Log flashcard generation for quota tracking
+  await logFlashcardGeneration(user.id, workspaceId, inserted.length, result.cost_usd);
 
   return c.json({ items: inserted, cost_usd: result.cost_usd });
 });

@@ -19,5 +19,26 @@ export default defineConfig({
     // Tests need the same .env as the API (DATABASE_URL, AUTH_SECRET, etc.)
     env: process.env,
     setupFiles: ["tests/setup.ts"],
+    // Coverage configuration
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+      exclude: [
+        "node_modules/",
+        "dist/",
+        "tests/",
+        "src/routeTree.gen.ts",
+        "**/*.config.ts",
+        "**/*.config.js",
+        "**/types.ts",
+      ],
+      // Target coverage thresholds (aspirational)
+      thresholds: {
+        statements: 60,
+        branches: 50,
+        functions: 50,
+        lines: 60,
+      },
+    },
   },
 });

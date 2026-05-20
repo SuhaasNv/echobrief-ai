@@ -18,6 +18,9 @@ import {
   Cpu,
   HardDrive,
   Sparkles,
+  Pencil,
+  Trash2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { getAuthToken } from "@/lib/api/client";
@@ -27,11 +30,39 @@ import {
   useAdminMeetings,
   useAdminQueue,
   useAdminSystem,
+  useUpdateUser,
+  useUpdateUserSubscription,
+  useDeleteUser,
   type AdminUserRow,
   type AdminMeetingRow,
   type AdminQueueResponse,
   type AdminSystemResponse,
 } from "@/lib/api/hooks";
+import { formatUptime, formatDateTime, formatDuration, formatDate } from "@/lib/date-utils";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin Console — EchoBrief" }] }),
@@ -202,29 +233,6 @@ function SystemPulse({ system }: { system: AdminSystemResponse | undefined }) {
   );
 }
 
-function formatUptime(sec: number): string {
-  if (sec < 60) return `${sec}s`;
-  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`;
-  return `${Math.floor(sec / 86400)}d ${Math.floor((sec % 86400) / 3600)}h`;
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function formatDuration(sec: number | null): string {
-  if (sec == null) return "—";
-  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
-}
-
 function CenterLoader() {
   return (
     <div className="flex justify-center py-12">
@@ -393,50 +401,348 @@ function OverviewSection() {
 // Users
 // ---------------------------------------------------------------------------
 
+interface EditUserDialogProps {
+  user: AdminUserRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps) {
+  const [name, setName] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [tier, setTier] = useState<"free" | "student" | "pro" | "team">("free");
+  const [status, setStatus] = useState<"active" | "cancelled" | "past_due" | "trialing">("active");
+  
+  const updateUser = useUpdateUser();
+  const updateSubscription = useUpdateUserSubscription();
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || "");
+      setIsAdmin(user.is_admin);
+      setTier((user.tier as "free" | "student" | "pro" | "team") || "free");
+      setStatus((user.subscription_status as "active" | "cancelled" | "past_due" | "trialing") || "active");
+    }
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user) return;
+
+    try {
+      // Update name and is_admin
+      await updateUser.mutateAsync({
+        userId: user.id,
+        updates: { name: name || undefined, is_admin: isAdmin },
+      });
+
+      // Update subscription
+      await updateSubscription.mutateAsync({
+        userId: user.id,
+        updates: { tier, status },
+      });
+
+      toast.success("User updated successfully");
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update user");
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Edit User</DialogTitle>
+          <DialogDescription>
+            Update user details, admin status, and subscription settings.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          {/* Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter name"
+            />
+          </div>
+
+          {/* Admin Status */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Admin Status</Label>
+              <p className="text-sm text-muted-foreground">Grant admin privileges to this user</p>
+            </div>
+            <Switch checked={isAdmin} onCheckedChange={setIsAdmin} />
+          </div>
+
+          {/* Subscription Tier */}
+          <div className="space-y-2">
+            <Label htmlFor="tier">Subscription Tier</Label>
+            <Select value={tier} onValueChange={(v) => setTier(v as typeof tier)}>
+              <SelectTrigger id="tier">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="student">Student</SelectItem>
+                <SelectItem value="pro">Pro</SelectItem>
+                <SelectItem value="team">Team</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Subscription Status */}
+          <div className="space-y-2">
+            <Label htmlFor="status">Subscription Status</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
+              <SelectTrigger id="status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="trialing">Trialing</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="past_due">Past Due</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={updateUser.isPending || updateSubscription.isPending}>
+            {updateUser.isPending || updateSubscription.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface DeleteUserDialogProps {
+  user: AdminUserRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogProps) {
+  const deleteUser = useDeleteUser();
+  const [needsConfirm, setNeedsConfirm] = useState(false);
+
+  const handleDelete = async () => {
+    if (!user) return;
+
+    try {
+      await deleteUser.mutateAsync({
+        userId: user.id,
+        confirm: user.is_admin,
+      });
+      toast.success(`User ${user.email} deleted successfully`);
+      onOpenChange(false);
+      setNeedsConfirm(false);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Failed to delete user";
+      
+      // Check if we need confirmation for admin user
+      if (errorMsg.includes("confirmation_required") && !needsConfirm) {
+        setNeedsConfirm(true);
+        toast.warning("This is an admin user. Please confirm deletion.");
+      } else {
+        toast.error(errorMsg);
+      }
+    }
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete User</AlertDialogTitle>
+          <AlertDialogDescription>
+            {user?.is_admin && needsConfirm ? (
+              <span className="text-destructive">
+                <strong>Warning:</strong> You are about to delete an admin user. This action cannot be undone.
+                All their meetings, action items, and data will be permanently deleted.
+              </span>
+            ) : (
+              <>
+                Are you sure you want to delete <strong>{user?.email}</strong>? This action cannot be undone.
+                All their meetings, action items, and data will be permanently deleted.
+              </>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setNeedsConfirm(false)}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={deleteUser.isPending}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deleteUser.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              "Delete User"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function UsersSection() {
   const { data, isLoading, isError, refetch } = useAdminUsers();
+  const { data: me } = useMe();
+  const [editUser, setEditUser] = useState<AdminUserRow | null>(null);
+  const [deleteUser, setDeleteUser] = useState<AdminUserRow | null>(null);
+  
   if (isLoading) return <CenterLoader />;
   if (isError) return <ErrorBlock onRetry={() => refetch()} />;
   const items = data?.items ?? [];
 
+  const getTierBadgeColor = (tier: string | null) => {
+    switch (tier) {
+      case "pro":
+        return "bg-purple-500/15 text-purple-600 dark:text-purple-400";
+      case "student":
+        return "bg-brand/15 text-brand";
+      case "team":
+        return "bg-amber-500/15 text-amber-600 dark:text-amber-400";
+      default:
+        return "bg-muted/60 text-muted-foreground";
+    }
+  };
+
+  const getStatusColor = (status: string | null) => {
+    switch (status) {
+      case "active":
+        return "text-success";
+      case "trialing":
+        return "text-brand";
+      case "cancelled":
+        return "text-muted-foreground";
+      case "past_due":
+        return "text-destructive";
+      default:
+        return "text-muted-foreground";
+    }
+  };
+
   return (
-    <section>
-      <SectionHeader title="Users" count={items.length} />
-      <DataTable<AdminUserRow>
-        rows={items}
-        columns={[
-          { key: "email", label: "Email", render: (u) => <span className="font-mono text-xs">{u.email}</span> },
-          { key: "name", label: "Name", render: (u) => u.name ?? <span className="text-muted-foreground">—</span> },
-          {
-            key: "role",
-            label: "Role",
-            render: (u) =>
-              u.is_admin ? (
-                <span className="inline-flex items-center gap-1 rounded-sm bg-brand/15 px-1.5 py-0.5 font-mono text-[10px] text-brand">
-                  <ShieldCheck className="h-3 w-3" /> admin
-                </span>
-              ) : (
-                <span className="font-mono text-[11px] text-muted-foreground">user</span>
+    <>
+      <section>
+        <SectionHeader title="Users" count={items.length} />
+        <DataTable<AdminUserRow>
+          rows={items}
+          columns={[
+            { key: "email", label: "Email", render: (u) => <span className="font-mono text-xs">{u.email}</span> },
+            { key: "name", label: "Name", render: (u) => u.name ?? <span className="text-muted-foreground">—</span> },
+            {
+              key: "role",
+              label: "Role",
+              render: (u) =>
+                u.is_admin ? (
+                  <span className="inline-flex items-center gap-1 rounded-sm bg-brand/15 px-1.5 py-0.5 font-mono text-[10px] text-brand">
+                    <ShieldCheck className="h-3 w-3" /> admin
+                  </span>
+                ) : (
+                  <span className="font-mono text-[11px] text-muted-foreground">user</span>
+                ),
+            },
+            {
+              key: "subscription",
+              label: "Subscription",
+              render: (u) => (
+                <div className="flex flex-col gap-1">
+                  <span className={`inline-flex w-fit items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${getTierBadgeColor(u.tier)}`}>
+                    {u.tier || "free"}
+                  </span>
+                  {u.subscription_status && (
+                    <span className={`font-mono text-[10px] ${getStatusColor(u.subscription_status)}`}>
+                      {u.subscription_status}
+                    </span>
+                  )}
+                </div>
               ),
-          },
-          {
-            key: "password",
-            label: "Auth",
-            render: (u) =>
-              u.has_password ? (
-                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-success">
-                  <CheckCircle2 className="h-3 w-3" /> password
-                </span>
-              ) : (
-                <span className="font-mono text-[11px] text-muted-foreground">oauth-only</span>
+            },
+            {
+              key: "password",
+              label: "Auth",
+              render: (u) =>
+                u.has_password ? (
+                  <span className="inline-flex items-center gap-1 font-mono text-[11px] text-success">
+                    <CheckCircle2 className="h-3 w-3" /> password
+                  </span>
+                ) : (
+                  <span className="font-mono text-[11px] text-muted-foreground">oauth-only</span>
+                ),
+            },
+            { key: "meetings", label: "Meetings", align: "right", render: (u) => <span className="font-mono text-xs">{u.meeting_count}</span> },
+            { key: "joined", label: "Joined", align: "right", render: (u) => <span className="font-mono text-[11px] text-muted-foreground">{formatDate(u.created_at)}</span> },
+            {
+              key: "actions",
+              label: "Actions",
+              align: "right",
+              render: (u) => (
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditUser(u)}
+                    className="h-7 px-2"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (u.id === me?.id) {
+                        toast.error("Cannot delete your own account");
+                        return;
+                      }
+                      setDeleteUser(u);
+                    }}
+                    disabled={u.id === me?.id}
+                    className="h-7 px-2 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               ),
-          },
-          { key: "meetings", label: "Meetings", align: "right", render: (u) => <span className="font-mono text-xs">{u.meeting_count}</span> },
-          { key: "joined", label: "Joined", align: "right", render: (u) => <span className="font-mono text-[11px] text-muted-foreground">{formatDate(u.created_at)}</span> },
-        ]}
-        emptyLabel="No users."
+            },
+          ]}
+          emptyLabel="No users."
+        />
+      </section>
+
+      <EditUserDialog
+        user={editUser}
+        open={!!editUser}
+        onOpenChange={(open) => !open && setEditUser(null)}
       />
-    </section>
+
+      <DeleteUserDialog
+        user={deleteUser}
+        open={!!deleteUser}
+        onOpenChange={(open) => !open && setDeleteUser(null)}
+      />
+    </>
   );
 }
 

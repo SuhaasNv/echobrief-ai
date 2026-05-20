@@ -14,6 +14,10 @@ import { getEnv } from "./server/env";
 import { closeSql } from "./server/db";
 import { closeRedis } from "./server/services/redis";
 import { closeQueue } from "./server/services/queue";
+import { initMonitoring } from "./server/lib/monitoring";
+
+// Initialize monitoring (Sentry APM + error tracking)
+initMonitoring();
 
 const app = new Hono();
 app.route("/api/v1", api);

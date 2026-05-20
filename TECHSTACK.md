@@ -759,7 +759,6 @@ Browser (TanStack Query)
   "recharts": "3.8.1",
   "lucide-react": "0.575.0",
   "date-fns": "4.1.0",
-  "@anthropic-ai/sdk": "latest",
   "openai": "latest",
   "@supabase/supabase-js": "latest"
 }

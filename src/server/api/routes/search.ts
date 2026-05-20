@@ -17,6 +17,7 @@ import { PROMPTS } from "../../lib/prompts";
 import { getSql } from "../../db";
 import type { MatchedChunkRow } from "../../db/types";
 import type { AppBindings } from "../types";
+import { logAIQuery } from "../../services/usage-tracker";
 
 const app = new Hono<AppBindings>();
 
@@ -79,6 +80,9 @@ app.post("/", zValidator("json", SearchRequest), async (c) => {
     history,
     userMessage: query,
   });
+
+  // Log AI query for quota tracking
+  await logAIQuery(user.id, workspaceId);
 
   c.header("content-type", "text/plain; charset=utf-8");
   c.header("cache-control", "no-cache");

@@ -144,7 +144,7 @@ V1: Core Intelligence          V2: Memory & Integrations       V3: Real-Time & T
 ─────────────────────          ─────────────────────────       ──────────────────────────
 Auth (Supabase)                Meeting Q&A (vector search)     Live transcription
 Audio upload + processing      Cross-meeting semantic search   Real-time action items
-Speech-to-text (Deepgram)      Speaker diarization             AI meeting copilot
+Speech-to-text (AssemblyAI)    Speaker diarization             AI meeting copilot
 Transcript + summary           Notion / Jira / Linear export   Team workspaces
 Action item extraction         AI email generator              Collaboration (comments)
 Meeting detail page            Meeting score analytics         Multi-language support
@@ -219,11 +219,11 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - If transcription fails, user is notified with option to retry
 
 **Technical notes:**
-- **Provider:** Deepgram Nova-3 (best latency/accuracy tradeoff)
-- **Fallback:** OpenAI Whisper (self-hosted or API) if Deepgram fails
-- Async job queue: Cloudflare Queues (or BullMQ if using Node backend)
-- Worker pulls job, calls Deepgram, stores structured transcript to PostgreSQL
-- Deepgram response shape:
+- **Provider:** AssemblyAI with "universal" speech model (best latency/accuracy tradeoff)
+- **Fallback:** OpenAI Whisper (self-hosted or API) if AssemblyAI fails
+- Worker pattern: `processing` job
+- Worker pulls job, calls AssemblyAI, stores structured transcript to PostgreSQL
+- AssemblyAI response shape:
 ```json
 {
   "words": [{ "word": "hello", "start": 0.0, "end": 0.4, "confidence": 0.99 }],
@@ -256,7 +256,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - User can mark action items complete, edit description, reassign owner
 
 **Technical notes:**
-- **Model:** Claude 3.5 Sonnet (cost-effective for batch analysis)
+- **Model:** OpenAI GPT-5 (cost-effective for batch analysis with structured outputs via json_schema mode)
 - **Prompt:** structured JSON output via tool_use (Anthropic tool calling), not freeform text
 - Summary prompt: feed full transcript in chunks (handle >100k token meetings via map-reduce)
 - For meetings > 30 minutes: summarize in 10-minute chunks, then synthesize
@@ -328,9 +328,9 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - User can ask follow-up questions in the same thread
 
 **Technical notes:**
-- **Model:** Claude 3.5 Sonnet with streaming (`stream=true`)
+- **Model:** OpenAI GPT-5 with streaming (`stream=true`)
 - System prompt includes full transcript (chunked for long meetings)
-- Long meetings (>1hr): use retrieval — embed transcript chunks, retrieve top-K, pass to Claude
+- Long meetings (>1hr): use retrieval — embed transcript chunks, retrieve top-K, pass to GPT-5
 - Conversation history maintained in React state (not persisted to DB in V1)
 
 ---
@@ -358,7 +358,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **Technical notes:**
 - Embed all transcript chunks at ingest time using `text-embedding-3-small` (OpenAI) or Cohere embeddings
 - Store vectors in **pgvector** (PostgreSQL extension) — collocated with main DB
-- Query flow: embed the user query → cosine similarity search → retrieve top 20 chunks → re-rank → pass to Claude with context
+- Query flow: embed the user query → cosine similarity search → retrieve top 20 chunks → re-rank → pass to GPT-5 with context
 - Chunk size: ~200 words with 50-word overlap
 
 ---
@@ -374,7 +374,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - Per-speaker stats shown on meeting detail page (talk time, word count)
 
 **Technical notes:**
-- Deepgram Nova-3 supports diarization natively via `diarize=true` param
+- AssemblyAI supports diarization natively via speaker labels in the Universal model
 - Speaker identity matching across meetings: store speaker embeddings, cosine-compare on new meetings
 
 ---
@@ -416,7 +416,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - Tone is professional and specific (not generic AI fluff)
 
 **Technical notes:**
-- Claude prompt includes summary + action items + participant names
+- GPT-5 prompt includes summary + action items + participant names
 - Output via streaming into an editable textarea
 
 ---
@@ -432,7 +432,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - Chapter titles are editable by the user
 
 **Technical notes:**
-- AI-generated chapters via Claude: segment transcript into logical topic blocks
+- AI-generated chapters via GPT-5: segment transcript into logical topic blocks
 - Prompt: "Given this transcript, identify 5–10 topic segments with titles and time ranges"
 - Structured JSON output via tool_use
 
@@ -471,8 +471,8 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - Recording auto-saved on session end
 
 **Technical notes:**
-- WebSocket connection for streaming audio to Deepgram Streaming API
-- Action item detection: run Claude mini on rolling 30-second windows
+- WebSocket connection for streaming audio to AssemblyAI Streaming API
+- Action item detection: run GPT-5-mini on rolling 30-second windows
 - Store session data to same pipeline as uploaded audio on completion
 
 ---
@@ -524,9 +524,9 @@ Job pushed to processing queue
     ↓
 User sees: "Processing your meeting..."
     ↓ (polling every 5s)
-Worker: Deepgram transcription (status: transcribing)
+Worker: AssemblyAI transcription (status: transcribing)
     ↓
-Worker: Claude analysis (status: analyzing)
+Worker: GPT-5 analysis (status: analyzing)
     ↓
 Worker: Vector embedding (status: indexing)
     ↓
@@ -548,7 +548,7 @@ Query embedded → vector similarity search (pgvector)
     ↓
 Top 20 chunks retrieved across all meetings
     ↓
-Chunks + query sent to Claude with RAG prompt
+Chunks + query sent to GPT-5 with RAG prompt
     ↓
 Answer streams in with source citations
     ↓
@@ -588,8 +588,8 @@ User clicks citation → opens meeting at timestamp
      │   AI Worker            │
      │   (Cloudflare Worker)  │
      │                        │
-     │  Deepgram (STT)        │
-     │  Claude API (Analysis) │
+│  AssemblyAI (STT)      │
+│  OpenAI API (Analysis) │
      │  OpenAI Embeddings     │
      └────────────────────────┘
 ```
@@ -611,8 +611,8 @@ User clicks citation → opens meeting at timestamp
 - **Cloudflare Workers (API + SSR):** Edge-first, zero cold starts, global distribution, integrated with R2/KV/Queues
 - **Supabase PostgreSQL:** Managed Postgres + pgvector + Auth + real-time subscriptions in one service
 - **pgvector over Pinecone:** Avoids a second vendor; vector search + relational queries in one DB = simpler queries, no sync issues
-- **Deepgram over Whisper:** 3–5x faster, cheaper at scale, streaming support for V3 live mode
-- **Claude API for analysis:** Best reasoning quality for meeting context; structured JSON output via tool_use is more reliable than prompt engineering GPT-4 for consistent schemas
+- **AssemblyAI over Whisper:** 3–5x faster, cheaper at scale, better diarization, streaming support for V3 live mode with Universal model
+- **OpenAI GPT-5 for analysis:** Best reasoning quality for meeting context; structured JSON output via json_schema strict mode ensures deterministic, type-safe outputs that match our TypeScript schemas exactly
 - **Hono.js:** Lightweight, fast, Cloudflare-native router for the API layer
 
 ---
@@ -790,7 +790,7 @@ DELETE /api/v1/integrations/:provider  → disconnect
 ### Processing Pipeline (per meeting)
 
 ```
-Step 1: Transcription (Deepgram)
+Step 1: Transcription (AssemblyAI)
 ─────────────────────────────────
 Input:  R2 audio URL
 Config: model=nova-3, diarize=true, smart_format=true, paragraphs=true, utterances=true
@@ -798,7 +798,7 @@ Output: { words[], paragraphs[], utterances[] }
 Store:  transcripts table (JSONB)
 Time:   ~2–5 min for 1hr audio
 
-Step 2: Summary Generation (Claude 3.5 Sonnet)
+Step 2: Summary Generation (OpenAI GPT-5)
 ───────────────────────────────────────────────
 Input:  Full transcript text
 Method: tool_use with structured JSON schema
@@ -811,7 +811,7 @@ For meetings > 90 minutes:
   - Summarize each chunk independently
   - Synthesize chunk summaries into final summary (map-reduce)
 
-Step 3: Action Item Extraction (Claude 3.5 Sonnet)
+Step 3: Action Item Extraction (OpenAI GPT-5)
 ──────────────────────────────────────────────────
 Input:  Full transcript + speaker names (if known)
 Prompt: Extract tasks with owner, deadline, source timestamp
@@ -827,7 +827,7 @@ Output: 1536-dimensional embedding per chunk
 Store:  transcript_chunks table (pgvector)
 Time:   ~5–10 seconds (batched API call)
 
-Step 5: Meeting Score (Claude 3.5 Haiku — cost-optimized)
+Step 5: Meeting Score (OpenAI GPT-5-mini — cost-optimized)
 ──────────────────────────────────────────────────────────
 Input:  Transcript + speaker stats + action items
 Output: { total, participation, actionability, focus, clarity, efficiency, explanation }
@@ -850,9 +850,9 @@ User query: "What did we decide about pricing?"
    ORDER BY c.embedding <=> $query_embedding
    LIMIT 20;
 
-3. Re-rank: Claude Haiku re-ranks top 20 by relevance (optional, adds ~1s)
+3. Re-rank: GPT-5-mini re-ranks top 20 by relevance (optional, adds ~1s)
 
-4. Generate answer: Claude Sonnet with RAG prompt
+4. Generate answer: GPT-5 with RAG prompt
    System: "Answer using only the provided context. Cite sources."
    User: { query, context_chunks }
 
@@ -863,10 +863,10 @@ User query: "What did we decide about pricing?"
 
 | Step | Provider | Cost |
 |------|----------|------|
-| Transcription | Deepgram Nova-3 | ~$0.14 |
-| Summary + Action Items | Claude 3.5 Sonnet (2 calls) | ~$0.08 |
-| Embeddings (chunks) | OpenAI text-embedding-3-small | ~$0.004 |
-| Meeting Score | Claude 3.5 Haiku | ~$0.01 |
+| Transcription | AssemblyAI Universal | ~$0.10-0.15 |
+| Summary + Action Items | OpenAI GPT-5 (1 call, structured) | ~$0.12 |
+| Embeddings (100 chunks) | OpenAI text-embedding-3-small | ~$0.002 |
+| Meeting Score | OpenAI GPT-5-mini | ~$0.01 |
 | **Total per meeting** | | **~$0.23** |
 
 At a $20/month plan with 30 meetings/month → COGS = ~$7/user/month → ~65% gross margin (target).
@@ -912,8 +912,8 @@ At a $20/month plan with 30 meetings/month → COGS = ~$7/user/month → ~65% gr
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| Deepgram accuracy poor for non-English or accented speech | Medium | High | Allow user to correct transcript inline; add language selection |
-| Claude API rate limits during processing spikes | Low | Medium | Queue-based architecture absorbs spikes; implement backoff |
+| AssemblyAI accuracy poor for non-English or accented speech | Medium | High | Allow user to correct transcript inline; add language selection via API parameter |
+| OpenAI API rate limits during processing spikes | Low | Medium | Queue-based architecture absorbs spikes; implement exponential backoff with retries |
 | Vector search quality poor for short meetings | Medium | Medium | Fall back to full-text search (PostgreSQL `tsvector`) if meeting < 5 minutes |
 | R2 presigned URL expiry before large file upload completes | Low | Medium | Generate URL with 2-hour TTL; implement resumable upload |
 | AI hallucination in meeting Q&A | Medium | High | Ground prompt with explicit transcript context; add "I don't know" escape hatch; display source quotes |

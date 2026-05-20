@@ -1,11 +1,11 @@
 /**
- * Redis-backed sliding-window rate limiter.
+ * Redis-backed sliding-window rate limiter with tier-based limits.
  *
  * Keys: ratelimit:{user_id|ip}:{bucket}:{window}
  *
  * Buckets:
- *   - general — 100 req/min/user — standard API endpoints (read/write)
- *   - ai      — 10 req/min/user  — LLM-heavy endpoints (cost protection)
+ *   - general — Tier-based limits (free: 100, student: 300, pro: 500, team: 2000 req/min)
+ *   - ai      — Tier-based limits (free: 10, student: 50, pro: 100, team: 500 req/min)
  *   - auth    — 5 attempts / 15min / (IP + email) — login bruteforce defense
  *   - signup  — 3 signups / hour / IP — signup spam defense
  *
@@ -16,6 +16,8 @@
 
 import type { MiddlewareHandler, Context } from "hono";
 import { getRedis } from "../../services/redis";
+import { getUserTier, type SubscriptionTier } from "../../services/usage-tracker";
+import { logRateLimit } from "../../lib/logger";
 import type { AppBindings } from "../types";
 import type { IncomingMessage } from "node:http";
 
@@ -24,11 +26,32 @@ interface BucketConfig {
   window_sec: number;
 }
 
+// Base limits (for non-authenticated or fixed-bucket endpoints)
 const LIMITS: Record<string, BucketConfig> = {
   general: { max: 100, window_sec: 60 },
   ai: { max: 10, window_sec: 60 },
   auth: { max: 5, window_sec: 60 * 15 },
   signup: { max: 3, window_sec: 60 * 60 },
+};
+
+// Tier-based limits (for authenticated users)
+const TIER_LIMITS: Record<SubscriptionTier, Record<string, BucketConfig>> = {
+  free: {
+    general: { max: 100, window_sec: 60 },
+    ai: { max: 10, window_sec: 60 },
+  },
+  student: {
+    general: { max: 300, window_sec: 60 },
+    ai: { max: 50, window_sec: 60 },
+  },
+  pro: {
+    general: { max: 500, window_sec: 60 },
+    ai: { max: 100, window_sec: 60 },
+  },
+  team: {
+    general: { max: 2000, window_sec: 60 },
+    ai: { max: 500, window_sec: 60 },
+  },
 };
 
 /**
@@ -70,10 +93,21 @@ export function rateLimit(
   opts: RateLimitOptions = {},
 ): MiddlewareHandler<AppBindings> {
   return async (c, next) => {
-    const cfg = LIMITS[bucket];
     const user = c.get("user");
     const identifier = user?.id ?? clientIp(c);
     const suffix = opts.keySuffix ? `:${opts.keySuffix}` : "";
+
+    // Get tier-specific limits for authenticated users
+    let cfg = LIMITS[bucket];
+    if (user && (bucket === "general" || bucket === "ai")) {
+      try {
+        const tier = await getUserTier(user.id);
+        cfg = TIER_LIMITS[tier]?.[bucket] ?? cfg;
+      } catch (err) {
+        // Fall back to base limits if getUserTier fails
+        console.warn("[RateLimit] Failed to get user tier, using base limits:", err);
+      }
+    }
 
     const windowStart = Math.floor(Date.now() / 1000 / cfg.window_sec);
     const key = `ratelimit:${identifier}${suffix}:${bucket}:${windowStart}`;
@@ -86,12 +120,30 @@ export function rateLimit(
       await redis.expire(key, cfg.window_sec + 5);
     }
 
+    // Calculate rate limit info for headers
+    const remaining = Math.max(0, cfg.max - count);
+    const resetTime = (windowStart + 1) * cfg.window_sec;
+    
+    // SECURITY: Always return rate limit headers (RFC 6585 standard)
+    // Helps clients implement proper retry logic and avoid hammering the API
+    c.header("X-RateLimit-Limit", String(cfg.max));
+    c.header("X-RateLimit-Remaining", String(remaining));
+    c.header("X-RateLimit-Reset", String(resetTime));
+    
     if (count > cfg.max) {
       const retryAfter = cfg.window_sec;
+      const ip = clientIp(c);
+      
+      // Log security event for rate limit violation
+      logRateLimit(bucket, identifier, count, cfg.max, ip);
+      
       return c.json(
         {
           error: "rate_limited",
           message: `Too many requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`,
+          retry_after_seconds: retryAfter,  // Machine-readable for client retry logic
+          limit: cfg.max,
+          window_seconds: cfg.window_sec,
         },
         429,
         { "Retry-After": String(retryAfter) },

@@ -432,11 +432,12 @@ function Landing() {
             <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">Pricing</p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">Pay for what you record.</h2>
           </motion.div>
-          <div className="mt-14 grid gap-5 md:grid-cols-3">
+          <div className="mt-14 grid gap-5 md:grid-cols-4">
             {[
-              { name: "Starter", price: "$0", desc: "For solo work and casual notes.", cta: "Start free", features: ["5 hrs / month", "AI summaries", "Action items", "7-day history"], featured: false },
-              { name: "Pro", price: "$29", desc: "For builders and operators.", cta: "Start trial", features: ["Unlimited hours", "Cross-meeting AI search", "Linear / Notion / Slack", "12-month history", "Priority processing"], featured: true },
-              { name: "Team", price: "$79", desc: "Per seat. For teams of 5+.", cta: "Talk to sales", features: ["Everything in Pro", "Workspace analytics", "SSO + SCIM", "Data residency", "Dedicated support"], featured: false },
+              { name: "Free", price: "$0", desc: "For solo work and casual notes.", cta: "Start free", features: ["5 hrs / month", "10 AI queries", "1 workspace", "30-day history"], featured: false },
+              { name: "Student", price: "$7", desc: "For students with .edu email.", cta: "Start trial", features: ["Unlimited hours", "Unlimited AI queries", "Flashcards", "1-year history"], featured: false },
+              { name: "Pro", price: "$14", desc: "For builders and operators.", cta: "Start trial", features: ["Everything in Student", "Integrations", "Email generation", "2-year history"], featured: true },
+              { name: "Team", price: "$29", desc: "For teams of 5+.", cta: "Talk to sales", features: ["Everything in Pro", "Shared workspaces", "Unlimited history", "Priority support"], featured: false },
             ].map((p) => (
               <div
                 key={p.name}

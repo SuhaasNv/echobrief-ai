@@ -1,0 +1,405 @@
+/**
+ * Integration tests for quota enforcement middleware.
+ *
+ * Tests that quota middleware correctly blocks requests when limits are exceeded
+ * and allows requests when quota is available.
+ */
+
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { Hono } from "hono";
+import { getSql } from "@/server/db";
+import {
+  requireTranscriptionQuota,
+  requireAIQueryQuota,
+  requireFlashcardQuota,
+} from "@/server/api/middleware/quota";
+import { requireAuth } from "@/server/api/middleware/auth";
+import type { AppBindings } from "@/server/api/types";
+import api from "@/server/api";
+
+const TEST_PREFIX = `vitest-quota-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+const createdEmails: string[] = [];
+
+function uniqueEmail(): string {
+  const e = `${TEST_PREFIX}-${createdEmails.length}@test.echobrief.local`;
+  createdEmails.push(e);
+  return e;
+}
+
+async function postJson(path: string, body: unknown, token?: string) {
+  return api.request(path, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+async function createUserWithTier(tier: string): Promise<{ token: string; userId: string; workspaceId: string }> {
+  const email = uniqueEmail();
+  const signup = await postJson("/auth/signup", {
+    email,
+    password: "testpassword12",
+    name: "Quota Test User",
+  });
+  expect(signup.status).toBe(200);
+  const { token, user } = await signup.json();
+
+  const sql = getSql();
+
+  // Set tier
+  if (tier !== "free") {
+    await sql`
+      UPDATE subscriptions
+      SET tier = ${tier}
+      WHERE user_id = ${user.id}
+    `;
+  }
+
+  // Get workspace
+  const [workspace] = await sql<[{ id: string }]>`
+    SELECT id FROM workspaces WHERE owner_id = ${user.id} LIMIT 1
+  `;
+
+  return { token, userId: user.id, workspaceId: workspace.id };
+}
+
+async function logUsageDirectly(userId: string, workspaceId: string, type: string, amount: number) {
+  const sql = getSql();
+  const period = new Date().toISOString().slice(0, 7);
+
+  await sql`
+    INSERT INTO usage_logs (user_id, workspace_id, usage_type, amount, period)
+    VALUES (${userId}, ${workspaceId}, ${type}, ${amount}, ${period})
+  `;
+}
+
+afterAll(async () => {
+  if (createdEmails.length === 0) return;
+  const sql = getSql();
+  await sql`DELETE FROM users WHERE email = ANY(${sql.array(createdEmails)})`;
+});
+
+// Create test app with quota middleware
+function createTestApp(middleware: any) {
+  const app = new Hono<AppBindings>();
+  app.use("*", requireAuth); // Auth required first
+  app.post("/test", middleware, async (c) => {
+    return c.json({ success: true });
+  });
+  return app;
+}
+
+describe("requireTranscriptionQuota middleware", () => {
+  let freeUser: { token: string; userId: string; workspaceId: string };
+  let proUser: { token: string; userId: string; workspaceId: string };
+
+  beforeAll(async () => {
+    freeUser = await createUserWithTier("free");
+    proUser = await createUserWithTier("pro");
+  });
+
+  it("allows transcription when free tier under limit (< 300 min)", async () => {
+    const app = createTestApp(requireTranscriptionQuota);
+
+    // Log 100 minutes (well under 300 limit)
+    await logUsageDirectly(freeUser.userId, freeUser.workspaceId, "transcription", 100);
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${freeUser.token}`,
+      },
+      body: JSON.stringify({ durationSec: 60 }), // 1 minute
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("blocks transcription when free tier at limit (300 min)", async () => {
+    const testUser = await createUserWithTier("free");
+    const app = createTestApp(requireTranscriptionQuota);
+
+    // Log exactly 300 minutes
+    await logUsageDirectly(testUser.userId, testUser.workspaceId, "transcription", 300);
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${testUser.token}`,
+      },
+      body: JSON.stringify({ durationSec: 60 }),
+    });
+
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).toBe("quota_exceeded");
+    expect(body.tier).toBe("free");
+    expect(body.current).toBe(300);
+    expect(body.limit).toBe(300);
+  });
+
+  it("blocks transcription when free tier over limit", async () => {
+    const testUser = await createUserWithTier("free");
+    const app = createTestApp(requireTranscriptionQuota);
+
+    // Log 350 minutes (over limit)
+    await logUsageDirectly(testUser.userId, testUser.workspaceId, "transcription", 350);
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${testUser.token}`,
+      },
+      body: JSON.stringify({ durationSec: 60 }),
+    });
+
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.current).toBeGreaterThanOrEqual(350);
+  });
+
+  it("allows transcription for pro tier even with high usage", async () => {
+    const app = createTestApp(requireTranscriptionQuota);
+
+    // Log 1000 minutes (would exceed free tier)
+    await logUsageDirectly(proUser.userId, proUser.workspaceId, "transcription", 1000);
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${proUser.token}`,
+      },
+      body: JSON.stringify({ durationSec: 60 }),
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("calculates minutes from durationSec correctly", async () => {
+    const testUser = await createUserWithTier("free");
+    const app = createTestApp(requireTranscriptionQuota);
+
+    // Log 299 minutes
+    await logUsageDirectly(testUser.userId, testUser.workspaceId, "transcription", 299);
+
+    // Request 90 seconds (2 minutes after ceiling)
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${testUser.token}`,
+      },
+      body: JSON.stringify({ durationSec: 90 }), // 1.5 min → ceil to 2
+    });
+
+    // 299 + 2 = 301, exceeds 300 limit
+    expect(res.status).toBe(429);
+  });
+});
+
+describe("requireAIQueryQuota middleware", () => {
+  let freeUser: { token: string; userId: string; workspaceId: string };
+  let studentUser: { token: string; userId: string; workspaceId: string };
+
+  beforeAll(async () => {
+    freeUser = await createUserWithTier("free");
+    studentUser = await createUserWithTier("student");
+  });
+
+  it("allows AI query when free tier under limit (< 10 queries)", async () => {
+    const app = createTestApp(requireAIQueryQuota);
+
+    // Log 5 queries
+    for (let i = 0; i < 5; i++) {
+      await logUsageDirectly(freeUser.userId, freeUser.workspaceId, "ai_query", 1);
+    }
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${freeUser.token}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("blocks AI query when free tier at limit (10 queries)", async () => {
+    const testUser = await createUserWithTier("free");
+    const app = createTestApp(requireAIQueryQuota);
+
+    // Log exactly 10 queries
+    for (let i = 0; i < 10; i++) {
+      await logUsageDirectly(testUser.userId, testUser.workspaceId, "ai_query", 1);
+    }
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${testUser.token}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).toBe("quota_exceeded");
+    expect(body.current).toBe(10);
+    expect(body.limit).toBe(10);
+  });
+
+  it("allows AI query for student tier with unlimited quota", async () => {
+    const app = createTestApp(requireAIQueryQuota);
+
+    // Log 100 queries (would exceed free tier)
+    for (let i = 0; i < 100; i++) {
+      await logUsageDirectly(studentUser.userId, studentUser.workspaceId, "ai_query", 1);
+    }
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${studentUser.token}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("requireFlashcardQuota middleware", () => {
+  let freeUser: { token: string; userId: string; workspaceId: string };
+  let studentUser: { token: string; userId: string; workspaceId: string };
+
+  beforeAll(async () => {
+    freeUser = await createUserWithTier("free");
+    studentUser = await createUserWithTier("student");
+  });
+
+  it("allows flashcard generation when free tier under limit (< 3)", async () => {
+    const app = createTestApp(requireFlashcardQuota);
+
+    // Log 1 flashcard
+    await logUsageDirectly(freeUser.userId, freeUser.workspaceId, "flashcard", 1);
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${freeUser.token}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("blocks flashcard generation when free tier at limit (3)", async () => {
+    const testUser = await createUserWithTier("free");
+    const app = createTestApp(requireFlashcardQuota);
+
+    // Log exactly 3 flashcards
+    await logUsageDirectly(testUser.userId, testUser.workspaceId, "flashcard", 3);
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${testUser.token}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).toBe("quota_exceeded");
+    expect(body.current).toBe(3);
+    expect(body.limit).toBe(3);
+  });
+
+  it("allows flashcard generation for student tier with unlimited quota", async () => {
+    const app = createTestApp(requireFlashcardQuota);
+
+    // Log 50 flashcards (would exceed free tier)
+    await logUsageDirectly(studentUser.userId, studentUser.workspaceId, "flashcard", 50);
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${studentUser.token}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("quota middleware error responses", () => {
+  let testUser: { token: string; userId: string; workspaceId: string };
+
+  beforeAll(async () => {
+    testUser = await createUserWithTier("free");
+  });
+
+  it("returns correct error structure on quota exceeded", async () => {
+    const app = createTestApp(requireAIQueryQuota);
+
+    // Exceed AI query limit
+    for (let i = 0; i < 10; i++) {
+      await logUsageDirectly(testUser.userId, testUser.workspaceId, "ai_query", 1);
+    }
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${testUser.token}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("content-type")).toContain("application/json");
+
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+    expect(body).toHaveProperty("message");
+    expect(body).toHaveProperty("tier");
+    expect(body).toHaveProperty("current");
+    expect(body).toHaveProperty("limit");
+
+    expect(body.message).toContain("upgrade"); // Should suggest upgrading
+  });
+
+  it("includes upgrade suggestion in error message", async () => {
+    const app = createTestApp(requireTranscriptionQuota);
+
+    await logUsageDirectly(testUser.userId, testUser.workspaceId, "transcription", 300);
+
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${testUser.token}`,
+      },
+      body: JSON.stringify({ durationSec: 60 }),
+    });
+
+    const body = await res.json();
+    expect(body.message.toLowerCase()).toMatch(/upgrade|limit/);
+  });
+});

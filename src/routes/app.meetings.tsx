@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Search, Filter, Plus, Clock, Loader2, Users, Trash2 } from "lucide-react";
+import { Search, Filter, Plus, Clock, Users, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useMeetings, useDeleteMeeting } from "@/lib/api/hooks";
 import { useLabels } from "@/lib/workspace-store";
+import { formatDate, formatDuration } from "@/lib/date-utils";
+import { LoadingSpinner } from "@/components/shared/loading-spinner";
 
 // Map server status string → progress percent for the inline bar.
 const STATUS_PERCENT: Record<string, number> = {
@@ -27,19 +29,6 @@ export const Route = createFileRoute("/app/meetings")({
   head: () => ({ meta: [{ title: "Meetings — EchoBrief" }] }),
   component: MeetingsPage,
 });
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-function formatDuration(sec: number | null): string {
-  if (sec == null) return "—";
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 function MeetingsPage() {
   const [q, setQ] = useState("");
@@ -93,7 +82,7 @@ function MeetingsPage() {
 
       {isLoading ? (
         <div className="mt-12 flex justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <LoadingSpinner size="lg" />
         </div>
       ) : isError ? (
         <div className="mt-12 rounded-xl border border-border/70 bg-surface p-10 text-center">
@@ -232,7 +221,7 @@ function MeetingsPage() {
                 disabled={del.isPending}
                 className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                {del.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                {del.isPending ? <LoadingSpinner size="sm" /> : <Trash2 className="h-3 w-3" />}
                 {del.isPending ? "Deleting…" : "Delete"}
               </button>
             </div>

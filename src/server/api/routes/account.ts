@@ -7,8 +7,11 @@ import { HTTPException } from "hono/http-exception";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import argon2 from "argon2";
+import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { UpdateProfileRequest } from "../../../lib/schemas";
 import { getSql } from "../../db";
+import { enqueueExportJob } from "../../services/queue";
+import { getEnv } from "../../env";
 import type { AppBindings } from "../types";
 
 const ChangePasswordRequest = z.object({
@@ -79,7 +82,13 @@ app.post("/password", zValidator("json", ChangePasswordRequest), async (c) => {
 
 app.post("/export", async (c) => {
   const user = c.get("user");
-  // TODO: enqueue an export job that builds a ZIP and emails a download link.
+  
+  // Enqueue background job to build ZIP and email download link
+  await enqueueExportJob({
+    user_id: user.id,
+    email: user.email,
+  });
+
   return c.json({
     queued: true,
     message: `Export queued for ${user.email}. You'll receive an email within 1 hour.`,
@@ -89,11 +98,77 @@ app.post("/export", async (c) => {
 app.delete("/me", async (c) => {
   const user = c.get("user");
   const sql = getSql();
+  const env = getEnv();
 
+  // ---- 1. Delete R2 audio files (best-effort) ------------------------------
+  // List all audio files under user's prefix and batch delete them.
+  // R2 cleanup failures are logged but don't block account deletion (GDPR
+  // compliance at DB level is mandatory; R2 cleanup is nice-to-have).
+  try {
+    if (env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY) {
+      const client = new S3Client({
+        region: "auto",
+        endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        credentials: {
+          accessKeyId: env.R2_ACCESS_KEY_ID,
+          secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+        },
+      });
+
+      let deletedCount = 0;
+      let continuationToken: string | undefined;
+
+      do {
+        // List all objects with user's prefix
+        const listResponse = await client.send(
+          new ListObjectsV2Command({
+            Bucket: env.R2_BUCKET,
+            Prefix: `${user.id}/`, // All audio files under userId/
+            ContinuationToken: continuationToken,
+            MaxKeys: 1000,
+          })
+        );
+
+        const objects = listResponse.Contents ?? [];
+        if (objects.length === 0) break;
+
+        // Batch delete all objects in this page
+        const deleteResponse = await client.send(
+          new DeleteObjectsCommand({
+            Bucket: env.R2_BUCKET,
+            Delete: {
+              Objects: objects.map((obj) => ({ Key: obj.Key })),
+              Quiet: true,
+            },
+          })
+        );
+
+        const deleted = objects.length - (deleteResponse.Errors?.length ?? 0);
+        deletedCount += deleted;
+
+        if (deleteResponse.Errors && deleteResponse.Errors.length > 0) {
+          console.error(
+            `[account-delete] R2 deletion errors for user ${user.id}:`,
+            deleteResponse.Errors.slice(0, 5)
+          );
+        }
+
+        continuationToken = listResponse.NextContinuationToken;
+      } while (continuationToken);
+
+      console.log(`[account-delete] deleted ${deletedCount} audio files from R2 for user ${user.id}`);
+    }
+  } catch (err) {
+    // Log R2 cleanup failures but don't block account deletion
+    console.error(`[account-delete] R2 cleanup failed for user ${user.id}:`, err);
+  }
+
+  // ---- 2. Delete user from database -----------------------------------------
   // ON DELETE CASCADE in migrations removes meetings, transcripts, chunks, etc.
   await sql`DELETE FROM users WHERE id = ${user.id}`;
-  // TODO: also queue R2 batch delete for any remaining audio under `${user.id}/*`.
-  // TODO: revoke Better Auth sessions.
+  
+  // TODO: revoke Better Auth sessions (if using session-based auth).
+  
   return c.json({ ok: true });
 });
 

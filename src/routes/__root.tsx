@@ -10,6 +10,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { CommandPaletteProvider } from "@/components/command-palette";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { themeBootScript } from "@/lib/theme";
 
 import appCss from "../styles.css?url";
@@ -124,13 +125,15 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <CommandPaletteProvider>
-          <Outlet />
-          <Toaster position="bottom-right" richColors closeButton />
-        </CommandPaletteProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <CommandPaletteProvider>
+            <Outlet />
+            <Toaster position="bottom-right" richColors closeButton />
+          </CommandPaletteProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

@@ -41,7 +41,7 @@ async function main() {
   );
 
   const files = readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith(".sql"))
+    .filter((f) => f.endsWith(".sql") && !f.includes("rollback"))
     .sort();
 
   let applied_count = 0;

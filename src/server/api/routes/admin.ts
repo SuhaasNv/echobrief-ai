@@ -6,12 +6,15 @@
  */
 
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { requireAdmin } from "../middleware/auth";
 import { getSql } from "../../db";
 import { getProcessingQueue, getQueueConnection } from "../../services/queue";
 import { getEnv } from "../../env";
 import type { AppBindings } from "../types";
 import type Redis from "ioredis";
+import adminWorkerRoutes from "./admin-workers";
 
 const admin = new Hono<AppBindings>();
 admin.use("*", requireAdmin);
@@ -24,8 +27,15 @@ interface AdminUserRow {
   has_password: boolean;
   meeting_count: number;
   created_at: string;
+  tier: string | null;
+  subscription_status: string | null;
+  stripe_customer_id: string | null;
+  billing_interval: string | null;
+  current_period_end: Date | null;
+  price_usd: number | null;
 }
 
+// GET /admin/users — list all users with subscription data
 admin.get("/users", async (c) => {
   const sql = getSql();
   const rows = await sql<AdminUserRow[]>`
@@ -35,8 +45,15 @@ admin.get("/users", async (c) => {
            u.is_admin,
            (u.password_hash IS NOT NULL) AS has_password,
            COALESCE(mc.cnt, 0)::int AS meeting_count,
-           u.created_at
+           u.created_at,
+           s.tier,
+           s.status AS subscription_status,
+           s.stripe_customer_id,
+           s.billing_interval,
+           s.current_period_end,
+           s.price_usd
     FROM users u
+    LEFT JOIN subscriptions s ON s.user_id = u.id
     LEFT JOIN (
       SELECT user_id, COUNT(*) AS cnt
       FROM meetings
@@ -45,6 +62,216 @@ admin.get("/users", async (c) => {
     ORDER BY u.created_at DESC
   `;
   return c.json({ items: rows });
+});
+
+// GET /admin/users/:id — detailed user view with subscription and usage history
+admin.get("/users/:id", async (c) => {
+  const userId = c.req.param("id");
+  const sql = getSql();
+
+  // Get user with subscription details
+  const userRows = await sql<
+    Array<{
+      id: string;
+      email: string;
+      name: string | null;
+      avatar_url: string | null;
+      is_admin: boolean;
+      has_password: boolean;
+      created_at: string;
+      updated_at: string;
+      tier: string | null;
+      subscription_status: string | null;
+      stripe_customer_id: string | null;
+      stripe_subscription_id: string | null;
+      billing_interval: string | null;
+      current_period_start: Date | null;
+      current_period_end: Date | null;
+      price_usd: number | null;
+      edu_email_verified: boolean | null;
+    }>
+  >`
+    SELECT u.id,
+           u.email,
+           u.name,
+           u.avatar_url,
+           u.is_admin,
+           (u.password_hash IS NOT NULL) AS has_password,
+           u.created_at,
+           u.updated_at,
+           s.tier,
+           s.status AS subscription_status,
+           s.stripe_customer_id,
+           s.stripe_subscription_id,
+           s.billing_interval,
+           s.current_period_start,
+           s.current_period_end,
+           s.price_usd,
+           s.edu_email_verified
+    FROM users u
+    LEFT JOIN subscriptions s ON s.user_id = u.id
+    WHERE u.id = ${userId}
+  `;
+
+  if (userRows.length === 0) {
+    return c.json({ error: "not_found", message: "User not found" }, 404);
+  }
+
+  // Get usage history (last 6 months)
+  const usageRows = await sql<
+    Array<{
+      period: string;
+      transcription_minutes: number;
+      ai_queries_count: number;
+      flashcards_generated: number;
+      total_cost_usd: number;
+    }>
+  >`
+    SELECT period,
+           transcription_minutes,
+           ai_queries_count,
+           flashcards_generated,
+           total_cost_usd
+    FROM usage_logs
+    WHERE user_id = ${userId}
+    ORDER BY period DESC
+    LIMIT 6
+  `;
+
+  return c.json({
+    user: userRows[0],
+    usage_history: usageRows,
+  });
+});
+
+// PATCH /admin/users/:id — update user name and is_admin flag
+const UpdateUserSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  is_admin: z.boolean().optional(),
+  // Note: Don't allow email changes (auth identifier)
+});
+
+admin.patch("/users/:id", zValidator("json", UpdateUserSchema), async (c) => {
+  const userId = c.req.param("id");
+  const updates = c.req.valid("json");
+  const sql = getSql();
+  const currentAdmin = c.get("user");
+
+  // Prevent admin from removing their own admin status
+  if (userId === currentAdmin.id && updates.is_admin === false) {
+    return c.json(
+      {
+        error: "forbidden",
+        message: "Cannot remove your own admin privileges",
+      },
+      403,
+    );
+  }
+
+  // Build dynamic UPDATE
+  const sets = [];
+  if (updates.name !== undefined) sets.push(sql`name = ${updates.name}`);
+  if (updates.is_admin !== undefined) sets.push(sql`is_admin = ${updates.is_admin}`);
+
+  if (sets.length === 0) return c.json({ ok: true });
+
+  const setClause = sets.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc}, ${cur}`));
+
+  await sql`
+    UPDATE users 
+    SET ${setClause}, updated_at = now() 
+    WHERE id = ${userId}
+  `;
+
+  return c.json({ ok: true });
+});
+
+// PATCH /admin/users/:id/subscription — update subscription tier and status
+const UpdateSubscriptionSchema = z.object({
+  tier: z.enum(["free", "student", "pro", "team"]),
+  status: z.enum(["active", "cancelled", "past_due", "trialing"]).optional(),
+});
+
+admin.patch("/users/:id/subscription", zValidator("json", UpdateSubscriptionSchema), async (c) => {
+  const userId = c.req.param("id");
+  const { tier, status } = c.req.valid("json");
+  const sql = getSql();
+
+  // Check if subscription exists
+  const existing = await sql<Array<{ id: string }>>`
+    SELECT id FROM subscriptions WHERE user_id = ${userId}
+  `;
+
+  if (existing.length === 0) {
+    // Create subscription if missing
+    await sql`
+      INSERT INTO subscriptions (user_id, tier, status)
+      VALUES (${userId}, ${tier}, ${status || "active"})
+    `;
+  } else {
+    // Update existing
+    const updates = [sql`tier = ${tier}`];
+    if (status) updates.push(sql`status = ${status}`);
+
+    const setClause = updates.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc}, ${cur}`));
+
+    await sql`
+      UPDATE subscriptions 
+      SET ${setClause}, updated_at = now()
+      WHERE user_id = ${userId}
+    `;
+  }
+
+  return c.json({ ok: true });
+});
+
+// DELETE /admin/users/:id — delete user with safety checks
+admin.delete("/users/:id", async (c) => {
+  const userId = c.req.param("id");
+  const sql = getSql();
+  const currentAdmin = c.get("user");
+
+  // Prevent self-deletion
+  if (userId === currentAdmin.id) {
+    return c.json(
+      {
+        error: "forbidden",
+        message: "Cannot delete your own account",
+      },
+      403,
+    );
+  }
+
+  // Check if user exists
+  const user = await sql<Array<{ id: string; email: string; is_admin: boolean }>>`
+    SELECT id, email, is_admin FROM users WHERE id = ${userId}
+  `;
+
+  if (user.length === 0) {
+    return c.json({ error: "not_found", message: "User not found" }, 404);
+  }
+
+  // Warn if deleting another admin (require confirmation)
+  if (user[0].is_admin) {
+    const confirmed = c.req.query("confirm") === "true";
+    if (!confirmed) {
+      return c.json(
+        {
+          error: "confirmation_required",
+          message: "This is an admin user. Add ?confirm=true to proceed",
+        },
+        400,
+      );
+    }
+  }
+
+  // Delete user (CASCADE handles related records: subscriptions, meetings, etc.)
+  await sql`DELETE FROM users WHERE id = ${userId}`;
+
+  return c.json({
+    ok: true,
+    deleted_email: user[0].email,
+  });
 });
 
 interface AdminMeetingRow {
@@ -164,5 +391,8 @@ admin.get("/system", async (c) => {
     },
   });
 });
+
+// Mount worker monitoring routes
+admin.route("/workers", adminWorkerRoutes);
 
 export default admin;

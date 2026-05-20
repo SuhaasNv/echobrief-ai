@@ -20,36 +20,19 @@ import {
   Copy,
   Link2,
   Link2Off,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useMeeting, useMeetingStatus, useActionItems, useRetryMeeting, useDeleteMeeting, usePatchMeeting, useMeetingAudioUrl, useShareMeeting, useFlashcards, useGenerateFlashcards, useDeleteFlashcard } from "@/lib/api/hooks";
 import type { MeetingDetail, MeetingStatusResponse } from "@/lib/schemas";
 import { useActiveWorkspaceKind, useLabels } from "@/lib/workspace-store";
 import { Brain, Sparkle, GraduationCap } from "lucide-react";
+import { formatTimestamp, formatDuration, formatDate } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/app/meetings_/$id")({
   head: () => ({ meta: [{ title: "Meeting — EchoBrief" }] }),
   component: MeetingDetailPage,
 });
-
-function formatTimestamp(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-function formatDuration(sec: number | null): string {
-  if (sec == null) return "—";
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
 
 function MeetingDetailPage() {
   const { id } = useParams({ from: "/app/meetings_/$id" });
@@ -273,6 +256,18 @@ function ShareMenu({ meetingId, shareToken }: { meetingId: string; shareToken: s
     }
   };
 
+  const handleReset = async () => {
+    try {
+      // Disable then re-enable to generate a new token
+      await share.mutateAsync(false);
+      await share.mutateAsync(true);
+      toast.success("Link regenerated");
+      setCopied(false); // Reset copied state
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't reset link");
+    }
+  };
+
   const handleDisable = async () => {
     try {
       await share.mutateAsync(false);
@@ -340,16 +335,36 @@ function ShareMenu({ meetingId, shareToken }: { meetingId: string; shareToken: s
                     >
                       {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
                     </button>
+                    <a
+                      href={shareUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Open in new tab"
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleDisable}
-                    disabled={share.isPending}
-                    className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60"
-                  >
-                    {share.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2Off className="h-3 w-3" />}
-                    Disable sharing
-                  </button>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      disabled={share.isPending}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs transition-colors hover:bg-accent disabled:opacity-60"
+                    >
+                      {share.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                      Reset link
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDisable}
+                      disabled={share.isPending}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60"
+                    >
+                      {share.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2Off className="h-3 w-3" />}
+                      Disable
+                    </button>
+                  </div>
                 </>
               ) : (
                 <button

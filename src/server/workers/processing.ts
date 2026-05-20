@@ -24,6 +24,7 @@ import {
 } from "../services/resend";
 import { chunkTranscript, chunkRawText } from "../lib/chunking";
 import { getEnv } from "../env";
+import { logTranscription, logAIQuery } from "../services/usage-tracker";
 
 interface SpeakerStat { label: string; talk_time_sec: number; word_count: number }
 
@@ -103,6 +104,9 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
       status: "success",
     });
 
+    // Log transcription usage for quota tracking
+    await logTranscription(job.user_id, workspaceId, result.duration_sec, result.cost_usd);
+
     raw_text = result.raw_text;
     words = result.words;
     speakers = result.speakers;
@@ -162,6 +166,9 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
     cost_usd: analysis.cost_usd,
     status: "success",
   });
+
+  // Log AI query usage (summary + action items generation)
+  await logAIQuery(job.user_id, workspaceId, analysis.cost_usd);
 
   // ---- 3. Embed for vector search ---------------------------------------
   await sql`UPDATE meetings SET status = 'indexing' WHERE id = ${job.meeting_id}`;

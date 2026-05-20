@@ -1,20 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Users, FileText, Loader2 } from "lucide-react";
+import { FileAudio, Loader2, FileText, Users } from "lucide-react";
 import { useMeetings } from "@/lib/api/hooks";
+import { formatDate } from "@/lib/date-utils";
 import { useLabels } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/shared")({
-  head: () => ({ meta: [{ title: "Notes library — EchoBrief" }] }),
-  component: NotesLibrary,
+  head: () => ({ meta: [{ title: "Shared Meetings — EchoBrief" }] }),
+  component: SharedPage,
 });
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-function NotesLibrary() {
+function SharedPage() {
   const { data, isLoading, isError, refetch } = useMeetings({ status: "complete", limit: 50 });
   const items = data?.items ?? [];
   const labels = useLabels();

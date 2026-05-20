@@ -15,24 +15,12 @@ import { toast } from "sonner";
 import type { ActionItem } from "@/lib/schemas";
 import { useActionItems, usePatchActionItem, useDeleteActionItem } from "@/lib/api/hooks";
 import { useLabels, useActiveWorkspaceKind } from "@/lib/workspace-store";
+import { formatDue, isOverdue } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/app/action-items")({
   head: () => ({ meta: [{ title: "Action Items — EchoBrief" }] }),
   component: ActionItemsPage,
 });
-
-function formatDue(due: string | null): string {
-  if (!due) return "No due date";
-  const d = new Date(due);
-  if (Number.isNaN(d.getTime())) return due;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function isOverdue(due: string | null): boolean {
-  if (!due) return false;
-  const d = new Date(due);
-  return !Number.isNaN(d.getTime()) && d.getTime() < Date.now();
-}
 
 function ActionItemsPage() {
   const { data, isLoading, isError, refetch } = useActionItems();

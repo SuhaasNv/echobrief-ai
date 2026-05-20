@@ -19,6 +19,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as ShareTokenRouteImport } from './routes/share.$token'
 import { Route as AppUploadRouteImport } from './routes/app.upload'
 import { Route as AppStudyRouteImport } from './routes/app.study'
 import { Route as AppSharedRouteImport } from './routes/app.shared'
@@ -78,6 +79,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRoute,
+} as any)
+const ShareTokenRoute = ShareTokenRouteImport.update({
+  id: '/share/$token',
+  path: '/share/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppUploadRoute = AppUploadRouteImport.update({
   id: '/upload',
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/app/shared': typeof AppSharedRoute
   '/app/study': typeof AppStudyRoute
   '/app/upload': typeof AppUploadRoute
+  '/share/$token': typeof ShareTokenRoute
   '/app/': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
 }
@@ -163,6 +170,7 @@ export interface FileRoutesByTo {
   '/app/shared': typeof AppSharedRoute
   '/app/study': typeof AppStudyRoute
   '/app/upload': typeof AppUploadRoute
+  '/share/$token': typeof ShareTokenRoute
   '/app': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
 }
@@ -185,6 +193,7 @@ export interface FileRoutesById {
   '/app/shared': typeof AppSharedRoute
   '/app/study': typeof AppStudyRoute
   '/app/upload': typeof AppUploadRoute
+  '/share/$token': typeof ShareTokenRoute
   '/app/': typeof AppIndexRoute
   '/app/meetings_/$id': typeof AppMeetingsIdRoute
 }
@@ -208,6 +217,7 @@ export interface FileRouteTypes {
     | '/app/shared'
     | '/app/study'
     | '/app/upload'
+    | '/share/$token'
     | '/app/'
     | '/app/meetings/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/app/shared'
     | '/app/study'
     | '/app/upload'
+    | '/share/$token'
     | '/app'
     | '/app/meetings/$id'
   id:
@@ -249,6 +260,7 @@ export interface FileRouteTypes {
     | '/app/shared'
     | '/app/study'
     | '/app/upload'
+    | '/share/$token'
     | '/app/'
     | '/app/meetings_/$id'
   fileRoutesById: FileRoutesById
@@ -263,6 +275,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   SignupRoute: typeof SignupRoute
   TermsRoute: typeof TermsRoute
+  ShareTokenRoute: typeof ShareTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -336,6 +349,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/share/$token': {
+      id: '/share/$token'
+      path: '/share/$token'
+      fullPath: '/share/$token'
+      preLoaderRoute: typeof ShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/app/upload': {
       id: '/app/upload'
@@ -441,6 +461,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   SignupRoute: SignupRoute,
   TermsRoute: TermsRoute,
+  ShareTokenRoute: ShareTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

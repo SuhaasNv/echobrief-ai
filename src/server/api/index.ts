@@ -13,10 +13,14 @@ import { requireAuth } from "./middleware/auth";
 import { requireWorkspace, requireProfessionalWorkspace } from "./middleware/workspace";
 import { rateLimit } from "./middleware/rate-limit";
 import { securityHeaders } from "./middleware/security-headers";
+import { requestLimits } from "./middleware/request-limits";
+import { sentryMiddleware } from "./middleware/monitoring";
 import { getEnv } from "../env";
 
 import adminRoutes from "./routes/admin";
 import authRoutes from "./routes/auth";
+import healthRoutes from "./routes/health";
+import docsRoutes from "./routes/docs";
 import meetingsRoutes from "./routes/meetings";
 import actionItemsRoutes from "./routes/action-items";
 import chatRoutes from "./routes/chat";
@@ -28,13 +32,17 @@ import shareRoutes from "./routes/share";
 import workspacesRoutes from "./routes/workspaces";
 import flashcardsRoutes from "./routes/flashcards";
 import streamingRoutes from "./routes/streaming";
+import analyticsRoutes from "./routes/analytics";
+import subscriptionRoutes from "./routes/subscription";
 
 import type { AppBindings } from "./types";
 
 const api = new Hono<AppBindings>();
 
 api.use("*", requestId);
+api.use("*", sentryMiddleware); // Monitoring + error tracking
 api.use("*", securityHeaders);
+api.use("*", requestLimits); // DoS protection via size limits
 api.use(
   "*",
   cors({
@@ -52,7 +60,11 @@ api.use(
 
 api.onError(errorHandler);
 
-api.get("/health", (c) => c.json({ ok: true, env: getEnv().NODE_ENV }));
+// Health checks (no auth, for load balancers / k8s probes)
+api.route("/", healthRoutes);
+
+// API documentation (no auth, public documentation)
+api.route("/docs", docsRoutes);
 
 // Public routes (no auth)
 api.route("/auth", authRoutes);
@@ -68,6 +80,8 @@ protectedApi.use("/account/*", rateLimit("general"));
 protectedApi.use("/integrations/*", rateLimit("general"));
 protectedApi.use("/workspaces/*", rateLimit("general"));
 protectedApi.use("/flashcards/*", rateLimit("general"));
+protectedApi.use("/analytics/*", rateLimit("general"));
+protectedApi.use("/subscription/*", rateLimit("general"));
 
 protectedApi.use("/search", rateLimit("ai"));
 protectedApi.use("/generate/*", rateLimit("ai"));
@@ -80,6 +94,9 @@ protectedApi.use("/streaming/*", rateLimit("ai"));
 // Workspaces CRUD is workspace-agnostic (you need to list them to switch).
 protectedApi.route("/workspaces", workspacesRoutes);
 
+// Subscription management is workspace-agnostic (user-level).
+protectedApi.route("/subscription", subscriptionRoutes);
+
 // Everything below this line operates inside an active workspace.
 protectedApi.use("/meetings/*", requireWorkspace);
 protectedApi.use("/action-items/*", requireWorkspace);
@@ -88,6 +105,7 @@ protectedApi.use("/flashcards/*", requireWorkspace);
 protectedApi.use("/integrations/*", requireWorkspace);
 protectedApi.use("/generate/*", requireWorkspace);
 protectedApi.use("/streaming/*", requireWorkspace);
+protectedApi.use("/analytics/*", requireWorkspace);
 
 // Pro-only carve-outs (server-side enforcement, not just UI-hide).
 protectedApi.use("/integrations/*", requireProfessionalWorkspace());
@@ -103,6 +121,7 @@ protectedApi.route("/search", searchRoutes);
 protectedApi.route("/integrations", integrationsRoutes);
 protectedApi.route("/account", accountRoutes);
 protectedApi.route("/generate", generateRoutes);
+protectedApi.route("/analytics", analyticsRoutes);
 protectedApi.route("/admin", adminRoutes);
 
 api.route("/", protectedApi);

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Clock, FileAudio, Sparkles, CheckSquare, Upload, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowUpRight, Clock, FileAudio, Sparkles, CheckSquare, Upload, ArrowRight } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -12,24 +12,13 @@ import {
 } from "recharts";
 import { useMe, useMeetings, useActionItems } from "@/lib/api/hooks";
 import { useLabels } from "@/lib/workspace-store";
+import { formatDate, formatDuration, getTodayFormatted } from "@/lib/date-utils";
+import { LoadingSpinner } from "@/components/shared/loading-spinner";
 
 export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "Dashboard — EchoBrief" }] }),
   component: Dashboard,
 });
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function formatDuration(sec: number | null): string {
-  if (sec == null) return "—";
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 function firstName(name: string | null | undefined, email: string): string {
   if (name && name.trim()) return name.trim().split(" ")[0];
@@ -43,7 +32,7 @@ function Dashboard() {
   const openActionsQuery = useActionItems({ completed: false });
   const labels = useLabels();
 
-  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  const today = getTodayFormatted();
 
   // Compute hours-transcribed-per-day for the last 7 days from real meetings.
   const { chartData, totalHours } = useMemo(() => {
@@ -191,9 +180,9 @@ function Dashboard() {
               View all →
             </Link>
           </div>
-          {openActionsQuery.isLoading ? (
-            <div className="mt-6 flex justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-          ) : openActions.length === 0 ? (
+        {openActionsQuery.isLoading ? (
+          <div className="mt-6 flex justify-center"><LoadingSpinner size="md" /></div>
+        ) : openActions.length === 0 ? (
             <p className="mt-6 text-center text-xs text-muted-foreground">No open actions.</p>
           ) : (
             <div className="mt-4 space-y-1.5">
@@ -223,7 +212,7 @@ function Dashboard() {
           </Link>
         </div>
         {meetingsQuery.isLoading ? (
-          <div className="mt-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          <div className="mt-6 flex justify-center"><LoadingSpinner size="lg" /></div>
         ) : recentMeetings.length === 0 ? (
           <div className="mt-4 rounded-xl border border-dashed border-border/70 bg-surface/40 py-12 text-center">
             <p className="text-sm font-medium">No {labels.meeting.plural.toLowerCase()} yet.</p>

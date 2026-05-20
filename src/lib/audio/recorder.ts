@@ -234,7 +234,7 @@ export class LiveRecorder extends EventTarget {
   private async connectWebSocket(): Promise<void> {
     const { token, ws_url } = await this.opts.fetchToken();
     const sampleRate = this.opts.sampleRate ?? 16000;
-    const url = `${ws_url}?token=${encodeURIComponent(token)}&sample_rate=${sampleRate}&encoding=pcm_s16le`;
+    const url = `${ws_url}?token=${encodeURIComponent(token)}&sample_rate=${sampleRate}&encoding=pcm_s16le&speech_model=universal`;
     this.wsUrl = ws_url;
 
     console.debug("[live-recorder] connecting WS", { sampleRate, wsHost: new URL(url).host });

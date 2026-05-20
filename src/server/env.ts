@@ -56,12 +56,54 @@ let cached: Env | null = null;
 
 export function getEnv(): Env {
   if (cached) return cached;
+  
   const parsed = EnvSchema.safeParse(process.env);
+  
   if (!parsed.success) {
-    console.error("Invalid environment:", parsed.error.flatten().fieldErrors);
-    throw new Error("Invalid environment configuration");
+    console.error("❌ Invalid environment configuration:");
+    console.error(JSON.stringify(parsed.error.flatten().fieldErrors, null, 2));
+    
+    // In production, fail fast - don't start with invalid config
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Cannot start in production with invalid environment configuration");
+    }
+    
+    // In development, warn but continue (for local dev convenience)
+    console.warn("⚠️  Continuing in development mode with partial configuration");
+    console.warn("⚠️  Some features may not work correctly");
   }
-  cached = parsed.data;
+  
+  cached = parsed.data || {} as Env;
+  
+  // Warn about missing optional features
+  if (!cached.OPENAI_API_KEY) {
+    console.warn("⚠️  OPENAI_API_KEY not set - AI features will be stubbed/disabled");
+  }
+  if (!cached.ASSEMBLYAI_API_KEY) {
+    console.warn("⚠️  ASSEMBLYAI_API_KEY not set - transcription will fail");
+  }
+  if (!cached.RESEND_API_KEY) {
+    console.warn("⚠️  RESEND_API_KEY not set - email notifications disabled");
+  }
+  if (!cached.R2_ACCESS_KEY_ID || !cached.R2_SECRET_ACCESS_KEY) {
+    console.warn("⚠️  R2 credentials not set - audio storage will fail");
+  }
+  
+  // Log configuration summary in development
+  if (cached.NODE_ENV === "development") {
+    console.log("[ENV] Configuration loaded:");
+    console.log("  - NODE_ENV:", cached.NODE_ENV);
+    console.log("  - DB pool size:", process.env.DB_POOL_SIZE || "100 (default)");
+    console.log("  - Worker concurrency:", process.env.WORKER_CONCURRENCY || "10 (default)");
+    console.log("  - Export worker concurrency:", process.env.EXPORT_WORKER_CONCURRENCY || "5 (default)");
+    console.log("  - Redis pool size:", process.env.REDIS_POOL_SIZE || "10 (default)");
+    console.log("  - OpenAI:", cached.OPENAI_API_KEY ? "✓ configured" : "✗ missing");
+    console.log("  - AssemblyAI:", cached.ASSEMBLYAI_API_KEY ? "✓ configured" : "✗ missing");
+    console.log("  - Resend:", cached.RESEND_API_KEY ? "✓ configured" : "✗ missing");
+    console.log("  - R2:", (cached.R2_ACCESS_KEY_ID && cached.R2_SECRET_ACCESS_KEY) ? "✓ configured" : "✗ missing");
+    console.log("  - Sentry:", process.env.SENTRY_DSN ? "✓ configured" : "✗ missing");
+  }
+  
   return cached;
 }
 
@@ -71,4 +113,9 @@ export interface ProcessingJob {
   audio_key: string;
   language?: string;
   retry_count?: number;
+}
+
+export interface ExportJob {
+  user_id: string;
+  email: string;
 }
