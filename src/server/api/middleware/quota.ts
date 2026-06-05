@@ -34,15 +34,22 @@ export const requireTranscriptionQuota = createMiddleware<AppBindings>(async (c,
 
   // SECURITY: Read validated body (set by zValidator middleware)
   // If route doesn't use zValidator, this will throw an error (fail-safe)
-  let body: QuotaRequestBody;
+  let body: QuotaRequestBody | undefined;
   try {
     body = (c.req.valid as unknown as (target: string) => QuotaRequestBody)("json");
   } catch {
-    // Fallback: parse body but validate strictly
-    body = (await c.req.json()) as QuotaRequestBody;
+    // Ignore and fall through to manual parsing
   }
 
-  const durationSec = body.durationSec ?? 0;
+  if (!body) {
+    try {
+      body = (await c.req.json()) as QuotaRequestBody;
+    } catch {
+      body = {};
+    }
+  }
+
+  const durationSec = body?.durationSec ?? 0;
 
   // SECURITY: Strict validation to prevent quota bypass attacks
   if (typeof durationSec !== "number") {

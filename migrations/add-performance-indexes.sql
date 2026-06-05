@@ -24,10 +24,10 @@ CREATE INDEX IF NOT EXISTS idx_meetings_workspace_status
 CREATE INDEX IF NOT EXISTS idx_usage_logs_period
   ON usage_logs(user_id, period);
 
--- Index on embeddings for vector search
--- Pattern: SELECT * FROM embeddings WHERE meeting_id = ?
-CREATE INDEX IF NOT EXISTS idx_embeddings_meeting
-  ON embeddings(meeting_id);
+-- Index on transcript_chunks for vector search
+-- Pattern: SELECT * FROM transcript_chunks WHERE meeting_id = ?
+CREATE INDEX IF NOT EXISTS idx_transcript_chunks_meeting
+  ON transcript_chunks(meeting_id);
 
 -- Index on chat_messages for conversation history
 -- Pattern: SELECT * FROM chat_messages WHERE meeting_id = ? ORDER BY created_at DESC
@@ -53,7 +53,7 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_user_status
 -- This helps PostgreSQL choose optimal query plans
 ANALYZE meetings;
 ANALYZE usage_logs;
-ANALYZE embeddings;
+ANALYZE transcript_chunks;
 ANALYZE chat_messages;
 ANALYZE action_items;
 ANALYZE flashcards;
