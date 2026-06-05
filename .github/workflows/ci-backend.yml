@@ -322,19 +322,19 @@ jobs:
     steps:
       - name: Write Summary
         env:
-          R_INSTALL:   ${{ needs.install-dependencies.result }}
-          R_SECRETS:   ${{ needs.secrets-detection.result }}
-          R_GITLEAKS:  ${{ needs.gitleaks.result }}
-          R_BUILD:     ${{ needs.production-build.result }}
-          R_LINT:      ${{ needs.lint.result }}
-          R_TESTS:     ${{ needs.unit-integration-tests.result }}
-          R_SCA:       ${{ needs.sca.result }}
-          R_AUDIT:     ${{ needs.npm-audit.result }}
-          R_OWASP:     ${{ needs.sca-owasp-dependency-check.result }}
-          R_SAST:      ${{ needs.sast.result }}
-          R_SEMGREP:   ${{ needs.semgrep.result }}
-          R_CODEQL:    ${{ needs.sast-codeql.result }}
-          R_ZAP:       ${{ needs.dast-owasp-zap.result }}
+          R_INSTALL: ${{ needs.install-dependencies.result }}
+          R_SECRETS: ${{ needs.secrets-detection.result }}
+          R_GITLEAKS: ${{ needs.gitleaks.result }}
+          R_BUILD: ${{ needs.production-build.result }}
+          R_LINT: ${{ needs.lint.result }}
+          R_TESTS: ${{ needs.unit-integration-tests.result }}
+          R_SCA: ${{ needs.sca.result }}
+          R_AUDIT: ${{ needs.npm-audit.result }}
+          R_OWASP: ${{ needs.sca-owasp-dependency-check.result }}
+          R_SAST: ${{ needs.sast.result }}
+          R_SEMGREP: ${{ needs.semgrep.result }}
+          R_CODEQL: ${{ needs.sast-codeql.result }}
+          R_ZAP: ${{ needs.dast-owasp-zap.result }}
         run: |
           icon() {
             case "$1" in
