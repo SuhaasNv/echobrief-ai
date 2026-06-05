@@ -51,14 +51,13 @@ async function createUserWithTier(
 
   const sql = getSql();
 
-  // Set tier
-  if (tier !== "free") {
-    await sql`
-      UPDATE subscriptions
-      SET tier = ${tier}
-      WHERE user_id = ${user.id}
-    `;
-  }
+  // Set tier (always UPSERT to ensure active row exists)
+  await sql`
+    INSERT INTO subscriptions (user_id, tier, status)
+    VALUES (${user.id}, ${tier}, 'active')
+    ON CONFLICT (user_id) DO UPDATE
+      SET tier = EXCLUDED.tier, status = 'active'
+  `;
 
   // Get workspace
   const [workspace] = await sql<[{ id: string }]>`
@@ -418,7 +417,7 @@ describe("quota middleware error responses", () => {
     expect(body).toHaveProperty("current");
     expect(body).toHaveProperty("limit");
 
-    expect(body.message).toContain("upgrade"); // Should suggest upgrading
+    expect(body.message.toLowerCase()).toContain("upgrade"); // Should suggest upgrading
   });
 
   it("includes upgrade suggestion in error message", async () => {

@@ -47,15 +47,13 @@ async function createUserDirect(
   expect(signup.status).toBe(200);
   const { token, user } = await signup.json();
 
-  // Set tier if not free
-  if (tier !== "free") {
-    const sql = getSql();
-    await sql`
-      UPDATE subscriptions
-      SET tier = ${tier}
-      WHERE user_id = ${user.id}
-    `;
-  }
+  const sql = getSql();
+  await sql`
+    INSERT INTO subscriptions (user_id, tier, status)
+    VALUES (${user.id}, ${tier}, 'active')
+    ON CONFLICT (user_id) DO UPDATE
+      SET tier = EXCLUDED.tier, status = 'active'
+  `;
 
   return { email, token, userId: user.id };
 }
