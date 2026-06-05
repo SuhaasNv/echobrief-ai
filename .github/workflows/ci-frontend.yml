@@ -235,6 +235,13 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:javascript,typescript"
+          upload: false
+          output: sarif-results
+      - name: Upload SARIF as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif-frontend
+          path: sarif-results/
 
   # ── Node 13 ───────────────────────────────────────────────────────────────
   dast-owasp-zap:
