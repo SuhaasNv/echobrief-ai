@@ -11,6 +11,6 @@ describe("GET /health", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(typeof body.env).toBe("string");
+    expect(typeof body.service).toBe("string");
   });
 });
