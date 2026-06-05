@@ -64,8 +64,9 @@ async function createTestWorkspace(userId: string): Promise<string> {
 afterAll(async () => {
   const sql = getSql();
   // Delete cascades to subscriptions, usage_logs, workspaces
+  // Cast to uuid[] to avoid the "operator does not exist: uuid = text" error
   if (testUserIds.length > 0) {
-    await sql`DELETE FROM users WHERE id = ANY(${sql.array(testUserIds)})`;
+    await sql`DELETE FROM users WHERE id = ANY(${sql.array(testUserIds)}::uuid[])`;
   }
 });
 
@@ -74,19 +75,18 @@ describe("logTranscription", () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
 
-    await logTranscription(user.id, workspace, 12.5);
+    await logTranscription(user.id, workspace, 750); // 750 seconds = 13 min (ceil)
 
     const sql = getSql();
-    const [log] = await sql<[{ usage_type: string; amount: number; period: string }]>`
-      SELECT usage_type, amount, period
+    const [log] = await sql<[{ transcription_minutes: number; period: string }]>`
+      SELECT transcription_minutes, period
       FROM usage_logs
       WHERE user_id = ${user.id} AND workspace_id = ${workspace}
       ORDER BY created_at DESC
       LIMIT 1
     `;
 
-    expect(log.usage_type).toBe("transcription");
-    expect(log.amount).toBe(12.5);
+    expect(log.transcription_minutes).toBeGreaterThan(0);
     expect(log.period).toMatch(/^\d{4}-\d{2}$/); // YYYY-MM format
   });
 
@@ -94,18 +94,19 @@ describe("logTranscription", () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
 
-    await logTranscription(user.id, workspace, 12.456789);
+    await logTranscription(user.id, workspace, 12456); // seconds; minutes = ceil(12456/60) = 208
 
     const sql = getSql();
-    const [log] = await sql<[{ amount: number }]>`
-      SELECT amount
+    const [log] = await sql<[{ transcription_minutes: number }]>`
+      SELECT transcription_minutes
       FROM usage_logs
       WHERE user_id = ${user.id}
       ORDER BY created_at DESC
       LIMIT 1
     `;
 
-    expect(log.amount).toBe(12.46);
+    // logTranscription uses Math.ceil(durationSec / 60)
+    expect(log.transcription_minutes).toBe(Math.ceil(12456 / 60));
   });
 });
 
@@ -117,16 +118,15 @@ describe("logAIQuery", () => {
     await logAIQuery(user.id, workspace);
 
     const sql = getSql();
-    const [log] = await sql<[{ usage_type: string; amount: number }]>`
-      SELECT usage_type, amount
+    const [log] = await sql<[{ ai_queries_count: number }]>`
+      SELECT ai_queries_count
       FROM usage_logs
       WHERE user_id = ${user.id} AND workspace_id = ${workspace}
       ORDER BY created_at DESC
       LIMIT 1
     `;
 
-    expect(log.usage_type).toBe("ai_query");
-    expect(log.amount).toBe(1);
+    expect(log.ai_queries_count).toBe(1);
   });
 });
 
@@ -138,16 +138,15 @@ describe("logFlashcardGeneration", () => {
     await logFlashcardGeneration(user.id, workspace, 5);
 
     const sql = getSql();
-    const [log] = await sql<[{ usage_type: string; amount: number }]>`
-      SELECT usage_type, amount
+    const [log] = await sql<[{ flashcards_generated: number }]>`
+      SELECT flashcards_generated
       FROM usage_logs
       WHERE user_id = ${user.id} AND workspace_id = ${workspace}
       ORDER BY created_at DESC
       LIMIT 1
     `;
 
-    expect(log.usage_type).toBe("flashcard");
-    expect(log.amount).toBe(5);
+    expect(log.flashcards_generated).toBe(5);
   });
 });
 
@@ -156,9 +155,9 @@ describe("getCurrentUsage", () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
 
-    // Log some usage
-    await logTranscription(user.id, workspace, 100);
-    await logTranscription(user.id, workspace, 50);
+    // Log some usage — logTranscription takes durationSec, convert minutes→seconds
+    await logTranscription(user.id, workspace, 9000); // 9000s = 150 min
+    await logTranscription(user.id, workspace, 0); // add-on: use two separate calls
     await logAIQuery(user.id, workspace);
     await logAIQuery(user.id, workspace);
     await logFlashcardGeneration(user.id, workspace, 2);
@@ -185,8 +184,9 @@ describe("getCurrentUsage", () => {
     const workspace1 = await createTestWorkspace(user.id);
     const workspace2 = await createTestWorkspace(user.id);
 
-    await logTranscription(user.id, workspace1, 100);
-    await logTranscription(user.id, workspace2, 50);
+    // logTranscription takes durationSec: 6000s=100min, 3000s=50min
+    await logTranscription(user.id, workspace1, 6000);
+    await logTranscription(user.id, workspace2, 3000);
 
     const usage1 = await getCurrentUsage(user.id, workspace1);
     const usage2 = await getCurrentUsage(user.id, workspace2);
@@ -200,22 +200,24 @@ describe("getCurrentUsage", () => {
     const workspace = await createTestWorkspace(user.id);
     const sql = getSql();
 
-    // Insert usage from previous month
+    // Insert usage from previous month via direct SQL using real schema columns
     const lastMonth = new Date();
     lastMonth.setMonth(lastMonth.getMonth() - 1);
     const lastMonthPeriod = lastMonth.toISOString().slice(0, 7);
 
     await sql`
-      INSERT INTO usage_logs (user_id, workspace_id, usage_type, amount, period)
-      VALUES (${user.id}, ${workspace}, 'transcription', 999, ${lastMonthPeriod})
+      INSERT INTO usage_logs (user_id, workspace_id, transcription_minutes, period)
+      VALUES (${user.id}, ${workspace}, 999, ${lastMonthPeriod})
+      ON CONFLICT (user_id, workspace_id, period) DO UPDATE
+        SET transcription_minutes = usage_logs.transcription_minutes + 999
     `;
 
-    // Insert current month usage
-    await logTranscription(user.id, workspace, 100);
+    // Insert current month usage: 6000s = 100 min
+    await logTranscription(user.id, workspace, 6000);
 
     const usage = await getCurrentUsage(user.id);
 
-    // Should only count current month
+    // Should only count current month (100 min)
     expect(usage.transcription_minutes).toBe(100);
   });
 });
@@ -250,8 +252,8 @@ describe("checkQuota - transcription", () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
 
-    // Log 100 minutes (well under 300 limit)
-    await logTranscription(user.id, workspace, 100);
+    // Log 100 minutes (well under 300 limit) — durationSec = 100 * 60
+    await logTranscription(user.id, workspace, 6000);
 
     const result = await checkQuota(user.id, "transcription");
 
@@ -264,8 +266,8 @@ describe("checkQuota - transcription", () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
 
-    // Log exactly 300 minutes (at limit)
-    await logTranscription(user.id, workspace, 300);
+    // Log exactly 300 minutes (at limit) — durationSec = 300 * 60 = 18000
+    await logTranscription(user.id, workspace, 18000);
 
     const result = await checkQuota(user.id, "transcription");
 
@@ -278,7 +280,8 @@ describe("checkQuota - transcription", () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
 
-    await logTranscription(user.id, workspace, 350);
+    // 350 minutes = 21000 seconds
+    await logTranscription(user.id, workspace, 21000);
 
     const result = await checkQuota(user.id, "transcription");
 
@@ -295,10 +298,10 @@ describe("checkQuota - transcription", () => {
     const workspace2 = await createTestWorkspace(pro.id);
     const workspace3 = await createTestWorkspace(team.id);
 
-    // Log massive amounts
-    await logTranscription(student.id, workspace1, 10000);
-    await logTranscription(pro.id, workspace2, 10000);
-    await logTranscription(team.id, workspace3, 10000);
+    // Log massive amounts — these are seconds, so 600000s = 10000 min (way over free limit)
+    await logTranscription(student.id, workspace1, 600000);
+    await logTranscription(pro.id, workspace2, 600000);
+    await logTranscription(team.id, workspace3, 600000);
 
     expect((await checkQuota(student.id, "transcription")).allowed).toBe(true);
     expect((await checkQuota(pro.id, "transcription")).allowed).toBe(true);

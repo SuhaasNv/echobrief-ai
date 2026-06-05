@@ -22,7 +22,7 @@ CREATE INDEX IF NOT EXISTS idx_meetings_workspace_status
 -- Index on usage_logs for quota checking
 -- Pattern: SELECT SUM(...) FROM usage_logs WHERE user_id = ? AND period = '2026-05'
 CREATE INDEX IF NOT EXISTS idx_usage_logs_period
-  ON usage_logs(user_id, period, usage_type);
+  ON usage_logs(user_id, period);
 
 -- Index on embeddings for vector search
 -- Pattern: SELECT * FROM embeddings WHERE meeting_id = ?

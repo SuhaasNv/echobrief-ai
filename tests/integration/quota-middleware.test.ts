@@ -72,10 +72,42 @@ async function logUsageDirectly(userId: string, workspaceId: string, type: strin
   const sql = getSql();
   const period = new Date().toISOString().slice(0, 7);
 
+  // Map type to the actual columnar schema column names
+  const colMap: Record<string, string> = {
+    transcription: "transcription_minutes",
+    ai_query: "ai_queries_count",
+    flashcard: "flashcards_generated",
+  };
+  const col = colMap[type];
+  if (!col) throw new Error(`Unknown usage type: ${type}`);
+
+  // Ensure the row exists first, then increment the right column
   await sql`
-    INSERT INTO usage_logs (user_id, workspace_id, usage_type, amount, period)
-    VALUES (${userId}, ${workspaceId}, ${type}, ${amount}, ${period})
+    INSERT INTO usage_logs (user_id, workspace_id, period)
+    VALUES (${userId}, ${workspaceId}, ${period})
+    ON CONFLICT (user_id, workspace_id, period) DO NOTHING
   `;
+
+  // Use dynamic SQL to increment the correct column
+  if (col === "transcription_minutes") {
+    await sql`
+      UPDATE usage_logs
+      SET transcription_minutes = transcription_minutes + ${amount}, updated_at = now()
+      WHERE user_id = ${userId} AND workspace_id = ${workspaceId} AND period = ${period}
+    `;
+  } else if (col === "ai_queries_count") {
+    await sql`
+      UPDATE usage_logs
+      SET ai_queries_count = ai_queries_count + ${amount}, updated_at = now()
+      WHERE user_id = ${userId} AND workspace_id = ${workspaceId} AND period = ${period}
+    `;
+  } else if (col === "flashcards_generated") {
+    await sql`
+      UPDATE usage_logs
+      SET flashcards_generated = flashcards_generated + ${amount}, updated_at = now()
+      WHERE user_id = ${userId} AND workspace_id = ${workspaceId} AND period = ${period}
+    `;
+  }
 }
 
 afterAll(async () => {

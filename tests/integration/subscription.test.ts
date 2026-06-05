@@ -70,24 +70,23 @@ async function logUsage(
   const sql = getSql();
   const period = new Date().toISOString().slice(0, 7); // YYYY-MM
 
-  if (minutes > 0) {
-    await sql`
-      INSERT INTO usage_logs (user_id, workspace_id, usage_type, amount, period)
-      VALUES (${userId}, ${workspaceId}, 'transcription', ${minutes}, ${period})
-    `;
-  }
+  // Ensure row exists
+  await sql`
+    INSERT INTO usage_logs (user_id, workspace_id, period)
+    VALUES (${userId}, ${workspaceId}, ${period})
+    ON CONFLICT (user_id, workspace_id, period) DO NOTHING
+  `;
 
-  for (let i = 0; i < queries; i++) {
+  // Increment the relevant columns
+  if (minutes > 0 || queries > 0 || flashcards > 0) {
     await sql`
-      INSERT INTO usage_logs (user_id, workspace_id, usage_type, amount, period)
-      VALUES (${userId}, ${workspaceId}, 'ai_query', 1, ${period})
-    `;
-  }
-
-  if (flashcards > 0) {
-    await sql`
-      INSERT INTO usage_logs (user_id, workspace_id, usage_type, amount, period)
-      VALUES (${userId}, ${workspaceId}, 'flashcard', ${flashcards}, ${period})
+      UPDATE usage_logs
+      SET
+        transcription_minutes = transcription_minutes + ${minutes},
+        ai_queries_count      = ai_queries_count + ${queries},
+        flashcards_generated  = flashcards_generated + ${flashcards},
+        updated_at = now()
+      WHERE user_id = ${userId} AND workspace_id = ${workspaceId} AND period = ${period}
     `;
   }
 }
