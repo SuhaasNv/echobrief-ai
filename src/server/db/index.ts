@@ -27,8 +27,11 @@ export function getSql(): Sql {
   // Railway Postgres supports up to 300 connections total
   const maxConnections = parseInt(process.env.DB_POOL_SIZE || "100");
 
+  // SSL: required in production (Railway), disabled in test/local (Docker Postgres has no SSL)
+  const sslConfig = env.NODE_ENV === "production" ? ("require" as const) : false;
+
   _sql = postgres(env.DATABASE_URL, {
-    ssl: "require",
+    ssl: sslConfig,
     max: maxConnections, // 100 connections per instance (up from 10)
     idle_timeout: 20, // Recycle idle connections faster (down from 30)
     connect_timeout: 10,

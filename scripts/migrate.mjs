@@ -22,8 +22,11 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
+// SSL: required in production (Railway), disabled in test/CI (Docker Postgres has no SSL)
+const sslConfig = process.env.NODE_ENV === "production" ? "require" : false;
+
 const sql = postgres(DATABASE_URL, {
-  ssl: "require",
+  ssl: sslConfig,
   max: 1,
   prepare: false,
 });

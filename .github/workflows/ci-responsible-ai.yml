@@ -54,6 +54,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
 
   # ── Node 4 ────────────────────────────────────────────────────────────────
   production-build:
@@ -236,31 +237,60 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     needs:
+      - install-dependencies
+      - secrets-detection
       - gitleaks
       - production-build
+      - lint
       - unit-integration-tests
+      - sca
       - npm-audit
       - sca-owasp-dependency-check
+      - sast
       - semgrep
       - sast-codeql
       - dast-owasp-zap
     steps:
       - name: Write Summary
+        env:
+          R_INSTALL:   ${{ needs.install-dependencies.result }}
+          R_SECRETS:   ${{ needs.secrets-detection.result }}
+          R_GITLEAKS:  ${{ needs.gitleaks.result }}
+          R_BUILD:     ${{ needs.production-build.result }}
+          R_LINT:      ${{ needs.lint.result }}
+          R_TESTS:     ${{ needs.unit-integration-tests.result }}
+          R_SCA:       ${{ needs.sca.result }}
+          R_AUDIT:     ${{ needs.npm-audit.result }}
+          R_OWASP:     ${{ needs.sca-owasp-dependency-check.result }}
+          R_SAST:      ${{ needs.sast.result }}
+          R_SEMGREP:   ${{ needs.semgrep.result }}
+          R_CODEQL:    ${{ needs.sast-codeql.result }}
+          R_ZAP:       ${{ needs.dast-owasp-zap.result }}
         run: |
+          icon() {
+            case "$1" in
+              success)  echo "✅" ;;
+              failure)  echo "❌" ;;
+              cancelled) echo "⏹️" ;;
+              skipped)  echo "⏭️" ;;
+              *)        echo "⚠️" ;;
+            esac
+          }
+
           echo "## CI Responsible AI — Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| Install Dependencies | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Secrets Detection | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Gitleaks | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Production Build | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Lint | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Unit & Integration Tests (450+ AI cases) | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| SCA | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| NPM Audit | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| SCA — OWASP Dependency Check | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| SAST | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| SAST — Semgrep | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| SAST — CodeQL | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| DAST — OWASP ZAP | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Install Dependencies | $(icon $R_INSTALL) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets Detection | $(icon $R_SECRETS) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gitleaks | $(icon $R_GITLEAKS) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Production Build | $(icon $R_BUILD) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | $(icon $R_LINT) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit & Integration Tests (450+ AI cases) | $(icon $R_TESTS) |" >> $GITHUB_STEP_SUMMARY
+          echo "| SCA | $(icon $R_SCA) |" >> $GITHUB_STEP_SUMMARY
+          echo "| NPM Audit | $(icon $R_AUDIT) |" >> $GITHUB_STEP_SUMMARY
+          echo "| SCA — OWASP Dependency Check | $(icon $R_OWASP) |" >> $GITHUB_STEP_SUMMARY
+          echo "| SAST | $(icon $R_SAST) |" >> $GITHUB_STEP_SUMMARY
+          echo "| SAST — Semgrep | $(icon $R_SEMGREP) |" >> $GITHUB_STEP_SUMMARY
+          echo "| SAST — CodeQL | $(icon $R_CODEQL) |" >> $GITHUB_STEP_SUMMARY
+          echo "| DAST — OWASP ZAP | $(icon $R_ZAP) |" >> $GITHUB_STEP_SUMMARY

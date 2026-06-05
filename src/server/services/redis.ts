@@ -19,8 +19,9 @@ import { getEnv } from "../env";
 let _redisPool: RedisClient[] = [];
 let _poolIndex = 0;
 
-// SCALABILITY: Configurable pool size
-const POOL_SIZE = parseInt(process.env.REDIS_POOL_SIZE || "10");
+// SCALABILITY: Configurable pool size; test environments use 1 to avoid connection noise
+const POOL_SIZE =
+  process.env.NODE_ENV === "test" ? 1 : parseInt(process.env.REDIS_POOL_SIZE || "10");
 
 export function getRedis(): RedisClient {
   // Initialize pool on first call
