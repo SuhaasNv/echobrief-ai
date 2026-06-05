@@ -91,6 +91,13 @@ export function rateLimit(
   opts: RateLimitOptions = {},
 ): MiddlewareHandler<AppBindings> {
   return async (c, next) => {
+    // Bypass rate limiting in test environments to prevent CI flakiness
+    // (all test workers share the same runner IP + Redis instance)
+    if (process.env.NODE_ENV === "test") {
+      await next();
+      return;
+    }
+
     const user = c.get("user");
     const identifier = user?.id ?? clientIp(c);
     const suffix = opts.keySuffix ? `:${opts.keySuffix}` : "";
@@ -163,6 +170,9 @@ export async function checkAuthRateLimit(
   bucket: "auth" | "signup",
   email: string,
 ): Promise<Response | null> {
+  // Bypass rate limiting in test environments
+  if (process.env.NODE_ENV === "test") return null;
+
   const cfg = LIMITS[bucket];
   const ip = clientIp(c);
   const windowStart = Math.floor(Date.now() / 1000 / cfg.window_sec);

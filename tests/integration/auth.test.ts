@@ -48,7 +48,7 @@ describe("POST /auth/signup", () => {
     expect(body.user.is_admin).toBe(false);
   });
 
-  it("rejects duplicate email with 409", async () => {
+  it("returns 200 with generic message for duplicate email (anti-enumeration)", async () => {
     const email = uniqueEmail();
     await postJson("/auth/signup", { email, password: "testpassword12", name: "First" });
     const res = await postJson("/auth/signup", {
@@ -56,9 +56,11 @@ describe("POST /auth/signup", () => {
       password: "testpassword12",
       name: "Second",
     });
-    expect(res.status).toBe(409);
+    // Anti-enumeration: never reveal whether an email is already registered.
+    // The API returns a generic 200 + status:"ok" message in both cases.
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error).toBe("conflict");
+    expect(body.status).toBe("ok");
   });
 
   it("rejects weak password (<8 chars)", async () => {
