@@ -1,11 +1,11 @@
 /**
  * Request size limits middleware.
- * 
+ *
  * Protects against:
  * - DoS attacks via giant request bodies
  * - Header bomb attacks (large headers)
  * - Memory exhaustion from uncontrolled input
- * 
+ *
  * Limits:
  * - JSON body: 10MB max (generous for audio metadata, but prevents abuse)
  * - Individual headers: 8KB max (prevents header bombs)
@@ -24,20 +24,20 @@ export const requestLimits: MiddlewareHandler<AppBindings> = async (c, next) => 
   const contentLength = c.req.header("content-length");
   if (contentLength) {
     const sizeBytes = parseInt(contentLength, 10);
-    
+
     if (isNaN(sizeBytes) || sizeBytes < 0) {
       throw new HTTPException(400, {
         message: "Invalid Content-Length header",
       });
     }
-    
+
     if (sizeBytes > MAX_JSON_SIZE) {
       throw new HTTPException(413, {
         message: `Request body too large. Maximum size: ${MAX_JSON_SIZE / 1024 / 1024}MB`,
       });
     }
   }
-  
+
   // Check individual header sizes
   const headers = c.req.raw.headers;
   for (const [key, value] of headers.entries()) {
@@ -47,6 +47,6 @@ export const requestLimits: MiddlewareHandler<AppBindings> = async (c, next) => 
       });
     }
   }
-  
+
   await next();
 };

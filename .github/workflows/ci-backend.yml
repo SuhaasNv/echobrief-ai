@@ -11,7 +11,6 @@ on:
 # ─────────────────────────────────────────────────────────────────────────────
 
 jobs:
-
   # ── Node 1 ────────────────────────────────────────────────────────────────
   install-dependencies:
     name: Install Dependencies
@@ -173,10 +172,10 @@ jobs:
       - name: OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@main
         with:
-          project: 'backend'
-          path: '.'
-          format: 'HTML'
-          out: 'owasp-dependency-reports'
+          project: "backend"
+          path: "."
+          format: "HTML"
+          out: "owasp-dependency-reports"
           args: >
             --failOnCVSS 7
             --enableRetired
@@ -283,8 +282,8 @@ jobs:
       - name: OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.12.0
         with:
-          target: 'http://localhost:3000'
-          cmd_options: '-a'
+          target: "http://localhost:3000"
+          cmd_options: "-a"
           allow_issue_writing: false
           fail_action: false
         continue-on-error: true

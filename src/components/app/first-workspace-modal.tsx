@@ -28,10 +28,7 @@ export function FirstWorkspaceModal() {
 
   const [name, setName] = useState<string>("");
 
-  const needsModal =
-    !!me &&
-    workspaces.isSuccess &&
-    (workspaces.data?.items ?? []).length === 0;
+  const needsModal = !!me && workspaces.isSuccess && (workspaces.data?.items ?? []).length === 0;
 
   if (!needsModal) return null;
 
@@ -67,12 +64,10 @@ export function FirstWorkspaceModal() {
           <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-brand">
             Welcome to EchoBrief
           </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-            Name your first workspace
-          </h2>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight">Name your first workspace</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Workspaces keep your meetings, action items, and AI memory separate.
-            You can add more later from Settings.
+            Workspaces keep your meetings, action items, and AI memory separate. You can add more
+            later from Settings.
           </p>
           <form onSubmit={submit} className="mt-6 space-y-3">
             <input

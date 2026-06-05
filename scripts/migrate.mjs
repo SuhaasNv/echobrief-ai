@@ -36,9 +36,7 @@ async function main() {
     )
   `;
 
-  const applied = new Set(
-    (await sql`SELECT name FROM _migrations`).map((r) => r.name),
-  );
+  const applied = new Set((await sql`SELECT name FROM _migrations`).map((r) => r.name));
 
   const files = readdirSync(MIGRATIONS_DIR)
     .filter((f) => f.endsWith(".sql") && !f.includes("rollback"))

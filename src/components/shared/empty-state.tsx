@@ -30,17 +30,17 @@ interface EmptyStateProps {
 
 /**
  * Empty state component
- * 
+ *
  * Standardized empty state UI used across the application.
  * Displays an optional icon, title, description, and action button.
- * 
+ *
  * @example
  * // Simple empty state
  * <EmptyState
  *   title="No meetings yet"
  *   description="Upload your first meeting to get started."
  * />
- * 
+ *
  * @example
  * // With icon and action
  * <EmptyState
@@ -50,13 +50,7 @@ interface EmptyStateProps {
  *   action={{ label: "Clear filters", onClick: handleClear }}
  * />
  */
-export function EmptyState({
-  icon: Icon,
-  title,
-  description,
-  action,
-  className,
-}: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
   return (
     <div
       className={cn(
@@ -69,24 +63,13 @@ export function EmptyState({
           <Icon className="h-6 w-6 text-muted-foreground" />
         </div>
       )}
-      
-      <h3 className="text-sm font-medium text-foreground">
-        {title}
-      </h3>
-      
-      {description && (
-        <p className="mt-1 text-xs text-muted-foreground">
-          {description}
-        </p>
-      )}
-      
+
+      <h3 className="text-sm font-medium text-foreground">{title}</h3>
+
+      {description && <p className="mt-1 text-xs text-muted-foreground">{description}</p>}
+
       {action && (
-        <Button
-          onClick={action.onClick}
-          variant="outline"
-          size="sm"
-          className="mt-4"
-        >
+        <Button onClick={action.onClick} variant="outline" size="sm" className="mt-4">
           {action.label}
         </Button>
       )}

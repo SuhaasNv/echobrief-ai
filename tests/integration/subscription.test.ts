@@ -35,7 +35,9 @@ async function get(path: string, token?: string) {
   });
 }
 
-async function createUserDirect(tier: string = "free"): Promise<{ email: string; token: string; userId: string }> {
+async function createUserDirect(
+  tier: string = "free",
+): Promise<{ email: string; token: string; userId: string }> {
   const email = uniqueEmail();
   const signup = await postJson("/auth/signup", {
     email,
@@ -58,7 +60,13 @@ async function createUserDirect(tier: string = "free"): Promise<{ email: string;
   return { email, token, userId: user.id };
 }
 
-async function logUsage(userId: string, workspaceId: string, minutes: number, queries: number, flashcards: number) {
+async function logUsage(
+  userId: string,
+  workspaceId: string,
+  minutes: number,
+  queries: number,
+  flashcards: number,
+) {
   const sql = getSql();
   const period = new Date().toISOString().slice(0, 7); // YYYY-MM
 
@@ -235,8 +243,11 @@ describe("POST /subscription/upgrade", () => {
   it("validates tier enum (only student/pro/team allowed)", async () => {
     const res = await postJson(
       "/subscription/upgrade",
-      { tier: "free", billing_interval: "monthly" } as any,
-      testUser.token
+      { tier: "free", billing_interval: "monthly" } as unknown as {
+        tier: string;
+        billing_interval: string;
+      },
+      testUser.token,
     );
     expect(res.status).toBe(400);
   });
@@ -244,8 +255,11 @@ describe("POST /subscription/upgrade", () => {
   it("validates billing_interval enum", async () => {
     const res = await postJson(
       "/subscription/upgrade",
-      { tier: "pro", billing_interval: "quarterly" } as any,
-      testUser.token
+      { tier: "pro", billing_interval: "quarterly" } as unknown as {
+        tier: string;
+        billing_interval: string;
+      },
+      testUser.token,
     );
     expect(res.status).toBe(400);
   });
@@ -254,7 +268,7 @@ describe("POST /subscription/upgrade", () => {
     const res = await postJson(
       "/subscription/upgrade",
       { tier: "pro", billing_interval: "monthly" },
-      testUser.token
+      testUser.token,
     );
 
     expect(res.status).toBe(200);

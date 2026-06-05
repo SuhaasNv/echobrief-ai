@@ -79,10 +79,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "EchoBrief — Meeting intelligence for modern teams" },
-      { name: "description", content: "Upload calls and meetings. Get summaries, action items, and AI answers across every conversation." },
+      {
+        name: "description",
+        content:
+          "Upload calls and meetings. Get summaries, action items, and AI answers across every conversation.",
+      },
       { name: "author", content: "EchoBrief" },
       { property: "og:title", content: "EchoBrief — Meeting intelligence for modern teams" },
-      { property: "og:description", content: "Your meetings finally become searchable intelligence." },
+      {
+        property: "og:description",
+        content: "Your meetings finally become searchable intelligence.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },

@@ -1,21 +1,21 @@
 /**
  * Redis caching wrapper utilities.
- * 
+ *
  * Provides:
  * - Automatic cache-aside pattern
  * - TTL-based expiration
  * - Error resilience (fallback to source on cache failure)
  * - JSON serialization/deserialization
- * 
+ *
  * Usage:
  *   import { withCache, invalidateCache } from "./cache";
- *   
+ *
  *   const pricing = await withCache(
  *     "pricing:all",
  *     3600, // 1 hour TTL
  *     () => fetchPricingFromDB()
  *   );
- * 
+ *
  * Cache Keys Convention:
  *   - pricing:* - Pricing data (long TTL: 1 hour)
  *   - subscription:{userId} - User subscription status (medium TTL: 5 min)
@@ -27,7 +27,7 @@ import { getRedis } from "../services/redis";
 
 /**
  * Cache-aside pattern: Try to read from cache, fall back to source function.
- * 
+ *
  * @param key - Redis cache key
  * @param ttlSeconds - Time-to-live in seconds
  * @param fn - Source function to call on cache miss
@@ -36,10 +36,10 @@ import { getRedis } from "../services/redis";
 export async function withCache<T>(
   key: string,
   ttlSeconds: number,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
 ): Promise<T> {
   const redis = getRedis();
-  
+
   // Try to read from cache
   try {
     const cached = await redis.get(key);
@@ -50,10 +50,10 @@ export async function withCache<T>(
     console.warn(`[Cache] Read failed for key "${key}", falling back to source:`, err);
     // Fall through to source function
   }
-  
+
   // Cache miss or error - fetch from source
   const result = await fn();
-  
+
   // Try to write to cache (best-effort)
   try {
     await redis.setex(key, ttlSeconds, JSON.stringify(result));
@@ -61,15 +61,15 @@ export async function withCache<T>(
     console.warn(`[Cache] Write failed for key "${key}":`, err);
     // Don't throw - cache write failure shouldn't break the request
   }
-  
+
   return result;
 }
 
 /**
  * Invalidate a cache key or pattern.
- * 
+ *
  * @param keyOrPattern - Exact key or pattern with * wildcard
- * 
+ *
  * Examples:
  *   invalidateCache("pricing:all")                // Invalidate single key
  *   invalidateCache("meeting:abc-123:*")          // Invalidate all keys for meeting
@@ -77,7 +77,7 @@ export async function withCache<T>(
  */
 export async function invalidateCache(keyOrPattern: string): Promise<void> {
   const redis = getRedis();
-  
+
   try {
     if (keyOrPattern.includes("*")) {
       // Pattern - scan and delete all matching keys
@@ -124,21 +124,21 @@ export async function getCacheStats(): Promise<{
   hit_rate: number;
 }> {
   const redis = getRedis();
-  
+
   try {
     const info = await redis.info("stats");
     const memory = await redis.info("memory");
-    
+
     // Parse Redis INFO output
     const parseInfo = (text: string, key: string): string => {
       const match = text.match(new RegExp(`${key}:(.+)`));
       return match ? match[1].trim() : "0";
     };
-    
+
     const hits = parseInt(parseInfo(info, "keyspace_hits"), 10);
     const misses = parseInt(parseInfo(info, "keyspace_misses"), 10);
     const hitRate = hits + misses > 0 ? hits / (hits + misses) : 0;
-    
+
     return {
       used_memory_human: parseInfo(memory, "used_memory_human"),
       keyspace_hits: hits,

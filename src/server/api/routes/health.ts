@@ -1,10 +1,10 @@
 /**
  * Health check routes for Kubernetes/Railway readiness and liveness probes.
- * 
+ *
  * Routes:
  * - GET /health - Liveness probe (is the process running?)
  * - GET /ready - Readiness probe (can we serve traffic?)
- * 
+ *
  * Railway and Kubernetes use these for:
  * - Zero-downtime deployments (wait until /ready returns 200)
  * - Auto-restart unhealthy instances
@@ -38,7 +38,7 @@ app.get("/health", (c) => {
 app.get("/ready", async (c) => {
   const checks: Record<string, boolean> = {};
   const latencies: Record<string, number> = {};
-  
+
   // Check database
   try {
     const t1 = performance.now();
@@ -50,7 +50,7 @@ app.get("/ready", async (c) => {
     checks.database = false;
     console.error("[Health] Database check failed:", err);
   }
-  
+
   // Check Redis
   try {
     const t2 = performance.now();
@@ -62,10 +62,10 @@ app.get("/ready", async (c) => {
     checks.redis = false;
     console.error("[Health] Redis check failed:", err);
   }
-  
+
   // Overall readiness: all checks must pass
   const ready = Object.values(checks).every(Boolean);
-  
+
   // Return 503 if not ready (tells load balancer to route elsewhere)
   return c.json(
     {
@@ -74,7 +74,7 @@ app.get("/ready", async (c) => {
       latencies,
       timestamp: Date.now(),
     },
-    ready ? 200 : 503
+    ready ? 200 : 503,
   );
 });
 

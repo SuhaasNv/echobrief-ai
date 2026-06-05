@@ -111,7 +111,11 @@ function AnalyticsPage() {
     };
     const counts = new Map<string, number>();
     items.forEach((m) => counts.set(m.status, (counts.get(m.status) ?? 0) + 1));
-    return [...counts.entries()].map(([name, value]) => ({ name, value, fill: colors[name] ?? "oklch(0.62 0.04 264)" }));
+    return [...counts.entries()].map(([name, value]) => ({
+      name,
+      value,
+      fill: colors[name] ?? "oklch(0.62 0.04 264)",
+    }));
   }, [meetings.data]);
 
   const actionPie = useMemo(
@@ -161,10 +165,26 @@ function AnalyticsPage() {
         <>
           <div className="mt-8 grid gap-px overflow-hidden rounded-xl border border-border/70 bg-border/40 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { l: "Total meeting hours", v: stats.totalHours, s: `${stats.totalMeetings} meetings` },
-              { l: "Action item closure", v: `${stats.closureRate}%`, s: `${stats.completedActionItems} of ${stats.completedActionItems + stats.openActionItems}` },
-              { l: "Avg. meeting length", v: `${stats.avgDurationMin} min`, s: "complete meetings only" },
-              { l: "Top tag", v: stats.topTag?.name ?? "—", s: stats.topTag ? `${stats.topTag.count} meetings` : "no tags yet" },
+              {
+                l: "Total meeting hours",
+                v: stats.totalHours,
+                s: `${stats.totalMeetings} meetings`,
+              },
+              {
+                l: "Action item closure",
+                v: `${stats.closureRate}%`,
+                s: `${stats.completedActionItems} of ${stats.completedActionItems + stats.openActionItems}`,
+              },
+              {
+                l: "Avg. meeting length",
+                v: `${stats.avgDurationMin} min`,
+                s: "complete meetings only",
+              },
+              {
+                l: "Top tag",
+                v: stats.topTag?.name ?? "—",
+                s: stats.topTag ? `${stats.topTag.count} meetings` : "no tags yet",
+              },
             ].map((s) => (
               <div key={s.l} className="bg-surface p-5">
                 <p className="text-xs text-muted-foreground">{s.l}</p>
@@ -177,7 +197,9 @@ function AnalyticsPage() {
           <div className="mt-6 grid gap-6 lg:grid-cols-3">
             <div className="rounded-xl border border-border/70 bg-surface p-6 lg:col-span-2">
               <h3 className="text-base font-medium">Meeting frequency</h3>
-              <p className="text-xs text-muted-foreground">Meetings created per month · last 12 months</p>
+              <p className="text-xs text-muted-foreground">
+                Meetings created per month · last 12 months
+              </p>
               <div className="mt-6 h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={monthlyData}>
@@ -187,10 +209,25 @@ function AnalyticsPage() {
                         <stop offset="100%" stopColor="oklch(0.68 0.18 295)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="m" tickLine={false} axisLine={false} stroke="oklch(0.62 0.012 264)" tick={{ fontSize: 11 }} />
+                    <XAxis
+                      dataKey="m"
+                      tickLine={false}
+                      axisLine={false}
+                      stroke="oklch(0.62 0.012 264)"
+                      tick={{ fontSize: 11 }}
+                    />
                     <YAxis hide allowDecimals={false} />
-                    <Tooltip cursor={{ stroke: "oklch(1 0 0 / 0.1)" }} contentStyle={tooltipStyle} />
-                    <Area type="monotone" dataKey="v" stroke="oklch(0.68 0.18 295)" strokeWidth={2} fill="url(#freqArea)" />
+                    <Tooltip
+                      cursor={{ stroke: "oklch(1 0 0 / 0.1)" }}
+                      contentStyle={tooltipStyle}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="v"
+                      stroke="oklch(0.68 0.18 295)"
+                      strokeWidth={2}
+                      fill="url(#freqArea)"
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -202,8 +239,17 @@ function AnalyticsPage() {
               <div className="mt-3 h-44">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={actionPie} dataKey="value" innerRadius={50} outerRadius={75} stroke="none" paddingAngle={2}>
-                      {actionPie.map((s) => <Cell key={s.name} fill={s.fill} />)}
+                    <Pie
+                      data={actionPie}
+                      dataKey="value"
+                      innerRadius={50}
+                      outerRadius={75}
+                      stroke="none"
+                      paddingAngle={2}
+                    >
+                      {actionPie.map((s) => (
+                        <Cell key={s.name} fill={s.fill} />
+                      ))}
                     </Pie>
                     <Tooltip contentStyle={tooltipStyle} />
                   </PieChart>
@@ -228,8 +274,17 @@ function AnalyticsPage() {
               <div className="mt-3 h-44">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={statusData} dataKey="value" innerRadius={50} outerRadius={75} stroke="none" paddingAngle={2}>
-                      {statusData.map((s) => <Cell key={s.name} fill={s.fill} />)}
+                    <Pie
+                      data={statusData}
+                      dataKey="value"
+                      innerRadius={50}
+                      outerRadius={75}
+                      stroke="none"
+                      paddingAngle={2}
+                    >
+                      {statusData.map((s) => (
+                        <Cell key={s.name} fill={s.fill} />
+                      ))}
                     </Pie>
                     <Tooltip contentStyle={tooltipStyle} />
                   </PieChart>
@@ -255,9 +310,18 @@ function AnalyticsPage() {
                 <div className="mt-6 h-56">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={tagData} barSize={28}>
-                      <XAxis dataKey="tag" tickLine={false} axisLine={false} stroke="oklch(0.62 0.012 264)" tick={{ fontSize: 11 }} />
+                      <XAxis
+                        dataKey="tag"
+                        tickLine={false}
+                        axisLine={false}
+                        stroke="oklch(0.62 0.012 264)"
+                        tick={{ fontSize: 11 }}
+                      />
                       <YAxis hide allowDecimals={false} />
-                      <Tooltip cursor={{ fill: "oklch(1 0 0 / 0.04)" }} contentStyle={tooltipStyle} />
+                      <Tooltip
+                        cursor={{ fill: "oklch(1 0 0 / 0.04)" }}
+                        contentStyle={tooltipStyle}
+                      />
                       <Bar dataKey="v" radius={[6, 6, 0, 0]} fill="oklch(0.72 0.15 160)" />
                     </BarChart>
                   </ResponsiveContainer>

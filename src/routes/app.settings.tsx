@@ -57,9 +57,7 @@ function SettingsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 md:px-8">
       <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Account, security, and danger zone.
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">Account, security, and danger zone.</p>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-2">
         <ProfileSection me={me} />
@@ -296,7 +294,11 @@ function WorkspacesSection() {
                       type="button"
                       onClick={() => deleteWorkspace(w)}
                       disabled={workspaces.length <= 1}
-                      title={workspaces.length <= 1 ? "Can't delete your only workspace" : "Delete workspace"}
+                      title={
+                        workspaces.length <= 1
+                          ? "Can't delete your only workspace"
+                          : "Delete workspace"
+                      }
                       className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                       aria-label="Delete workspace"
                     >
@@ -415,7 +417,9 @@ function KindToggle({
         type="button"
         onClick={() => onChange("student")}
         className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
-          value === "student" ? "bg-violet/15 text-violet" : "text-muted-foreground hover:text-foreground"
+          value === "student"
+            ? "bg-violet/15 text-violet"
+            : "text-muted-foreground hover:text-foreground"
         }`}
       >
         <GraduationCap className="h-3 w-3" /> Student
@@ -424,7 +428,9 @@ function KindToggle({
         type="button"
         onClick={() => onChange("professional")}
         className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
-          value === "professional" ? "bg-brand/15 text-brand" : "text-muted-foreground hover:text-foreground"
+          value === "professional"
+            ? "bg-brand/15 text-brand"
+            : "text-muted-foreground hover:text-foreground"
         }`}
       >
         <Briefcase className="h-3 w-3" /> Professional
@@ -458,7 +464,13 @@ function SectionHeader({
 function ProfileSection({
   me,
 }: {
-  me: { id: string; email: string; name: string | null; avatar_url: string | null; is_admin: boolean };
+  me: {
+    id: string;
+    email: string;
+    name: string | null;
+    avatar_url: string | null;
+    is_admin: boolean;
+  };
 }) {
   const update = useUpdateProfile();
   const [name, setName] = useState(me.name ?? "");
@@ -523,7 +535,9 @@ function ProfileSection({
         />
 
         <div className="grid gap-1.5">
-          <label htmlFor="settings-email" className="text-sm font-medium">Email</label>
+          <label htmlFor="settings-email" className="text-sm font-medium">
+            Email
+          </label>
           <input
             id="settings-email"
             value={me.email}
@@ -538,7 +552,9 @@ function ProfileSection({
         </div>
 
         <div className="grid gap-1.5">
-          <label htmlFor="settings-name" className="text-sm font-medium">Display name</label>
+          <label htmlFor="settings-name" className="text-sm font-medium">
+            Display name
+          </label>
           <input
             id="settings-name"
             value={name}
@@ -572,15 +588,29 @@ function PasswordSection() {
   const [confirm, setConfirm] = useState("");
 
   function reset() {
-    setCurrent(""); setNext(""); setConfirm("");
+    setCurrent("");
+    setNext("");
+    setConfirm("");
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!current || !next) { toast.error("Fill in both fields"); return; }
-    if (next.length < 8) { toast.error("New password must be at least 8 characters"); return; }
-    if (next !== confirm) { toast.error("New password and confirmation don't match"); return; }
-    if (next === current) { toast.error("New password must be different from current"); return; }
+    if (!current || !next) {
+      toast.error("Fill in both fields");
+      return;
+    }
+    if (next.length < 8) {
+      toast.error("New password must be at least 8 characters");
+      return;
+    }
+    if (next !== confirm) {
+      toast.error("New password and confirmation don't match");
+      return;
+    }
+    if (next === current) {
+      toast.error("New password must be different from current");
+      return;
+    }
     try {
       await change.mutateAsync({ current_password: current, new_password: next });
       toast.success("Password updated");
@@ -592,10 +622,16 @@ function PasswordSection() {
 
   return (
     <section className="rounded-xl border border-border/70 bg-surface p-6">
-      <SectionHeader icon={KeyRound} title="Password" subtitle="Argon2id hashed; we never store plaintext." />
+      <SectionHeader
+        icon={KeyRound}
+        title="Password"
+        subtitle="Argon2id hashed; we never store plaintext."
+      />
       <form className="mt-6 space-y-4" onSubmit={submit}>
         <div className="grid gap-1.5">
-          <label htmlFor="pw-current" className="text-sm font-medium">Current password</label>
+          <label htmlFor="pw-current" className="text-sm font-medium">
+            Current password
+          </label>
           <input
             id="pw-current"
             type="password"
@@ -606,7 +642,9 @@ function PasswordSection() {
           />
         </div>
         <div className="grid gap-1.5">
-          <label htmlFor="pw-new" className="text-sm font-medium">New password</label>
+          <label htmlFor="pw-new" className="text-sm font-medium">
+            New password
+          </label>
           <input
             id="pw-new"
             type="password"
@@ -618,7 +656,9 @@ function PasswordSection() {
           <p className="font-mono text-[10px] text-muted-foreground">Minimum 8 characters.</p>
         </div>
         <div className="grid gap-1.5">
-          <label htmlFor="pw-confirm" className="text-sm font-medium">Confirm new password</label>
+          <label htmlFor="pw-confirm" className="text-sm font-medium">
+            Confirm new password
+          </label>
           <input
             id="pw-confirm"
             type="password"
@@ -634,7 +674,11 @@ function PasswordSection() {
             disabled={change.isPending}
             className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
           >
-            {change.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <KeyRound className="h-3 w-3" />}
+            {change.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <KeyRound className="h-3 w-3" />
+            )}
             Change password
           </button>
         </div>
@@ -673,12 +717,18 @@ function DangerSection() {
 
   return (
     <section className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
-      <SectionHeader icon={AlertTriangle} title="Danger zone" subtitle="Sign out from this device or delete your account." />
+      <SectionHeader
+        icon={AlertTriangle}
+        title="Danger zone"
+        subtitle="Sign out from this device or delete your account."
+      />
       <div className="mt-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/40 p-4">
           <div className="min-w-0">
             <p className="text-sm font-medium">Sign out</p>
-            <p className="text-xs text-muted-foreground">Clears the auth token from this browser.</p>
+            <p className="text-xs text-muted-foreground">
+              Clears the auth token from this browser.
+            </p>
           </div>
           <button
             type="button"
@@ -709,13 +759,16 @@ function DangerSection() {
                 type="text"
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
-                placeholder='Type DELETE to confirm'
+                placeholder="Type DELETE to confirm"
                 className="w-full rounded-md border border-border/70 bg-background px-3 py-2 text-sm focus:border-border focus:outline-none"
               />
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => { setConfirming(false); setConfirmText(""); }}
+                  onClick={() => {
+                    setConfirming(false);
+                    setConfirmText("");
+                  }}
                   className="rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs hover:bg-accent"
                 >
                   Cancel
@@ -726,7 +779,11 @@ function DangerSection() {
                   disabled={!armed || del.isPending}
                   className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
-                  {del.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                  {del.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3 w-3" />
+                  )}
                   Confirm delete
                 </button>
               </div>

@@ -6,16 +6,17 @@
 
 **Ship 4 tiers**, but in sequence:
 
-| Tier | Price (annual) | Price (monthly) | Who it's for |
-|---|---|---|---|
-| **Free** | $0 | $0 | Try-before-buy, single workspace |
-| **Student** | $7 /mo ($84/yr) | $10 /mo | Verified .edu, learning-focused |
-| **Pro** | $14 /mo ($168/yr) | $19 /mo | Solo working professionals, mixed-mode users |
-| **Team** | $29 /user/mo ($348/yr) | $39 /user/mo | 5+ seats, shared workspaces |
+| Tier        | Price (annual)         | Price (monthly) | Who it's for                                 |
+| ----------- | ---------------------- | --------------- | -------------------------------------------- |
+| **Free**    | $0                     | $0              | Try-before-buy, single workspace             |
+| **Student** | $7 /mo ($84/yr)        | $10 /mo         | Verified .edu, learning-focused              |
+| **Pro**     | $14 /mo ($168/yr)      | $19 /mo         | Solo working professionals, mixed-mode users |
+| **Team**    | $29 /user/mo ($348/yr) | $39 /user/mo    | 5+ seats, shared workspaces                  |
 
 Plus an off-menu **Enterprise** tier (talk to sales) for SSO/SCIM/data-residency at $5K+/yr.
 
 ### Shipping order
+
 1. **v1 → Free + Pro only**, Stripe, monthly + annual. Validate that anyone pays.
 2. **v2 → Add Student** with simple `.edu` domain check (SheerID later).
 3. **v3 → Add Team** when multi-user workspace membership is built.
@@ -26,17 +27,18 @@ Don't ship 4 tiers on day one. Too much surface to maintain conversion data for;
 
 ## Market context (May 2026)
 
-| Competitor | Free | Pro (annual) | Team | Student |
-|---|---|---|---|---|
-| Otter | 300 min/mo, 30-min cap | $8.33/mo | $20/user/mo | 20% off Pro for .edu |
-| Fathom | unlimited recordings, 5 AI summaries/mo | $15/mo | $29–39/user/mo | — |
-| Fireflies | 800 min/mo | $19.75/mo | $29.75/user/mo | — |
-| tl;dv | unlimited recordings | $18/mo | $59/user/mo | — |
-| Granola | 25 meetings | $14–18/mo | $29/user/mo | — |
-| Perplexity (adjacent) | (search free) | $20/mo | — | $10/mo via SheerID (50% off) |
-| NotebookLM | free, 1-mo Gemini Pro trial | (in Google AI Pro $20/mo) | — | 12-mo trial of Google AI Pro |
+| Competitor            | Free                                    | Pro (annual)              | Team           | Student                      |
+| --------------------- | --------------------------------------- | ------------------------- | -------------- | ---------------------------- |
+| Otter                 | 300 min/mo, 30-min cap                  | $8.33/mo                  | $20/user/mo    | 20% off Pro for .edu         |
+| Fathom                | unlimited recordings, 5 AI summaries/mo | $15/mo                    | $29–39/user/mo | —                            |
+| Fireflies             | 800 min/mo                              | $19.75/mo                 | $29.75/user/mo | —                            |
+| tl;dv                 | unlimited recordings                    | $18/mo                    | $59/user/mo    | —                            |
+| Granola               | 25 meetings                             | $14–18/mo                 | $29/user/mo    | —                            |
+| Perplexity (adjacent) | (search free)                           | $20/mo                    | —              | $10/mo via SheerID (50% off) |
+| NotebookLM            | free, 1-mo Gemini Pro trial             | (in Google AI Pro $20/mo) | —              | 12-mo trial of Google AI Pro |
 
 ### Patterns
+
 1. **Be generous with capture, ration AI.** Free users get recording; AI summaries/queries are the conversion gate.
 2. **Pro is $12–19/month annual.** $14–15 is the modern sweet spot.
 3. **Team is $25–35/user/mo annual.** Above $40 hits resistance for <50-person companies.
@@ -47,24 +49,24 @@ Don't ship 4 tiers on day one. Too much surface to maintain conversion data for;
 
 ## Feature matrix
 
-| Feature | Free | Student | Pro | Team |
-|---|:--:|:--:|:--:|:--:|
-| Workspaces | 1 | unlimited (student kind only) | unlimited (any kind) | unlimited (shared) |
-| Transcription quota | 5 hrs/mo | unlimited | unlimited | unlimited |
-| AI summaries | ✓ | ✓ | ✓ | ✓ |
-| Per-meeting AI chat | 10 queries/mo | unlimited | unlimited | unlimited |
-| Cross-meeting search | ✗ | ✓ | ✓ | ✓ |
-| Flashcards | 3/lecture | unlimited | unlimited (in student WS) | unlimited (in student WS) |
-| Study mode | ✗ | ✓ | ✓ (in student WS) | ✓ (in student WS) |
-| Speaker analytics | basic | basic | full | full |
-| Action item exports (Linear/Notion/Jira) | ✗ | ✗ | ✓ | ✓ |
-| Email generator | ✗ | ✗ | ✓ | ✓ |
-| Integrations | ✗ | ✗ | ✓ | ✓ |
-| History retention | 30 days | 1 year | 2 years | unlimited |
-| Multi-user shared workspaces | ✗ | ✗ | ✗ | ✓ |
-| Workspace analytics | ✗ | ✗ | ✓ | team-level |
-| Priority processing | ✗ | ✗ | ✓ | ✓ |
-| SSO + SCIM + audit logs | ✗ | ✗ | ✗ | Enterprise add-on |
+| Feature                                  |     Free      |            Student            |            Pro            |           Team            |
+| ---------------------------------------- | :-----------: | :---------------------------: | :-----------------------: | :-----------------------: |
+| Workspaces                               |       1       | unlimited (student kind only) |   unlimited (any kind)    |    unlimited (shared)     |
+| Transcription quota                      |   5 hrs/mo    |           unlimited           |         unlimited         |         unlimited         |
+| AI summaries                             |       ✓       |               ✓               |             ✓             |             ✓             |
+| Per-meeting AI chat                      | 10 queries/mo |           unlimited           |         unlimited         |         unlimited         |
+| Cross-meeting search                     |       ✗       |               ✓               |             ✓             |             ✓             |
+| Flashcards                               |   3/lecture   |           unlimited           | unlimited (in student WS) | unlimited (in student WS) |
+| Study mode                               |       ✗       |               ✓               |     ✓ (in student WS)     |     ✓ (in student WS)     |
+| Speaker analytics                        |     basic     |             basic             |           full            |           full            |
+| Action item exports (Linear/Notion/Jira) |       ✗       |               ✗               |             ✓             |             ✓             |
+| Email generator                          |       ✗       |               ✗               |             ✓             |             ✓             |
+| Integrations                             |       ✗       |               ✗               |             ✓             |             ✓             |
+| History retention                        |    30 days    |            1 year             |          2 years          |         unlimited         |
+| Multi-user shared workspaces             |       ✗       |               ✗               |             ✗             |             ✓             |
+| Workspace analytics                      |       ✗       |               ✗               |             ✓             |        team-level         |
+| Priority processing                      |       ✗       |               ✗               |             ✓             |             ✓             |
+| SSO + SCIM + audit logs                  |       ✗       |               ✗               |             ✗             |     Enterprise add-on     |
 
 ### Why this structure
 
@@ -78,14 +80,14 @@ Don't ship 4 tiers on day one. Too much surface to maintain conversion data for;
 
 ## Workspace ↔ tier mapping (this is the elegant bit)
 
-Since workspaces already exist and have a `kind`, tier enforcement is just two questions: *can this user have another workspace?* and *can this user use this feature inside this workspace?*
+Since workspaces already exist and have a `kind`, tier enforcement is just two questions: _can this user have another workspace?_ and _can this user use this feature inside this workspace?_
 
-| Tier | Workspace rules |
-|---|---|
-| **Free** | Exactly 1 workspace, type chosen at signup. Trying to create a 2nd → upgrade modal. |
+| Tier        | Workspace rules                                                                                                                                                              |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Free**    | Exactly 1 workspace, type chosen at signup. Trying to create a 2nd → upgrade modal.                                                                                          |
 | **Student** | Unlimited workspaces, **all must be `kind: 'student'`**. Trying to create `professional` → "Looks like you've got real work going on — upgrade to Pro for mixed workspaces." |
-| **Pro** | Unlimited workspaces of any kind. Each `professional` workspace gets full pro features; each `student` workspace gets flashcards. No friction. |
-| **Team** | Same as Pro + workspaces become invitable. Billing per active member across all team workspaces. |
+| **Pro**     | Unlimited workspaces of any kind. Each `professional` workspace gets full pro features; each `student` workspace gets flashcards. No friction.                               |
+| **Team**    | Same as Pro + workspaces become invitable. Billing per active member across all team workspaces.                                                                             |
 
 The conversion mechanic: every time someone hits the boundary of their tier, that's a paywall moment. With workspaces as the boundary, it's natural — not "feature creep."
 
@@ -96,26 +98,32 @@ The conversion mechanic: every time someone hits the boundary of their tier, tha
 Ranked by typical conversion:
 
 ### 1. Hard gates at action time (highest)
+
 The user is mid-flow. Show the upgrade for the exact thing.
+
 - Free user clicks "Generate flashcards" beyond limit → **"Unlimited flashcards on Student ($7) or Pro."**
 - Student clicks Integrations → **"Integrations are a Pro feature."**
 - Free user creates 2nd workspace → **"Multiple workspaces are on Pro."**
 - Free user, 11th AI query of month → **"You've used your 10 free queries. Upgrade for unlimited."**
 
 ### 2. Soft nudges at quota awareness (medium)
+
 - Banner on /app when transcription quota crosses 80%: **"4 of 5 hours used this month."** Dismissible.
 - After uploading a 90-minute lecture: **"This one took 60% of your monthly cap."**
 
 ### 3. Empty state on locked surfaces (low but free)
+
 - /app/analytics for a Free user → not a 404, a beautiful "Analytics is a Pro feature" pitch with a chart screenshot.
 - /app/integrations same treatment.
 
 ### 4. Lifecycle moments (drip)
-- End of week 1 email: *"You've added 12 lectures in your first week. Pro keeps everything for 2 years instead of 30 days."*
-- End of month 1 email: *"Here's what Pro would unlock."*
-- After action-item completion streak: *"You're using this enough to justify Pro."*
+
+- End of week 1 email: _"You've added 12 lectures in your first week. Pro keeps everything for 2 years instead of 30 days."_
+- End of month 1 email: _"Here's what Pro would unlock."_
+- After action-item completion streak: _"You're using this enough to justify Pro."_
 
 ### 5. Settings → Billing (passive but trusted)
+
 Always-on comparison table. People price-shop here before deciding.
 
 ---

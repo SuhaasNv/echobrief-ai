@@ -36,9 +36,24 @@ const NAV: NavItem[] = [
 ];
 
 const transcript = [
-  { t: "00:42", who: "Maya Chen", text: "Let's lock in the Q3 launch date — I'm proposing September 18.", color: "brand" },
-  { t: "00:58", who: "David Park", text: "That works on engineering. Pricing page redesign ships before then.", color: "violet" },
-  { t: "01:14", who: "Priya Rao", text: "I'll own the partner outreach by next Friday.", color: "success" },
+  {
+    t: "00:42",
+    who: "Maya Chen",
+    text: "Let's lock in the Q3 launch date — I'm proposing September 18.",
+    color: "brand",
+  },
+  {
+    t: "00:58",
+    who: "David Park",
+    text: "That works on engineering. Pricing page redesign ships before then.",
+    color: "violet",
+  },
+  {
+    t: "01:14",
+    who: "Priya Rao",
+    text: "I'll own the partner outreach by next Friday.",
+    color: "success",
+  },
 ];
 
 // Pre-compute the waveform bars at module load (runs identically in Node
@@ -54,10 +69,34 @@ const WAVEFORM_BARS: Array<{ height: string; opacity: string }> = Array.from(
 );
 
 const meetingList = [
-  { title: "Q3 Planning Sync", date: "Aug 14", duration: "47m", tags: ["#planning"], participants: 6 },
-  { title: "Pricing Page Review", date: "Aug 13", duration: "32m", tags: ["#product"], participants: 4 },
-  { title: "Customer · Northwind", date: "Aug 12", duration: "58m", tags: ["#sales"], participants: 3 },
-  { title: "Engineering Standup", date: "Aug 12", duration: "18m", tags: ["#eng"], participants: 8 },
+  {
+    title: "Q3 Planning Sync",
+    date: "Aug 14",
+    duration: "47m",
+    tags: ["#planning"],
+    participants: 6,
+  },
+  {
+    title: "Pricing Page Review",
+    date: "Aug 13",
+    duration: "32m",
+    tags: ["#product"],
+    participants: 4,
+  },
+  {
+    title: "Customer · Northwind",
+    date: "Aug 12",
+    duration: "58m",
+    tags: ["#sales"],
+    participants: 3,
+  },
+  {
+    title: "Engineering Standup",
+    date: "Aug 12",
+    duration: "18m",
+    tags: ["#eng"],
+    participants: 8,
+  },
   { title: "Investor Update", date: "Aug 11", duration: "1h 4m", tags: ["#exec"], participants: 5 },
 ];
 
@@ -305,13 +344,7 @@ function MeetingsList({ onPickMeeting }: { onPickMeeting: () => void }) {
   );
 }
 
-function LockedModal({
-  feature,
-  onClose,
-}: {
-  feature: NavItem | null;
-  onClose: () => void;
-}) {
+function LockedModal({ feature, onClose }: { feature: NavItem | null; onClose: () => void }) {
   return (
     <AnimatePresence>
       {feature && (
@@ -341,8 +374,8 @@ function LockedModal({
                 {feature.label} is part of the full app
               </h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Sign in to try {feature.label.toLowerCase()} on your own meetings — free
-                for 14 days, no card.
+                Sign in to try {feature.label.toLowerCase()} on your own meetings — free for 14
+                days, no card.
               </p>
               <div className="mt-5 flex gap-2">
                 <Link

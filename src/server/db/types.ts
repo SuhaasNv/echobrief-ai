@@ -12,12 +12,7 @@ export type MeetingStatus =
 
 export type MeetingVisibility = "private" | "team";
 
-export type IntegrationProvider =
-  | "notion"
-  | "linear"
-  | "jira"
-  | "google_calendar"
-  | "trello";
+export type IntegrationProvider = "notion" | "linear" | "jira" | "google_calendar" | "trello";
 
 export type AccountType = "student" | "professional";
 

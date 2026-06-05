@@ -1,12 +1,5 @@
 "use client";
-import {
-  type CSSProperties,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
@@ -45,8 +38,7 @@ function calculateGap(width: number) {
   const minGap = 60;
   const maxGap = 86;
   if (width <= minWidth) return minGap;
-  if (width >= maxWidth)
-    return Math.max(minGap, maxGap + 0.06018 * (width - maxWidth));
+  if (width >= maxWidth) return Math.max(minGap, maxGap + 0.06018 * (width - maxWidth));
   return minGap + (maxGap - minGap) * ((width - minWidth) / (maxWidth - minWidth));
 }
 
@@ -77,10 +69,7 @@ export function CircularTestimonials({
   const autoplayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const testimonialsLength = useMemo(() => testimonials.length, [testimonials]);
-  const activeTestimonial = useMemo(
-    () => testimonials[activeIndex],
-    [activeIndex, testimonials]
-  );
+  const activeTestimonial = useMemo(() => testimonials[activeIndex], [activeIndex, testimonials]);
 
   useEffect(() => {
     function handleResize() {
@@ -195,10 +184,7 @@ export function CircularTestimonials({
               exit="exit"
               transition={{ duration: 0.3, ease: "easeInOut" }}
             >
-              <h3
-                className="ct-name"
-                style={{ color: colorName, fontSize: fontSizeName }}
-              >
+              <h3 className="ct-name" style={{ color: colorName, fontSize: fontSizeName }}>
                 {activeTestimonial.name}
               </h3>
               <p

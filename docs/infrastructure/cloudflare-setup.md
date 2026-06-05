@@ -3,6 +3,7 @@
 **Purpose:** Configure Cloudflare as a protective edge layer for EchoBrief AI production deployment.
 
 **Benefits:**
+
 - Edge-level DDoS protection (automatic mitigation)
 - WAF (Web Application Firewall) with managed rulesets
 - Bot management and challenge pages
@@ -90,6 +91,7 @@ Then:
 ```
 
 **Configure:**
+
 1. Navigate to **Security** → **WAF** → **Rate limiting rules**
 2. Click "Create rate limiting rule"
 3. Set threshold: 1000 requests / 10 seconds
@@ -113,6 +115,7 @@ Then:
 ```
 
 **Configure:**
+
 1. Create rate limiting rule
 2. Path contains: `/api/v1/meetings/`
 3. Threshold: 100 requests / 1 minute
@@ -161,11 +164,13 @@ Then:
 2. Enable the following rulesets:
 
 #### a) Cloudflare Managed Ruleset
+
 - **Status:** Enabled
 - **Action:** Block
 - **Sensitivity:** Medium
 
 Protects against:
+
 - SQL injection
 - XSS (Cross-site scripting)
 - Command injection
@@ -173,6 +178,7 @@ Protects against:
 - Log4j exploits
 
 #### b) OWASP Core Ruleset
+
 - **Status:** Enabled
 - **Action:** Block
 - **Paranoia Level:** PL2 (Medium)
@@ -180,6 +186,7 @@ Protects against:
 Industry-standard protection against OWASP Top 10 vulnerabilities.
 
 #### c) Cloudflare Specials
+
 - **Status:** Enabled
 - **Action:** Block
 
@@ -197,7 +204,7 @@ Expression:
   (http.user_agent contains "nikto") or
   (http.user_agent contains "nmap") or
   (http.user_agent eq "")
-  
+
 Action: Block
 ```
 
@@ -207,7 +214,7 @@ Action: Block
 Expression:
   (http.request.uri.path contains "/api/v1/admin") and
   (ip.geoip.country ne "US")
-  
+
 Action: Challenge (Managed Challenge)
 ```
 
@@ -225,6 +232,7 @@ Action: Challenge (Managed Challenge)
 ### Pro/Business Tier Settings (Optional)
 
 If you upgrade to Pro:
+
 - **Super Bot Fight Mode**: More advanced bot detection
 - **JavaScript Detection**: Challenges browsers without JS
 - **Verified Bots**: Allow known good bots (Google, Bing crawlers)
@@ -361,11 +369,11 @@ curl "https://echobrief.ai/api/v1/meetings?title=<script>alert(1)</script>"
 
 ## 11. Cost Considerations
 
-| Plan | Price | Features |
-|------|-------|----------|
-| **Free** | $0/month | Basic DDoS, Bot Fight Mode, 100K requests/month rate limiting |
-| **Pro** | $20/month | Advanced DDoS, Super Bot Fight Mode, 10M requests/month rate limiting |
-| **Business** | $200/month | 1 Gbps DDoS, Custom WAF rules, Guaranteed uptime SLA |
+| Plan         | Price      | Features                                                              |
+| ------------ | ---------- | --------------------------------------------------------------------- |
+| **Free**     | $0/month   | Basic DDoS, Bot Fight Mode, 100K requests/month rate limiting         |
+| **Pro**      | $20/month  | Advanced DDoS, Super Bot Fight Mode, 10M requests/month rate limiting |
+| **Business** | $200/month | 1 Gbps DDoS, Custom WAF rules, Guaranteed uptime SLA                  |
 
 **Recommendation:** Start with Free, upgrade to Pro if you see high bot traffic or need more rate limit capacity.
 
@@ -374,18 +382,21 @@ curl "https://echobrief.ai/api/v1/meetings?title=<script>alert(1)</script>"
 ## 12. Maintenance Checklist
 
 **Monthly:**
+
 - [ ] Review Security Events analytics
 - [ ] Check for false positives in WAF blocks
 - [ ] Verify SSL certificate auto-renewal
 - [ ] Review rate limit trigger counts
 
 **Quarterly:**
+
 - [ ] Update WAF sensitivity if needed
 - [ ] Review and adjust rate limit thresholds
 - [ ] Test failover (pause Cloudflare, verify Railway direct access)
 - [ ] Review bot challenge success rates
 
 **Annual:**
+
 - [ ] Review Cloudflare plan (upgrade if needed)
 - [ ] Audit firewall rules (remove unused)
 - [ ] Update geographic restrictions if business changes
@@ -399,6 +410,7 @@ curl "https://echobrief.ai/api/v1/meetings?title=<script>alert(1)</script>"
 **Cause:** Cloudflare can't reach Railway.
 
 **Fix:**
+
 1. Check Railway deployment is running
 2. Verify DNS A/CNAME record points to correct Railway domain
 3. Check Railway logs for errors
@@ -410,6 +422,7 @@ curl "https://echobrief.ai/api/v1/meetings?title=<script>alert(1)</script>"
 **Cause:** Railway SSL certificate invalid or encryption mode mismatch.
 
 **Fix:**
+
 1. Set SSL/TLS mode to "Full (strict)"
 2. Verify Railway has valid SSL certificate
 3. Check Railway custom domain configuration
@@ -421,6 +434,7 @@ curl "https://echobrief.ai/api/v1/meetings?title=<script>alert(1)</script>"
 **Cause:** WAF sensitivity too high for your traffic patterns.
 
 **Fix:**
+
 1. Review blocked requests in Security Events
 2. Create exception rules for legitimate traffic
 3. Lower OWASP paranoia level from PL2 to PL1
@@ -432,6 +446,7 @@ curl "https://echobrief.ai/api/v1/meetings?title=<script>alert(1)</script>"
 **Cause:** Rate limits too aggressive.
 
 **Fix:**
+
 1. Identify user IP from Security Events
 2. Add IP to allowlist (IP Access Rules)
 3. Adjust rate limit thresholds upward
@@ -445,6 +460,7 @@ curl "https://echobrief.ai/api/v1/meetings?title=<script>alert(1)</script>"
 **Scenario:** False positives blocking all traffic, need to bypass immediately.
 
 **Steps:**
+
 1. Navigate to **DNS**
 2. Click on proxied record (orange cloud)
 3. Toggle to "DNS only" (grey cloud)
@@ -460,6 +476,7 @@ curl "https://echobrief.ai/api/v1/meetings?title=<script>alert(1)</script>"
 **Scenario:** Specific IP blocked but needs immediate access.
 
 **Steps:**
+
 1. Navigate to **Security** → **WAF** → **Tools**
 2. Click "IP Access Rules"
 3. Add rule:
@@ -481,6 +498,7 @@ Cloudflare provides multiple layers of protection:
 5. **SSL/TLS:** Certificate management + HSTS
 
 **Security Stack:**
+
 ```
 User Request
   ↓

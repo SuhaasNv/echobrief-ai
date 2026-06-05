@@ -2,12 +2,12 @@
 
 EchoBrief deploys as **three Railway services** in one project:
 
-| Service | What it runs | Start command |
-|---------|-------------|---------------|
-| `api` | Hono REST API | `npx tsx src/api.ts` |
-| `worker` | BullMQ processing pipeline | `npx tsx src/server/workers/main.ts` |
-| `postgres` | Railway Postgres (managed) | — |
-| `redis` | Railway Redis (managed) | — |
+| Service    | What it runs               | Start command                        |
+| ---------- | -------------------------- | ------------------------------------ |
+| `api`      | Hono REST API              | `npx tsx src/api.ts`                 |
+| `worker`   | BullMQ processing pipeline | `npx tsx src/server/workers/main.ts` |
+| `postgres` | Railway Postgres (managed) | —                                    |
+| `redis`    | Railway Redis (managed)    | —                                    |
 
 The frontend (TanStack Start SSR) is a separate deployment — currently a Cloudflare Worker (`wrangler deploy`).
 

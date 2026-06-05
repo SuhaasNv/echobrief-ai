@@ -26,7 +26,12 @@ app.post("/email", zValidator("json", EmailGenerationRequest), async (c) => {
       key_topics: string[] | null;
       decisions: string[] | null;
       open_questions: string[] | null;
-      chapters: Array<{ title: string; start_sec: number; end_sec: number; summary: string }> | null;
+      chapters: Array<{
+        title: string;
+        start_sec: number;
+        end_sec: number;
+        summary: string;
+      }> | null;
       speakers: Array<{ label: string }> | null;
     }>
   >`

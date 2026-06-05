@@ -21,7 +21,10 @@ import {
 } from "@/lib/api/hooks";
 import type { UploadUrlRequest } from "@/lib/schemas";
 import { useLabels, useActiveWorkspaceKind } from "@/lib/workspace-store";
-import { LiveRecorderPanel, type LiveRecorderCompletePayload } from "@/components/app/live-recorder";
+import {
+  LiveRecorderPanel,
+  type LiveRecorderCompletePayload,
+} from "@/components/app/live-recorder";
 
 export const Route = createFileRoute("/app/upload")({
   head: () => ({ meta: [{ title: "Upload — EchoBrief" }] }),
@@ -148,10 +151,7 @@ function UploadPage() {
       const xhr = new XMLHttpRequest();
       await new Promise<void>((resolve, reject) => {
         xhr.open("PUT", presign.upload_url);
-        xhr.setRequestHeader(
-          "Content-Type",
-          payload.mime.split(";")[0] || "audio/webm",
-        );
+        xhr.setRequestHeader("Content-Type", payload.mime.split(";")[0] || "audio/webm");
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) resolve();
           else reject(new Error(`R2 upload failed: ${xhr.status}`));
@@ -249,8 +249,14 @@ function UploadPage() {
   };
 
   async function submitTranscript() {
-    if (!transcriptTitle.trim()) { toast.error("Title is required"); return; }
-    if (transcriptText.trim().length < 50) { toast.error("Paste at least 50 characters of transcript"); return; }
+    if (!transcriptTitle.trim()) {
+      toast.error("Title is required");
+      return;
+    }
+    if (transcriptText.trim().length < 50) {
+      toast.error("Paste at least 50 characters of transcript");
+      return;
+    }
     setTranscriptSubmitting(true);
     try {
       const res = await uploadTranscript.mutateAsync({
@@ -287,7 +293,9 @@ function UploadPage() {
           onClick={() => setMode("audio")}
           disabled={inProgress}
           className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
-            mode === "audio" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            mode === "audio"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <FileAudio className="h-3.5 w-3.5" /> Audio / video
@@ -297,7 +305,9 @@ function UploadPage() {
           onClick={() => setMode("live")}
           disabled={inProgress}
           className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
-            mode === "live" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            mode === "live"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <Mic className="h-3.5 w-3.5" /> Record live
@@ -310,7 +320,9 @@ function UploadPage() {
           onClick={() => setMode("transcript")}
           disabled={inProgress}
           className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
-            mode === "transcript" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            mode === "transcript"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <FileText className="h-3.5 w-3.5" /> Paste transcript
@@ -331,195 +343,209 @@ function UploadPage() {
           submitting={transcriptSubmitting}
           onSubmit={submitTranscript}
         />
-      ) : (<>
+      ) : (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACCEPT_ATTR}
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) handleFiles(e.target.files);
+            }}
+          />
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPT_ATTR}
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files && e.target.files.length > 0) handleFiles(e.target.files);
-        }}
-      />
-
-      <div
-        onDragOver={(e) => {
-          if (inProgress) return;
-          e.preventDefault();
-          setDrag(true);
-        }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDrag(false);
-          if (inProgress) return;
-          if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
-        }}
-        onClick={() => !inProgress && openPicker()}
-        className={`group relative mt-8 overflow-hidden rounded-2xl border border-dashed transition-all ${
-          inProgress ? "cursor-not-allowed border-border bg-surface/40" : "cursor-pointer"
-        } ${drag ? "border-brand/60 bg-brand/5" : !inProgress ? "border-border bg-surface hover:bg-surface-elevated" : ""}`}
-      >
-        <div className="absolute inset-0 bg-grid bg-grid-fade opacity-30" />
-        <div className="relative flex flex-col items-center justify-center px-6 py-20 text-center">
-          <motion.div
-            animate={{ y: drag ? -4 : 0 }}
-            className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-violet shadow-glow"
+          <div
+            onDragOver={(e) => {
+              if (inProgress) return;
+              e.preventDefault();
+              setDrag(true);
+            }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDrag(false);
+              if (inProgress) return;
+              if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+            }}
+            onClick={() => !inProgress && openPicker()}
+            className={`group relative mt-8 overflow-hidden rounded-2xl border border-dashed transition-all ${
+              inProgress ? "cursor-not-allowed border-border bg-surface/40" : "cursor-pointer"
+            } ${drag ? "border-brand/60 bg-brand/5" : !inProgress ? "border-border bg-surface hover:bg-surface-elevated" : ""}`}
           >
-            <UploadCloud className="h-6 w-6 text-white" />
-          </motion.div>
-          <p className="mt-5 text-base font-medium">
-            {inProgress ? "Upload in progress…" : "Drop a file to transcribe"}
-          </p>
-          {!inProgress && <p className="mt-1 text-sm text-muted-foreground">or click to browse</p>}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-1.5">
-            {["MP3", "WAV", "M4A", "MP4", "WebM"].map((t) => (
-              <span key={t} className="rounded-md bg-accent px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-                {t}
-              </span>
-            ))}
-          </div>
-          <p className="mt-3 text-[11px] text-muted-foreground/70">Max 500 MB · Encrypted in transit</p>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {file && phase === "ready" && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-6 rounded-xl border border-border/70 bg-surface p-5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent">
-                <FileAudio className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{file.name}</p>
-                <p className="font-mono text-[11px] text-muted-foreground">{formatSize(file.size)} · ready to upload</p>
-              </div>
-              <button
-                type="button"
-                onClick={reset}
-                aria-label="Choose a different file"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            <div className="absolute inset-0 bg-grid bg-grid-fade opacity-30" />
+            <div className="relative flex flex-col items-center justify-center px-6 py-20 text-center">
+              <motion.div
+                animate={{ y: drag ? -4 : 0 }}
+                className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-violet shadow-glow"
               >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            <div className="mt-5 space-y-1.5">
-              <label htmlFor="audio-title" className="text-sm font-medium">
-                Meeting title
-              </label>
-              <input
-                id="audio-title"
-                type="text"
-                value={audioTitle}
-                onChange={(e) => setAudioTitle(e.target.value)}
-                placeholder="e.g. Q3 Launch Sync"
-                maxLength={200}
-                autoFocus
-                className="w-full rounded-md border border-border/70 bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-border focus:outline-none"
-              />
-              <p className="font-mono text-[10px] text-muted-foreground">
-                Default is the filename — change it now or rename later on the meeting page.
+                <UploadCloud className="h-6 w-6 text-white" />
+              </motion.div>
+              <p className="mt-5 text-base font-medium">
+                {inProgress ? "Upload in progress…" : "Drop a file to transcribe"}
+              </p>
+              {!inProgress && (
+                <p className="mt-1 text-sm text-muted-foreground">or click to browse</p>
+              )}
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-1.5">
+                {["MP3", "WAV", "M4A", "MP4", "WebM"].map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-md bg-accent px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground/70">
+                Max 500 MB · Encrypted in transit
               </p>
             </div>
+          </div>
 
-            <div className="mt-5 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={reset}
-                className="rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs hover:bg-accent"
+          <AnimatePresence>
+            {file && phase === "ready" && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-6 rounded-xl border border-border/70 bg-surface p-5"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={startUpload}
-                disabled={!audioTitle.trim()}
-                className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
-                <UploadCloud className="h-3 w-3" /> Start upload
-              </button>
-            </div>
-          </motion.div>
-        )}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent">
+                    <FileAudio className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{file.name}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      {formatSize(file.size)} · ready to upload
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={reset}
+                    aria-label="Choose a different file"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
 
-        {file && phase !== "ready" && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-6 rounded-xl border border-border/70 bg-surface"
-          >
-            <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-              <p className="truncate text-sm font-medium">{audioTitle || file.name}</p>
-              <span className="font-mono text-[10px] text-muted-foreground">{phase}</span>
-            </div>
-            <div className="flex items-center gap-4 px-4 py-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent">
-                <FileAudio className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="truncate text-sm font-medium">{file.name}</p>
-                  <span className="font-mono text-[11px] text-muted-foreground">{formatSize(file.size)}</span>
+                <div className="mt-5 space-y-1.5">
+                  <label htmlFor="audio-title" className="text-sm font-medium">
+                    Meeting title
+                  </label>
+                  <input
+                    id="audio-title"
+                    type="text"
+                    value={audioTitle}
+                    onChange={(e) => setAudioTitle(e.target.value)}
+                    placeholder="e.g. Q3 Launch Sync"
+                    maxLength={200}
+                    autoFocus
+                    className="w-full rounded-md border border-border/70 bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-border focus:outline-none"
+                  />
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    Default is the filename — change it now or rename later on the meeting page.
+                  </p>
                 </div>
-                {/* Waveform progress */}
-                <div className="mt-2 flex h-6 items-center gap-[2px]">
-                  {WAVEFORM_HEIGHTS.map((h, i) => {
-                    const reached = (i / 60) * 100 < progress;
-                    return (
-                      <span
-                        key={i}
-                        className={`w-[3px] rounded-full transition-colors ${reached ? "bg-brand" : "bg-foreground/15"}`}
-                        style={{ height: h }}
-                      />
-                    );
-                  })}
+
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={reset}
+                    className="rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs hover:bg-accent"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={startUpload}
+                    disabled={!audioTitle.trim()}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                  >
+                    <UploadCloud className="h-3 w-3" /> Start upload
+                  </button>
                 </div>
-                <div className="mt-1.5 flex items-center justify-between">
-                  <span className="text-[11px] text-muted-foreground">
-                    {phase === "presigning" && (
-                      <span className="inline-flex items-center gap-1">
-                        <Loader2 className="h-3 w-3 animate-spin" /> Requesting upload URL…
-                      </span>
-                    )}
-                    {phase === "uploading" && "Uploading to storage…"}
-                    {phase === "confirming" && (
-                      <span className="inline-flex items-center gap-1 text-brand">
-                        <Sparkles className="h-3 w-3" /> Queueing for transcription…
-                      </span>
-                    )}
-                    {phase === "redirecting" && (
-                      <span className="inline-flex items-center gap-1 text-success">
-                        <CheckCircle2 className="h-3 w-3" /> Done — opening meeting…
-                      </span>
-                    )}
-                    {phase === "error" && (
-                      <span className="inline-flex items-center gap-1 text-destructive">
-                        <AlertTriangle className="h-3 w-3" /> {errorMsg ?? "Upload failed"}
-                      </span>
-                    )}
-                  </span>
-                  <span className="font-mono text-[10px] text-muted-foreground">{progress}%</span>
-                </div>
-              </div>
-              <button
-                onClick={reset}
-                disabled={inProgress}
-                aria-label="Clear"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              </motion.div>
+            )}
+
+            {file && phase !== "ready" && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-6 rounded-xl border border-border/70 bg-surface"
               >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      </>)}
+                <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+                  <p className="truncate text-sm font-medium">{audioTitle || file.name}</p>
+                  <span className="font-mono text-[10px] text-muted-foreground">{phase}</span>
+                </div>
+                <div className="flex items-center gap-4 px-4 py-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent">
+                    <FileAudio className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="truncate text-sm font-medium">{file.name}</p>
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {formatSize(file.size)}
+                      </span>
+                    </div>
+                    {/* Waveform progress */}
+                    <div className="mt-2 flex h-6 items-center gap-[2px]">
+                      {WAVEFORM_HEIGHTS.map((h, i) => {
+                        const reached = (i / 60) * 100 < progress;
+                        return (
+                          <span
+                            key={i}
+                            className={`w-[3px] rounded-full transition-colors ${reached ? "bg-brand" : "bg-foreground/15"}`}
+                            style={{ height: h }}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">
+                        {phase === "presigning" && (
+                          <span className="inline-flex items-center gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Requesting upload URL…
+                          </span>
+                        )}
+                        {phase === "uploading" && "Uploading to storage…"}
+                        {phase === "confirming" && (
+                          <span className="inline-flex items-center gap-1 text-brand">
+                            <Sparkles className="h-3 w-3" /> Queueing for transcription…
+                          </span>
+                        )}
+                        {phase === "redirecting" && (
+                          <span className="inline-flex items-center gap-1 text-success">
+                            <CheckCircle2 className="h-3 w-3" /> Done — opening meeting…
+                          </span>
+                        )}
+                        {phase === "error" && (
+                          <span className="inline-flex items-center gap-1 text-destructive">
+                            <AlertTriangle className="h-3 w-3" /> {errorMsg ?? "Upload failed"}
+                          </span>
+                        )}
+                      </span>
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        {progress}%
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={reset}
+                    disabled={inProgress}
+                    aria-label="Clear"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </div>
   );
 }
@@ -546,7 +572,10 @@ function TranscriptForm({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
       className="mt-8 space-y-4 rounded-2xl border border-border/70 bg-surface p-6"
     >
       <div className="flex items-start gap-3 rounded-lg border border-brand/30 bg-brand/5 p-3">
@@ -588,7 +617,9 @@ function TranscriptForm({
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={14}
-          placeholder={"Paste your transcript here. Speaker labels like\n\nSpeaker 1: …\nSpeaker 2: …\n\nare supported but optional."}
+          placeholder={
+            "Paste your transcript here. Speaker labels like\n\nSpeaker 1: …\nSpeaker 2: …\n\nare supported but optional."
+          }
           disabled={submitting}
           className="w-full resize-y rounded-md border border-border/70 bg-background px-3 py-2 text-sm leading-relaxed placeholder:text-muted-foreground focus:border-border focus:outline-none disabled:opacity-50"
         />

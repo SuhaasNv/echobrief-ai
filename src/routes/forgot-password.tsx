@@ -37,7 +37,9 @@ function ForgotPage() {
           <Label htmlFor="email">Work email</Label>
           <Input id="email" type="email" placeholder="you@company.com" />
         </div>
-        <Button type="submit" className="w-full">Send recovery link</Button>
+        <Button type="submit" className="w-full">
+          Send recovery link
+        </Button>
       </form>
     </AuthShell>
   );

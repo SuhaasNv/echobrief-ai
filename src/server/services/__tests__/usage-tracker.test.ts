@@ -31,7 +31,7 @@ interface TestUser {
 async function createTestUser(tier: SubscriptionTier = "free"): Promise<TestUser> {
   const sql = getSql();
   const email = `${TEST_PREFIX}-${testUserIds.length}@test.echobrief.local`;
-  
+
   // Create user
   const [user] = await sql<[{ id: string }]>`
     INSERT INTO users (email, password_hash, name)
@@ -73,7 +73,7 @@ describe("logTranscription", () => {
   it("creates a usage_log row with minutes", async () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
-    
+
     await logTranscription(user.id, workspace, 12.5);
 
     const sql = getSql();
@@ -93,7 +93,7 @@ describe("logTranscription", () => {
   it("rounds minutes to 2 decimal places", async () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
-    
+
     await logTranscription(user.id, workspace, 12.456789);
 
     const sql = getSql();
@@ -113,7 +113,7 @@ describe("logAIQuery", () => {
   it("creates a usage_log row for AI query", async () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
-    
+
     await logAIQuery(user.id, workspace);
 
     const sql = getSql();
@@ -134,7 +134,7 @@ describe("logFlashcardGeneration", () => {
   it("creates a usage_log row with flashcard count", async () => {
     const user = await createTestUser("student");
     const workspace = await createTestWorkspace(user.id);
-    
+
     await logFlashcardGeneration(user.id, workspace, 5);
 
     const sql = getSql();
@@ -155,7 +155,7 @@ describe("getCurrentUsage", () => {
   it("aggregates usage for current month", async () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
-    
+
     // Log some usage
     await logTranscription(user.id, workspace, 100);
     await logTranscription(user.id, workspace, 50);
@@ -166,25 +166,25 @@ describe("getCurrentUsage", () => {
     const usage = await getCurrentUsage(user.id);
 
     expect(usage.transcription_minutes).toBe(150);
-    expect(usage.ai_queries).toBe(2);
-    expect(usage.flashcards).toBe(2);
+    expect(usage.ai_queries_count).toBe(2);
+    expect(usage.flashcards_generated).toBe(2);
   });
 
   it("returns zeros when no usage exists", async () => {
     const user = await createTestUser("free");
-    
+
     const usage = await getCurrentUsage(user.id);
 
     expect(usage.transcription_minutes).toBe(0);
-    expect(usage.ai_queries).toBe(0);
-    expect(usage.flashcards).toBe(0);
+    expect(usage.ai_queries_count).toBe(0);
+    expect(usage.flashcards_generated).toBe(0);
   });
 
   it("filters by workspace when workspaceId provided", async () => {
     const user = await createTestUser("free");
     const workspace1 = await createTestWorkspace(user.id);
     const workspace2 = await createTestWorkspace(user.id);
-    
+
     await logTranscription(user.id, workspace1, 100);
     await logTranscription(user.id, workspace2, 50);
 

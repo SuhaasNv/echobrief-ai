@@ -31,12 +31,14 @@ const sql = postgres(DATABASE_URL, {
 async function main() {
   mkdirSync(BACKUPS_DIR, { recursive: true });
 
-  const tables = (await sql`
+  const tables = (
+    await sql`
     SELECT table_name
     FROM information_schema.tables
     WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
     ORDER BY table_name
-  `).map((r) => r.table_name);
+  `
+  ).map((r) => r.table_name);
 
   const dump = {
     dumped_at: new Date().toISOString(),

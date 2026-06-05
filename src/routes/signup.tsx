@@ -86,10 +86,9 @@ function SignupPage() {
       if (!res.token) {
         // Server suppressed details to prevent email enumeration. Show the
         // generic message and stay on the page — let the user try signing in.
-        toast.message(
-          res.message ?? "If this email is new, your account has been created.",
-          { duration: 6000 },
-        );
+        toast.message(res.message ?? "If this email is new, your account has been created.", {
+          duration: 6000,
+        });
         return;
       }
       setAuthToken(res.token);
@@ -110,7 +109,7 @@ function SignupPage() {
         qc.setQueryData(qk.account, meData);
         qc.setQueryData(qk.workspaces, wsData);
         const preferred = meData.default_account_type
-          ? wsData.items.find((w) => w.kind === meData.default_account_type) ?? wsData.items[0]
+          ? (wsData.items.find((w) => w.kind === meData.default_account_type) ?? wsData.items[0])
           : wsData.items[0];
         if (preferred) setActiveWorkspace(preferred.id);
       } catch {
@@ -178,95 +177,112 @@ function SignupPage() {
               className="space-y-4"
               onSubmit={handleSubmit}
             >
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="first">First name</Label>
-            <Input id="first" placeholder="Maya" value={first} onChange={(e) => setFirst(e.target.value)} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="last">Last name</Label>
-            <Input id="last" placeholder="Chen" value={last} onChange={(e) => setLast(e.target.value)} />
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Work email</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="you@company.com"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
-          <PasswordInput
-            id="password"
-            placeholder="At least 8 characters"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          {password && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.18 }}
-              className="space-y-1.5"
-            >
-              <div className="flex gap-1">
-                {[0, 1, 2, 3].map((i) => (
-                  <span
-                    key={i}
-                    className={`h-1 flex-1 rounded-full transition-colors ${
-                      i < strength.score ? strength.color : "bg-muted"
-                    }`}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="first">First name</Label>
+                  <Input
+                    id="first"
+                    placeholder="Maya"
+                    value={first}
+                    onChange={(e) => setFirst(e.target.value)}
+                    required
                   />
-                ))}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="last">Last name</Label>
+                  <Input
+                    id="last"
+                    placeholder="Chen"
+                    value={last}
+                    onChange={(e) => setLast(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>{strength.label}</span>
-                <span className="flex items-center gap-1.5 font-mono">
-                  {password.length >= 8 && <Check className="h-3 w-3 text-success" />}
-                  {password.length}+ chars
-                </span>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Work email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
-            </motion.div>
-          )}
-        </div>
 
-        <Button type="submit" className="group w-full" disabled={submitting}>
-          <motion.span
-            key={submitting ? "loading" : "idle"}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-            className="inline-flex items-center gap-1.5"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Creating workspace…
-              </>
-            ) : (
-              <>
-                Create account
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-              </>
-            )}
-          </motion.span>
-        </Button>
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Password</Label>
+                <PasswordInput
+                  id="password"
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                {password && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="space-y-1.5"
+                  >
+                    <div className="flex gap-1">
+                      {[0, 1, 2, 3].map((i) => (
+                        <span
+                          key={i}
+                          className={`h-1 flex-1 rounded-full transition-colors ${
+                            i < strength.score ? strength.color : "bg-muted"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{strength.label}</span>
+                      <span className="flex items-center gap-1.5 font-mono">
+                        {password.length >= 8 && <Check className="h-3 w-3 text-success" />}
+                        {password.length}+ chars
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
 
-        <p className="text-center text-[11px] text-muted-foreground">
-          By continuing you agree to our{" "}
-          <Link to="/terms" className="underline-offset-4 hover:underline">terms</Link> and{" "}
-          <Link to="/privacy" className="underline-offset-4 hover:underline">privacy policy</Link>.
-        </p>
+              <Button type="submit" className="group w-full" disabled={submitting}>
+                <motion.span
+                  key={submitting ? "loading" : "idle"}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="inline-flex items-center gap-1.5"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Creating workspace…
+                    </>
+                  ) : (
+                    <>
+                      Create account
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                    </>
+                  )}
+                </motion.span>
+              </Button>
+
+              <p className="text-center text-[11px] text-muted-foreground">
+                By continuing you agree to our{" "}
+                <Link to="/terms" className="underline-offset-4 hover:underline">
+                  terms
+                </Link>{" "}
+                and{" "}
+                <Link to="/privacy" className="underline-offset-4 hover:underline">
+                  privacy policy
+                </Link>
+                .
+              </p>
             </motion.form>
           )}
         </AnimatePresence>
@@ -298,7 +314,10 @@ function TypeCard({
           : "border-border/70 bg-surface/40 hover:border-border hover:bg-surface"
       }`}
     >
-      <Icon className={`h-4 w-4 ${active ? "text-brand" : "text-muted-foreground"}`} strokeWidth={1.6} />
+      <Icon
+        className={`h-4 w-4 ${active ? "text-brand" : "text-muted-foreground"}`}
+        strokeWidth={1.6}
+      />
       <span className="text-sm font-medium">{label}</span>
       <span className="text-[11px] text-muted-foreground">{hint}</span>
     </button>

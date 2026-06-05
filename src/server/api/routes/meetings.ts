@@ -129,9 +129,7 @@ app.post("/from-transcript", zValidator("json", TranscriptUploadRequest), async 
     retry_count: 0,
   });
 
-  return c.json(
-    TranscriptUploadResponse.parse({ meeting_id: meetingId, status: "queued" }),
-  );
+  return c.json(TranscriptUploadResponse.parse({ meeting_id: meetingId, status: "queued" }));
 });
 
 // ---------------------------------------------------------------------------
@@ -191,9 +189,7 @@ app.post("/from-live", zValidator("json", LiveUploadRequest), async (c) => {
     retry_count: 0,
   });
 
-  return c.json(
-    TranscriptUploadResponse.parse({ meeting_id: meetingId, status: "queued" }),
-  );
+  return c.json(TranscriptUploadResponse.parse({ meeting_id: meetingId, status: "queued" }));
 });
 
 // ---------------------------------------------------------------------------
@@ -244,9 +240,7 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
   if (q.to) conditions.push(sql`created_at <= ${q.to}`);
   if (q.q) conditions.push(sql`title ILIKE ${`%${q.q}%`}`);
 
-  const whereClause = conditions.reduce((acc, cur, i) =>
-    i === 0 ? cur : sql`${acc} AND ${cur}`,
-  );
+  const whereClause = conditions.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc} AND ${cur}`));
 
   const rows = await sql<
     Array<{
@@ -342,7 +336,12 @@ app.get("/:id", async (c) => {
         key_topics: coerceJsonArray<string>(summaryRow.key_topics),
         decisions: coerceJsonArray<string>(summaryRow.decisions),
         open_questions: coerceJsonArray<string>(summaryRow.open_questions),
-        chapters: coerceJsonArray<{ title: string; start_sec: number; end_sec: number; summary: string }>(summaryRow.chapters),
+        chapters: coerceJsonArray<{
+          title: string;
+          start_sec: number;
+          end_sec: number;
+          summary: string;
+        }>(summaryRow.chapters),
       }
     : null;
 
@@ -406,7 +405,12 @@ interface WordEntry {
   speaker?: string | null;
 }
 
-interface SegmentOut { speaker: string | null; start_sec: number; end_sec: number; text: string }
+interface SegmentOut {
+  speaker: string | null;
+  start_sec: number;
+  end_sec: number;
+  text: string;
+}
 
 function buildTranscriptResponse(row: {
   raw_text: string;
@@ -415,10 +419,14 @@ function buildTranscriptResponse(row: {
 }): { raw_text: string; segments: SegmentOut[]; speakers: typeof row.speakers } {
   // `content` may be a real JSONB object OR a JSON-encoded string (older
   // meetings inserted before the sql.json fix). Normalize both forms.
-  let content: { words?: WordEntry[]; paragraphs?: Array<{ start: number; end: number; speaker?: string | null; text: string }> } = {};
+  let content: {
+    words?: WordEntry[];
+    paragraphs?: Array<{ start: number; end: number; speaker?: string | null; text: string }>;
+  } = {};
   try {
     if (typeof row.content === "string") content = JSON.parse(row.content) as typeof content;
-    else if (row.content && typeof row.content === "object") content = row.content as typeof content;
+    else if (row.content && typeof row.content === "object")
+      content = row.content as typeof content;
   } catch {
     /* leave content empty — segments will be empty too */
   }

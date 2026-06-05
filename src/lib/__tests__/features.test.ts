@@ -11,7 +11,7 @@ import type { SubscriptionTier } from "../../server/services/usage-tracker";
 describe("TIER_FEATURES configuration", () => {
   it("defines all four tiers", () => {
     const tiers: SubscriptionTier[] = ["free", "student", "pro", "team"];
-    
+
     tiers.forEach((tier) => {
       expect(TIER_FEATURES[tier]).toBeDefined();
     });
@@ -215,7 +215,7 @@ describe("TIER_PRICING configuration", () => {
 
   it("defines pricing for student tier", () => {
     const student = TIER_PRICING.student;
-    
+
     expect(student.name).toBe("Student");
     expect(student.price_usd).toBe(7);
     expect(student.annual_price_usd).toBe(84);
@@ -225,7 +225,7 @@ describe("TIER_PRICING configuration", () => {
 
   it("defines pricing for pro tier", () => {
     const pro = TIER_PRICING.pro;
-    
+
     expect(pro.name).toBe("Professional");
     expect(pro.price_usd).toBe(14);
     expect(pro.annual_price_usd).toBe(168);
@@ -235,7 +235,7 @@ describe("TIER_PRICING configuration", () => {
 
   it("defines pricing for team tier", () => {
     const team = TIER_PRICING.team;
-    
+
     expect(team.name).toBe("Team");
     expect(team.price_usd).toBe(29);
     expect(team.annual_price_usd).toBe(348);
@@ -245,7 +245,7 @@ describe("TIER_PRICING configuration", () => {
 
   it("annual pricing equals 12 * monthly (no discount for now)", () => {
     const tiers = ["student", "pro", "team"] as const;
-    
+
     tiers.forEach((tier) => {
       const pricing = TIER_PRICING[tier];
       expect(pricing.annual_price_usd).toBe(pricing.price_usd * 12);

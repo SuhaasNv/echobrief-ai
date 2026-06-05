@@ -6,12 +6,12 @@
  *   (or: tsx src/server/workers/main.ts for dev)
  *
  * BullMQ Workers consume the `processing` and `export` queues and run jobs.
- * 
+ *
  * SCALABILITY: Concurrency tuned for production load.
  * - Processing: 10 concurrent jobs per worker (up from 1)
  * - Export: 5 concurrent jobs per worker (up from 2)
  * - Deploy 10 worker instances for 1M users → 100 total parallel jobs
- * 
+ *
  * Environment Variables:
  * - WORKER_CONCURRENCY: Processing worker concurrency (default: 10)
  * - EXPORT_WORKER_CONCURRENCY: Export worker concurrency (default: 5)
@@ -42,14 +42,17 @@ const worker = new Worker<ProcessingJob>(
   },
   {
     connection: getQueueConnection(),
-    concurrency: PROCESSING_CONCURRENCY,  // ✅ Up from 1 to 10 (or env var)
-    lockDuration: 15 * 60 * 1000,         // 15 minutes; AI pipeline can be slow
+    concurrency: PROCESSING_CONCURRENCY, // ✅ Up from 1 to 10 (or env var)
+    lockDuration: 15 * 60 * 1000, // 15 minutes; AI pipeline can be slow
   },
 );
 
 worker.on("failed", async (job, err) => {
   if (!job) return;
-  console.error(`[worker] job ${job.id} failed (attempt ${job.attemptsMade}/${job.opts.attempts}):`, err.message);
+  console.error(
+    `[worker] job ${job.id} failed (attempt ${job.attemptsMade}/${job.opts.attempts}):`,
+    err.message,
+  );
   // BullMQ retries automatically; only mark final-failed once attempts exhausted.
   if (job.attemptsMade >= (job.opts.attempts ?? 3)) {
     await markFailed(job.data, err);
@@ -76,14 +79,17 @@ const exportWorker = new Worker<ExportJob>(
   },
   {
     connection: getQueueConnection(),
-    concurrency: EXPORT_CONCURRENCY,  // ✅ Up from 2 to 5 (or env var)
-    lockDuration: 10 * 60 * 1000,     // 10 minutes; exports can take time
+    concurrency: EXPORT_CONCURRENCY, // ✅ Up from 2 to 5 (or env var)
+    lockDuration: 10 * 60 * 1000, // 10 minutes; exports can take time
   },
 );
 
 exportWorker.on("failed", async (job, err) => {
   if (!job) return;
-  console.error(`[export-worker] job ${job.id} failed (attempt ${job.attemptsMade}/${job.opts.attempts}):`, err.message);
+  console.error(
+    `[export-worker] job ${job.id} failed (attempt ${job.attemptsMade}/${job.opts.attempts}):`,
+    err.message,
+  );
   // BullMQ retries automatically; final failures are logged here
 });
 
@@ -107,16 +113,18 @@ function scheduleNextCleanup() {
   const now = new Date();
   const next3am = new Date(now);
   next3am.setHours(3, 0, 0, 0);
-  
+
   // If 3 AM already passed today, schedule for tomorrow
   if (next3am <= now) {
     next3am.setDate(next3am.getDate() + 1);
   }
-  
+
   const msUntilNext = next3am.getTime() - now.getTime();
-  
-  console.log(`[r2-cleanup] scheduled for ${next3am.toISOString()} (in ${Math.round(msUntilNext / 1000 / 60)} minutes)`);
-  
+
+  console.log(
+    `[r2-cleanup] scheduled for ${next3am.toISOString()} (in ${Math.round(msUntilNext / 1000 / 60)} minutes)`,
+  );
+
   cleanupTimer = setTimeout(async () => {
     try {
       await cleanupOldAudioFiles();
@@ -135,27 +143,26 @@ scheduleNextCleanup();
 // Uncomment the line below to run cleanup when worker starts:
 // cleanupOldAudioFiles().catch((err) => console.error("[r2-cleanup] startup run failed:", err));
 
-
 async function shutdown(signal: string) {
   console.log(`[worker] received ${signal}, shutting down gracefully...`);
-  
+
   // 1. Stop accepting new jobs
   console.log("[worker] Pausing workers (no new jobs accepted)...");
   await worker.pause();
   await exportWorker.pause();
-  
+
   // 2. Clear cleanup timer
   if (cleanupTimer) {
     clearTimeout(cleanupTimer);
     console.log("[r2-cleanup] timer cleared");
   }
-  
+
   // 3. Wait for in-flight jobs to complete (with timeout)
   const shutdownTimeout = setTimeout(() => {
     console.warn("[worker] Shutdown timeout reached, forcing exit");
     process.exit(1);
   }, 30_000); // 30 seconds max wait
-  
+
   try {
     console.log("[worker] Waiting for in-flight jobs to complete (max 30s)...");
     await worker.close();
@@ -166,12 +173,12 @@ async function shutdown(signal: string) {
     console.error("[worker] Error during graceful shutdown:", err);
     clearTimeout(shutdownTimeout);
   }
-  
+
   // 4. Close connections
   console.log("[worker] Closing database and Redis connections...");
   await closeSql();
   await closeRedis();
-  
+
   console.log("[worker] Shutdown complete");
   process.exit(0);
 }

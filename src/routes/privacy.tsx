@@ -1,15 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import {
-  Database,
-  Lock,
-  Eye,
-  Trash2,
-  Server,
-  Sparkles,
-  ArrowUpRight,
-  X,
-} from "lucide-react";
+import { Database, Lock, Eye, Trash2, Server, Sparkles, ArrowUpRight, X } from "lucide-react";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 
@@ -57,8 +48,7 @@ function PrivacyPage() {
             <span className="text-gradient-brand">so you don't have to be.</span>
           </h1>
           <p className="mt-5 max-w-2xl text-base text-muted-foreground">
-            We wrote this in plain English. If something here is unclear, that's
-            on us — email{" "}
+            We wrote this in plain English. If something here is unclear, that's on us — email{" "}
             <a
               href="mailto:privacy@echobrief.ai"
               className="text-foreground underline-offset-4 hover:underline"
@@ -96,10 +86,7 @@ function PrivacyPage() {
                 body: "Account delete cascades everything in seconds — audio + DB + vectors.",
               },
             ].map(({ Icon, title, body }) => (
-              <div
-                key={title}
-                className="rounded-xl border border-border/60 bg-background/40 p-4"
-              >
+              <div key={title} className="rounded-xl border border-border/60 bg-background/40 p-4">
                 <Icon className="h-4 w-4 text-brand" strokeWidth={1.6} />
                 <p className="mt-2 text-sm font-medium text-foreground">{title}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{body}</p>
@@ -114,8 +101,8 @@ function PrivacyPage() {
           title="Specifically — the audio you upload and what we make of it."
         >
           <p>
-            The list is short. We can't do meeting intelligence without meeting
-            data, so we ask for as little else as possible:
+            The list is short. We can't do meeting intelligence without meeting data, so we ask for
+            as little else as possible:
           </p>
           <ul className="mt-4 space-y-2">
             {[
@@ -152,14 +139,11 @@ function PrivacyPage() {
         </Section>
 
         {/* Vendors */}
-        <Section
-          eyebrow="Who else touches it"
-          title="Sub-processors that help us run EchoBrief."
-        >
+        <Section eyebrow="Who else touches it" title="Sub-processors that help us run EchoBrief.">
           <p>
-            These vendors process small slices of your data on our behalf.
-            Each operates under a commercial agreement that prohibits using your
-            data to train models or share it elsewhere.
+            These vendors process small slices of your data on our behalf. Each operates under a
+            commercial agreement that prohibits using your data to train models or share it
+            elsewhere.
           </p>
           <div className="mt-5 overflow-hidden rounded-xl border border-border/60">
             <table className="w-full text-sm">
@@ -189,9 +173,21 @@ function PrivacyPage() {
         <Section eyebrow="Retention" title="How long things stick around.">
           <div className="mt-2 space-y-3">
             <RetentionRow icon={Database} label="Audio files" value="90 days, then auto-deleted" />
-            <RetentionRow icon={Sparkles} label="Transcripts + AI artifacts" value="Until you delete the meeting" />
-            <RetentionRow icon={Server} label="Account data" value="Until you delete your account" />
-            <RetentionRow icon={Lock} label="Authentication logs" value="30 days for security forensics" />
+            <RetentionRow
+              icon={Sparkles}
+              label="Transcripts + AI artifacts"
+              value="Until you delete the meeting"
+            />
+            <RetentionRow
+              icon={Server}
+              label="Account data"
+              value="Until you delete your account"
+            />
+            <RetentionRow
+              icon={Lock}
+              label="Authentication logs"
+              value="30 days for security forensics"
+            />
           </div>
         </Section>
 

@@ -18,8 +18,8 @@ function SharedPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
       <h1 className="text-3xl font-semibold tracking-tight">{labels.notes.library}</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Every processed {labels.meeting.singular.toLowerCase()} becomes a searchable, citable note. Click any card
-        to open the full transcript, summary, and action items.
+        Every processed {labels.meeting.singular.toLowerCase()} becomes a searchable, citable note.
+        Click any card to open the full transcript, summary, and action items.
       </p>
 
       {isLoading ? (
@@ -29,7 +29,10 @@ function SharedPage() {
       ) : isError ? (
         <div className="mt-12 rounded-xl border border-border/70 bg-surface p-10 text-center">
           <p className="text-sm font-medium">Could not load notes.</p>
-          <button onClick={() => refetch()} className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:underline">
+          <button
+            onClick={() => refetch()}
+            className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:underline"
+          >
             Try again
           </button>
         </div>
@@ -64,19 +67,25 @@ function SharedPage() {
                   <div className="flex flex-wrap items-baseline gap-2">
                     <h3 className="text-base font-medium">{m.title}</h3>
                     {m.tags.slice(0, 4).map((t) => (
-                      <span key={t} className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      <span
+                        key={t}
+                        className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                      >
                         {t}
                       </span>
                     ))}
                   </div>
                   {m.summary_excerpt && (
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{m.summary_excerpt}</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                      {m.summary_excerpt}
+                    </p>
                   )}
                   <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span className="font-mono">{formatDate(m.created_at)}</span>
                     <span>·</span>
                     <span className="inline-flex items-center gap-1">
-                      <Users className="h-3 w-3" /> {m.participant_count} speaker{m.participant_count === 1 ? "" : "s"}
+                      <Users className="h-3 w-3" /> {m.participant_count} speaker
+                      {m.participant_count === 1 ? "" : "s"}
                     </span>
                     <span>·</span>
                     <span>

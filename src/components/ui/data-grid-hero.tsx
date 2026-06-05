@@ -154,10 +154,7 @@ export function DataGridHero(props: DataGridHeroProps) {
   }, [mouseGlow]);
 
   return (
-    <div
-      className={`data-grid-hero ${className ?? ""}`}
-      style={{ background }}
-    >
+    <div className={`data-grid-hero ${className ?? ""}`} style={{ background }}>
       <div ref={gridRef} className="grid-container" aria-hidden="true" />
       {children !== undefined && <div className="hero-content">{children}</div>}
     </div>

@@ -86,8 +86,17 @@ export type MeetingListResponse = z.infer<typeof MeetingListResponse>;
 export const UploadUrlRequest = z.object({
   filename: z.string().min(1).max(255),
   content_type: SupportedMime,
-  size: z.number().int().positive().max(500 * 1024 * 1024), // 500MB
-  duration_sec: z.number().int().positive().max(4 * 60 * 60).optional(),
+  size: z
+    .number()
+    .int()
+    .positive()
+    .max(500 * 1024 * 1024), // 500MB
+  duration_sec: z
+    .number()
+    .int()
+    .positive()
+    .max(4 * 60 * 60)
+    .optional(),
   title: z.string().trim().min(1).max(200).optional(),
   language: z.string().min(2).max(10).default("en"),
   tags: z.array(z.string().trim().max(50)).max(10).default([]),
@@ -142,9 +151,17 @@ export const LiveUploadRequest = z.object({
     .min(1, "Transcript is empty")
     .max(500_000, "Transcript too large (500k char max)"),
   audio_key: z.string().trim().min(1).max(500),
-  audio_size: z.number().int().positive().max(500 * 1024 * 1024),
+  audio_size: z
+    .number()
+    .int()
+    .positive()
+    .max(500 * 1024 * 1024),
   audio_mime: z.string().trim().min(1).max(100),
-  duration_sec: z.number().int().nonnegative().max(60 * 60 * 6),
+  duration_sec: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(60 * 60 * 6),
   language: z.string().min(2).max(10).default("en"),
   tags: z.array(z.string().trim().max(50)).max(10).default([]),
 });

@@ -139,7 +139,9 @@ auth.post("/login", zValidator("json", LoginBody), async (c) => {
   const limited = await checkAuthRateLimit(c, "auth", email);
   if (limited) return limited;
 
-  const rows = await sql<UserRow[]>`SELECT id, email, name, password_hash, is_admin FROM users WHERE email = ${email} LIMIT 1`;
+  const rows = await sql<
+    UserRow[]
+  >`SELECT id, email, name, password_hash, is_admin FROM users WHERE email = ${email} LIMIT 1`;
   const user = rows[0];
 
   // Use the same generic error for "no such user" and "wrong password" so

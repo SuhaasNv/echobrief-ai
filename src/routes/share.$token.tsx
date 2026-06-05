@@ -82,9 +82,7 @@ function SharePage() {
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="max-w-md text-center">
           <Lock className="mx-auto h-12 w-12 text-muted-foreground/50" />
-          <h1 className="mt-4 text-xl font-semibold text-foreground">
-            Meeting not available
-          </h1>
+          <h1 className="mt-4 text-xl font-semibold text-foreground">Meeting not available</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             This link may have expired, been disabled, or doesn't exist.
           </p>
@@ -154,10 +152,7 @@ function SharePage() {
             {meeting.tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {meeting.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-md bg-accent px-2 py-0.5 text-xs font-medium"
-                  >
+                  <span key={tag} className="rounded-md bg-accent px-2 py-0.5 text-xs font-medium">
                     {tag}
                   </span>
                 ))}

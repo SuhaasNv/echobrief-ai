@@ -1,14 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Loader2,
-  GraduationCap,
-  Check,
-  RotateCcw,
-  ArrowRight,
-  Sparkle,
-} from "lucide-react";
+import { Loader2, GraduationCap, Check, RotateCcw, ArrowRight, Sparkle } from "lucide-react";
 import { useReviewQueue, useUpdateFlashcard } from "@/lib/api/hooks";
 import { useActiveWorkspaceKind } from "@/lib/workspace-store";
 
@@ -101,8 +94,9 @@ function StudyPage() {
         <GraduationCap className="mx-auto h-10 w-10 text-violet" strokeWidth={1.4} />
         <h1 className="mt-4 text-2xl font-semibold tracking-tight">No flashcards yet</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Open a lecture and click <span className="font-medium text-foreground">Generate flashcards</span> to start
-          building your study deck.
+          Open a lecture and click{" "}
+          <span className="font-medium text-foreground">Generate flashcards</span> to start building
+          your study deck.
         </p>
         <Link
           to="/app/meetings"
@@ -195,7 +189,9 @@ function StudyPage() {
               className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-foreground py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
             >
               Reveal answer
-              <kbd className="ml-2 rounded border border-background/30 px-1.5 py-0.5 font-mono text-[9px]">Space</kbd>
+              <kbd className="ml-2 rounded border border-background/30 px-1.5 py-0.5 font-mono text-[9px]">
+                Space
+              </kbd>
             </button>
           ) : (
             <div className="mt-6 grid grid-cols-2 gap-2">
@@ -205,7 +201,9 @@ function StudyPage() {
                 className="flex items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-surface py-2 text-sm transition-colors hover:bg-accent"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Review again
-                <kbd className="rounded border border-border/60 px-1.5 py-0.5 font-mono text-[9px]">J</kbd>
+                <kbd className="rounded border border-border/60 px-1.5 py-0.5 font-mono text-[9px]">
+                  J
+                </kbd>
               </button>
               <button
                 type="button"
@@ -213,7 +211,9 @@ function StudyPage() {
                 className="flex items-center justify-center gap-1.5 rounded-lg bg-foreground py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
               >
                 <Check className="h-3.5 w-3.5" /> Got it
-                <kbd className="rounded border border-background/30 px-1.5 py-0.5 font-mono text-[9px]">K</kbd>
+                <kbd className="rounded border border-background/30 px-1.5 py-0.5 font-mono text-[9px]">
+                  K
+                </kbd>
               </button>
             </div>
           )}

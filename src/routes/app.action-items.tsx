@@ -54,14 +54,23 @@ function ActionItemsPage() {
 
   const bulkComplete = async (completed: boolean) => {
     const ids = [...selected];
-    await Promise.all(ids.map((id) => patch.mutateAsync({ id, patch: { completed } }).catch(() => {})));
-    toast.success(`${ids.length} item${ids.length === 1 ? "" : "s"} ${completed ? "completed" : "reopened"}`);
+    await Promise.all(
+      ids.map((id) => patch.mutateAsync({ id, patch: { completed } }).catch(() => {})),
+    );
+    toast.success(
+      `${ids.length} item${ids.length === 1 ? "" : "s"} ${completed ? "completed" : "reopened"}`,
+    );
     setSelected(new Set());
   };
 
   const bulkDelete = async () => {
     const ids = [...selected];
-    if (!confirm(`Delete ${ids.length} action item${ids.length === 1 ? "" : "s"}? This can't be undone.`)) return;
+    if (
+      !confirm(
+        `Delete ${ids.length} action item${ids.length === 1 ? "" : "s"}? This can't be undone.`,
+      )
+    )
+      return;
     await Promise.all(ids.map((id) => del.mutateAsync(id).catch(() => {})));
     toast.success(`Deleted ${ids.length}`);
     setSelected(new Set());
@@ -79,7 +88,10 @@ function ActionItemsPage() {
     return (
       <div className="mx-auto max-w-7xl px-4 py-16 text-center">
         <h2 className="text-lg font-medium">Could not load action items.</h2>
-        <button onClick={() => refetch()} className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:underline">
+        <button
+          onClick={() => refetch()}
+          className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:underline"
+        >
           Try again
         </button>
       </div>
@@ -95,9 +107,10 @@ function ActionItemsPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{labels.actions.plural}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {kind === "student" ? "From your lectures" : "Extracted from every meeting"} · {items.length} total · {overdue > 0 && (
-              <span className="text-destructive">{overdue} overdue · </span>
-            )}{open.length} open · {done.length} completed
+            {kind === "student" ? "From your lectures" : "Extracted from every meeting"} ·{" "}
+            {items.length} total ·{" "}
+            {overdue > 0 && <span className="text-destructive">{overdue} overdue · </span>}
+            {open.length} open · {done.length} completed
           </p>
         </div>
       </div>
@@ -106,8 +119,18 @@ function ActionItemsPage() {
       <div className="mt-8 grid gap-px overflow-hidden rounded-xl border border-border/70 bg-border/40 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Open" value={open.length} accent="text-foreground" icon={Circle} />
         <Kpi label="Completed" value={done.length} accent="text-success" icon={CheckCircle2} />
-        <Kpi label="Overdue" value={overdue} accent={overdue > 0 ? "text-destructive" : "text-muted-foreground"} icon={AlertTriangle} />
-        <Kpi label="Across meetings" value={new Set(items.map((i) => i.meeting_id)).size} accent="text-foreground" icon={Clock} />
+        <Kpi
+          label="Overdue"
+          value={overdue}
+          accent={overdue > 0 ? "text-destructive" : "text-muted-foreground"}
+          icon={AlertTriangle}
+        />
+        <Kpi
+          label="Across meetings"
+          value={new Set(items.map((i) => i.meeting_id)).size}
+          accent="text-foreground"
+          icon={Clock}
+        />
       </div>
 
       {items.length === 0 ? (
@@ -127,13 +150,19 @@ function ActionItemsPage() {
               onClick={selectAll}
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
-              {allSelected ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
+              {allSelected ? (
+                <CheckSquare className="h-3.5 w-3.5" />
+              ) : (
+                <Square className="h-3.5 w-3.5" />
+              )}
               {allSelected ? "Deselect all" : "Select all"}
             </button>
             {hasSelection && (
               <>
                 <span className="text-xs text-muted-foreground">·</span>
-                <span className="font-mono text-[11px] text-muted-foreground">{selected.size} selected</span>
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {selected.size} selected
+                </span>
                 <div className="ml-auto flex flex-wrap items-center gap-1">
                   <button
                     type="button"
@@ -170,7 +199,9 @@ function ActionItemsPage() {
               items={open}
               selected={selected}
               onToggleSelect={toggleSelect}
-              onToggleDone={(item) => patch.mutate({ id: item.id, patch: { completed: !item.completed } })}
+              onToggleDone={(item) =>
+                patch.mutate({ id: item.id, patch: { completed: !item.completed } })
+              }
               onDelete={(item) => del.mutate(item.id)}
               hasSelection={hasSelection}
             />
@@ -181,7 +212,9 @@ function ActionItemsPage() {
               items={done}
               selected={selected}
               onToggleSelect={toggleSelect}
-              onToggleDone={(item) => patch.mutate({ id: item.id, patch: { completed: !item.completed } })}
+              onToggleDone={(item) =>
+                patch.mutate({ id: item.id, patch: { completed: !item.completed } })
+              }
               onDelete={(item) => del.mutate(item.id)}
               hasSelection={hasSelection}
               dimmed
@@ -247,7 +280,9 @@ function Column({
         </h2>
         <span className="font-mono text-[10px] text-muted-foreground">· {items.length}</span>
       </div>
-      <div className={`overflow-hidden rounded-xl border border-border/70 ${dimmed ? "bg-surface/50" : "bg-surface"}`}>
+      <div
+        className={`overflow-hidden rounded-xl border border-border/70 ${dimmed ? "bg-surface/50" : "bg-surface"}`}
+      >
         {items.length === 0 ? (
           <p className="px-4 py-8 text-center text-xs text-muted-foreground">Empty.</p>
         ) : (
@@ -285,23 +320,38 @@ function Column({
                       a.completed ? "text-success" : "text-muted-foreground hover:text-brand"
                     }`}
                   >
-                    {a.completed ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                    {a.completed ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <Circle className="h-4 w-4" />
+                    )}
                   </button>
 
                   {/* Body */}
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm ${a.completed ? "text-muted-foreground line-through" : ""}`}>
+                    <p
+                      className={`text-sm ${a.completed ? "text-muted-foreground line-through" : ""}`}
+                    >
                       {a.description}
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {a.meeting_title ? (
-                        <Link to="/app/meetings/$id" params={{ id: a.meeting_id }} className="inline-flex items-center gap-1 hover:underline">
+                        <Link
+                          to="/app/meetings/$id"
+                          params={{ id: a.meeting_id }}
+                          className="inline-flex items-center gap-1 hover:underline"
+                        >
                           {a.meeting_title} <ChevronRight className="h-3 w-3" />
                         </Link>
                       ) : (
                         <span className="italic">Untitled meeting</span>
                       )}
-                      {a.assignee_name && <> · <span className="font-mono">{a.assignee_name}</span></>}
+                      {a.assignee_name && (
+                        <>
+                          {" "}
+                          · <span className="font-mono">{a.assignee_name}</span>
+                        </>
+                      )}
                     </p>
                   </div>
 
@@ -309,7 +359,9 @@ function Column({
                   <div className="flex items-center gap-2">
                     <span
                       className={`rounded-md px-2 py-0.5 font-mono text-[10px] ${
-                        overdueFlag ? "bg-destructive/15 text-destructive" : "bg-accent text-muted-foreground"
+                        overdueFlag
+                          ? "bg-destructive/15 text-destructive"
+                          : "bg-accent text-muted-foreground"
                       }`}
                     >
                       {formatDue(a.due_date)}

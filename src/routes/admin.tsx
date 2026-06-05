@@ -60,7 +60,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
@@ -97,7 +103,10 @@ function AdminGate() {
         <p className="mt-2 text-sm text-muted-foreground">
           Your account ({me.email}) doesn't have admin permissions.
         </p>
-        <Link to="/app" className="mt-4 inline-block text-sm text-muted-foreground underline-offset-4 hover:underline">
+        <Link
+          to="/app"
+          className="mt-4 inline-block text-sm text-muted-foreground underline-offset-4 hover:underline"
+        >
           ← Back to dashboard
         </Link>
       </div>
@@ -129,7 +138,9 @@ function AdminConsole({ adminEmail }: { adminEmail: string }) {
       <aside className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col border-r border-border/60 bg-sidebar md:flex">
         <div className="border-b border-border/60 px-4 py-4">
           <Link to="/" className="block">
-            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">EchoBrief</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+              EchoBrief
+            </p>
             <div className="mt-1 flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-brand" />
               <p className="text-base font-semibold tracking-tight">Admin Console</p>
@@ -186,7 +197,9 @@ function AdminConsole({ adminEmail }: { adminEmail: string }) {
               live
             </span>
             <span>env: {system.data?.runtime.env ?? "—"}</span>
-            <span>uptime: {system.data ? formatUptime(system.data.runtime.uptime_seconds) : "—"}</span>
+            <span>
+              uptime: {system.data ? formatUptime(system.data.runtime.uptime_seconds) : "—"}
+            </span>
           </div>
         </header>
 
@@ -216,7 +229,9 @@ function SystemPulse({ system }: { system: AdminSystemResponse | undefined }) {
   if (!system) return <div className="h-5" />;
   return (
     <div>
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">Services</p>
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
+        Services
+      </p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {system.services.map((svc) => (
           <span
@@ -245,7 +260,10 @@ function ErrorBlock({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="rounded-md border border-border/70 bg-surface p-10 text-center">
       <p className="text-sm font-medium">Could not load data.</p>
-      <button onClick={onRetry} className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:underline">
+      <button
+        onClick={onRetry}
+        className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:underline"
+      >
         Try again
       </button>
     </div>
@@ -254,9 +272,17 @@ function ErrorBlock({ onRetry }: { onRetry: () => void }) {
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "complete")
-    return <span className="rounded-sm bg-success/15 px-1.5 py-0.5 font-mono text-[10px] text-success">complete</span>;
+    return (
+      <span className="rounded-sm bg-success/15 px-1.5 py-0.5 font-mono text-[10px] text-success">
+        complete
+      </span>
+    );
   if (status === "failed")
-    return <span className="rounded-sm bg-destructive/15 px-1.5 py-0.5 font-mono text-[10px] text-destructive">failed</span>;
+    return (
+      <span className="rounded-sm bg-destructive/15 px-1.5 py-0.5 font-mono text-[10px] text-destructive">
+        failed
+      </span>
+    );
   return (
     <span className="inline-flex items-center gap-1 rounded-sm bg-warning/15 px-1.5 py-0.5 font-mono text-[10px] text-warning">
       <span className="h-1 w-1 animate-pulse rounded-full bg-warning" /> {status}
@@ -285,17 +311,39 @@ function OverviewSection() {
   const adminCount = users.data?.items.filter((u) => u.is_admin).length ?? 0;
 
   const kpis = [
-    { label: "Total users", value: users.data?.items.length, sub: adminCount > 0 ? `${adminCount} admin` : null, icon: Users as LucideIcon },
-    { label: "Meetings indexed", value: meetings.data?.items.length, sub: null, icon: FileAudio as LucideIcon },
-    { label: "Queue waiting", value: queue.data?.counts.waiting ?? 0, sub: queue.data ? `${queue.data.counts.active ?? 0} active` : null, icon: ListChecks as LucideIcon },
-    { label: "Failed (24h)", value: failedLast24h, sub: queue.data ? `${queue.data.counts.failed ?? 0} all-time` : null, icon: AlertTriangle as LucideIcon },
+    {
+      label: "Total users",
+      value: users.data?.items.length,
+      sub: adminCount > 0 ? `${adminCount} admin` : null,
+      icon: Users as LucideIcon,
+    },
+    {
+      label: "Meetings indexed",
+      value: meetings.data?.items.length,
+      sub: null,
+      icon: FileAudio as LucideIcon,
+    },
+    {
+      label: "Queue waiting",
+      value: queue.data?.counts.waiting ?? 0,
+      sub: queue.data ? `${queue.data.counts.active ?? 0} active` : null,
+      icon: ListChecks as LucideIcon,
+    },
+    {
+      label: "Failed (24h)",
+      value: failedLast24h,
+      sub: queue.data ? `${queue.data.counts.failed ?? 0} all-time` : null,
+      icon: AlertTriangle as LucideIcon,
+    },
   ];
 
   return (
     <div className="space-y-6">
       {/* KPI hero */}
       <section>
-        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Key metrics</p>
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Key metrics
+        </p>
         <div className="mt-3 grid gap-px overflow-hidden rounded-md border border-border/70 bg-border/40 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((k, i) => (
             <motion.div
@@ -321,10 +369,13 @@ function OverviewSection() {
       {/* System health */}
       <section>
         <div className="flex items-center justify-between">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">System health</p>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            System health
+          </p>
           {system.data && (
             <p className="font-mono text-[10px] text-muted-foreground">
-              {system.data.services.filter((s) => s.status === "ok").length}/{system.data.services.length} services up
+              {system.data.services.filter((s) => s.status === "ok").length}/
+              {system.data.services.length} services up
             </p>
           )}
         </div>
@@ -359,7 +410,9 @@ function OverviewSection() {
       {/* Recent activity */}
       <section>
         <div className="flex items-center justify-between">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Recent activity</p>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Recent activity
+          </p>
           <span className="inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
             <Activity className="h-3 w-3" /> last 10
           </span>
@@ -412,7 +465,7 @@ function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [tier, setTier] = useState<"free" | "student" | "pro" | "team">("free");
   const [status, setStatus] = useState<"active" | "cancelled" | "past_due" | "trialing">("active");
-  
+
   const updateUser = useUpdateUser();
   const updateSubscription = useUpdateUserSubscription();
 
@@ -421,7 +474,9 @@ function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps) {
       setName(user.name || "");
       setIsAdmin(user.is_admin);
       setTier((user.tier as "free" | "student" | "pro" | "team") || "free");
-      setStatus((user.subscription_status as "active" | "cancelled" | "past_due" | "trialing") || "active");
+      setStatus(
+        (user.subscription_status as "active" | "cancelled" | "past_due" | "trialing") || "active",
+      );
     }
   }, [user]);
 
@@ -514,7 +569,10 @@ function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps) {
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={updateUser.isPending || updateSubscription.isPending}>
+          <Button
+            onClick={handleSave}
+            disabled={updateUser.isPending || updateSubscription.isPending}
+          >
             {updateUser.isPending || updateSubscription.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -553,7 +611,7 @@ function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogProps) {
       setNeedsConfirm(false);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Failed to delete user";
-      
+
       // Check if we need confirmation for admin user
       if (errorMsg.includes("confirmation_required") && !needsConfirm) {
         setNeedsConfirm(true);
@@ -572,13 +630,13 @@ function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogProps) {
           <AlertDialogDescription>
             {user?.is_admin && needsConfirm ? (
               <span className="text-destructive">
-                <strong>Warning:</strong> You are about to delete an admin user. This action cannot be undone.
-                All their meetings, action items, and data will be permanently deleted.
+                <strong>Warning:</strong> You are about to delete an admin user. This action cannot
+                be undone. All their meetings, action items, and data will be permanently deleted.
               </span>
             ) : (
               <>
-                Are you sure you want to delete <strong>{user?.email}</strong>? This action cannot be undone.
-                All their meetings, action items, and data will be permanently deleted.
+                Are you sure you want to delete <strong>{user?.email}</strong>? This action cannot
+                be undone. All their meetings, action items, and data will be permanently deleted.
               </>
             )}
           </AlertDialogDescription>
@@ -610,7 +668,7 @@ function UsersSection() {
   const { data: me } = useMe();
   const [editUser, setEditUser] = useState<AdminUserRow | null>(null);
   const [deleteUser, setDeleteUser] = useState<AdminUserRow | null>(null);
-  
+
   if (isLoading) return <CenterLoader />;
   if (isError) return <ErrorBlock onRetry={() => refetch()} />;
   const items = data?.items ?? [];
@@ -650,8 +708,16 @@ function UsersSection() {
         <DataTable<AdminUserRow>
           rows={items}
           columns={[
-            { key: "email", label: "Email", render: (u) => <span className="font-mono text-xs">{u.email}</span> },
-            { key: "name", label: "Name", render: (u) => u.name ?? <span className="text-muted-foreground">—</span> },
+            {
+              key: "email",
+              label: "Email",
+              render: (u) => <span className="font-mono text-xs">{u.email}</span>,
+            },
+            {
+              key: "name",
+              label: "Name",
+              render: (u) => u.name ?? <span className="text-muted-foreground">—</span>,
+            },
             {
               key: "role",
               label: "Role",
@@ -669,11 +735,15 @@ function UsersSection() {
               label: "Subscription",
               render: (u) => (
                 <div className="flex flex-col gap-1">
-                  <span className={`inline-flex w-fit items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${getTierBadgeColor(u.tier)}`}>
+                  <span
+                    className={`inline-flex w-fit items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-[10px] ${getTierBadgeColor(u.tier)}`}
+                  >
                     {u.tier || "free"}
                   </span>
                   {u.subscription_status && (
-                    <span className={`font-mono text-[10px] ${getStatusColor(u.subscription_status)}`}>
+                    <span
+                      className={`font-mono text-[10px] ${getStatusColor(u.subscription_status)}`}
+                    >
                       {u.subscription_status}
                     </span>
                   )}
@@ -692,8 +762,22 @@ function UsersSection() {
                   <span className="font-mono text-[11px] text-muted-foreground">oauth-only</span>
                 ),
             },
-            { key: "meetings", label: "Meetings", align: "right", render: (u) => <span className="font-mono text-xs">{u.meeting_count}</span> },
-            { key: "joined", label: "Joined", align: "right", render: (u) => <span className="font-mono text-[11px] text-muted-foreground">{formatDate(u.created_at)}</span> },
+            {
+              key: "meetings",
+              label: "Meetings",
+              align: "right",
+              render: (u) => <span className="font-mono text-xs">{u.meeting_count}</span>,
+            },
+            {
+              key: "joined",
+              label: "Joined",
+              align: "right",
+              render: (u) => (
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {formatDate(u.created_at)}
+                </span>
+              ),
+            },
             {
               key: "actions",
               label: "Actions",
@@ -778,10 +862,32 @@ function MeetingsSection() {
               </div>
             ),
           },
-          { key: "user", label: "User", render: (m) => <span className="font-mono text-xs text-muted-foreground">{m.user_email}</span> },
+          {
+            key: "user",
+            label: "User",
+            render: (m) => (
+              <span className="font-mono text-xs text-muted-foreground">{m.user_email}</span>
+            ),
+          },
           { key: "status", label: "Status", render: (m) => <StatusBadge status={m.status} /> },
-          { key: "duration", label: "Duration", align: "right", render: (m) => <span className="font-mono text-xs">{formatDuration(m.duration_sec)}</span> },
-          { key: "created", label: "Created", align: "right", render: (m) => <span className="font-mono text-[11px] text-muted-foreground">{formatDate(m.created_at)}</span> },
+          {
+            key: "duration",
+            label: "Duration",
+            align: "right",
+            render: (m) => (
+              <span className="font-mono text-xs">{formatDuration(m.duration_sec)}</span>
+            ),
+          },
+          {
+            key: "created",
+            label: "Created",
+            align: "right",
+            render: (m) => (
+              <span className="font-mono text-[11px] text-muted-foreground">
+                {formatDate(m.created_at)}
+              </span>
+            ),
+          },
         ]}
         emptyLabel="No meetings."
       />
@@ -798,13 +904,14 @@ function QueueSection() {
   if (isLoading) return <CenterLoader />;
   if (isError) return <ErrorBlock onRetry={() => refetch()} />;
   const counts = data?.counts ?? {};
-  const buckets: Array<{ label: string; key: keyof AdminQueueResponse["counts"]; color: string }> = [
-    { label: "waiting", key: "waiting", color: "text-warning" },
-    { label: "active", key: "active", color: "text-brand" },
-    { label: "delayed", key: "delayed", color: "text-muted-foreground" },
-    { label: "completed", key: "completed", color: "text-success" },
-    { label: "failed", key: "failed", color: "text-destructive" },
-  ];
+  const buckets: Array<{ label: string; key: keyof AdminQueueResponse["counts"]; color: string }> =
+    [
+      { label: "waiting", key: "waiting", color: "text-warning" },
+      { label: "active", key: "active", color: "text-brand" },
+      { label: "delayed", key: "delayed", color: "text-muted-foreground" },
+      { label: "completed", key: "completed", color: "text-success" },
+      { label: "failed", key: "failed", color: "text-destructive" },
+    ];
 
   return (
     <section className="space-y-6">
@@ -812,7 +919,9 @@ function QueueSection() {
       <div className="grid gap-px overflow-hidden rounded-md border border-border/70 bg-border/40 sm:grid-cols-5">
         {buckets.map((b) => (
           <div key={b.label} className="bg-surface p-4">
-            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{b.label}</p>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              {b.label}
+            </p>
             <p className={`mt-2 font-mono text-3xl font-semibold tracking-tight ${b.color}`}>
               {counts[b.key] ?? 0}
             </p>
@@ -821,11 +930,15 @@ function QueueSection() {
       </div>
 
       <div>
-        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Recent failures</p>
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Recent failures
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">Last 10 jobs that exhausted retries.</p>
         <div className="mt-3 overflow-hidden rounded-md border border-border/70 bg-surface">
           {data?.recent_failed.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-muted-foreground">No recent failures.</p>
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+              No recent failures.
+            </p>
           ) : (
             <table className="w-full text-sm">
               <thead className="border-b border-border/60 bg-surface/60">
@@ -906,7 +1019,9 @@ function SystemSection() {
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                     {s.latency_ms != null ? `${s.latency_ms}ms` : "—"}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{s.detail ?? "—"}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                    {s.detail ?? "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -920,7 +1035,9 @@ function SystemSection() {
           {runtimeItems.map((r) => (
             <div key={r.label} className="bg-surface p-4">
               <div className="flex items-center justify-between">
-                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{r.label}</p>
+                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {r.label}
+                </p>
                 <r.icon className="h-3 w-3 text-muted-foreground" />
               </div>
               <p className="mt-2 truncate font-mono text-sm">{r.value}</p>
@@ -939,7 +1056,9 @@ function SystemSection() {
 function SectionHeader({ title, count }: { title: string; count: number | null }) {
   return (
     <div className="mb-3 flex items-baseline justify-between">
-      <h2 className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">{title}</h2>
+      <h2 className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+        {title}
+      </h2>
       {count != null && (
         <span className="font-mono text-[10px] text-muted-foreground">{count} rows</span>
       )}
@@ -981,7 +1100,10 @@ function DataTable<T extends { id: string }>({
         <tbody className="divide-y divide-border/60">
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-4 py-10 text-center text-sm text-muted-foreground">
+              <td
+                colSpan={columns.length}
+                className="px-4 py-10 text-center text-sm text-muted-foreground"
+              >
                 {emptyLabel}
               </td>
             </tr>

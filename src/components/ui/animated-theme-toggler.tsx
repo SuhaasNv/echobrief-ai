@@ -75,10 +75,7 @@ function tick(last: MutableRefObject<number>): void {
 
 /* ── Component ── */
 
-export function AnimatedThemeToggler({
-  sound = true,
-  className,
-}: AnimatedThemeTogglerProps) {
+export function AnimatedThemeToggler({ sound = true, className }: AnimatedThemeTogglerProps) {
   const rawId = useId();
   const maskId = `att${rawId.replace(/:/g, "")}`;
   const lastSnd = useRef(0);

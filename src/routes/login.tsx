@@ -68,7 +68,7 @@ function LoginPage() {
         // on "My class" by default. Fall back to the oldest workspace if
         // there's no match (or the user predates the student/pro fork).
         const preferred = meData.default_account_type
-          ? wsData.items.find((w) => w.kind === meData.default_account_type) ?? wsData.items[0]
+          ? (wsData.items.find((w) => w.kind === meData.default_account_type) ?? wsData.items[0])
           : wsData.items[0];
         if (preferred) setActiveWorkspace(preferred.id);
       } catch {
@@ -159,8 +159,14 @@ function LoginPage() {
 
         <p className="pt-2 text-center text-[11px] text-muted-foreground">
           By signing in you agree to our{" "}
-          <Link to="/terms" className="underline-offset-4 hover:underline">terms</Link> and{" "}
-          <Link to="/privacy" className="underline-offset-4 hover:underline">privacy policy</Link>.
+          <Link to="/terms" className="underline-offset-4 hover:underline">
+            terms
+          </Link>{" "}
+          and{" "}
+          <Link to="/privacy" className="underline-offset-4 hover:underline">
+            privacy policy
+          </Link>
+          .
         </p>
       </form>
     </AuthShell>

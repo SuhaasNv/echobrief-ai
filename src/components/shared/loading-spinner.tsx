@@ -28,43 +28,29 @@ const SIZE_CLASSES = {
 
 /**
  * Loading spinner component
- * 
+ *
  * Replaces inline Loader2 usage with a standardized component.
  * Provides consistent sizing and optional centering.
- * 
+ *
  * @example
  * // Button spinner
  * <LoadingSpinner size="sm" />
- * 
+ *
  * @example
  * // Centered page loader
  * <LoadingSpinner size="lg" center />
- * 
+ *
  * @example
  * // Custom styling
  * <LoadingSpinner size="md" className="text-brand" />
  */
-export function LoadingSpinner({
-  size = "md",
-  center = false,
-  className,
-}: LoadingSpinnerProps) {
+export function LoadingSpinner({ size = "md", center = false, className }: LoadingSpinnerProps) {
   const spinner = (
-    <Loader2
-      className={cn(
-        SIZE_CLASSES[size],
-        "animate-spin text-muted-foreground",
-        className,
-      )}
-    />
+    <Loader2 className={cn(SIZE_CLASSES[size], "animate-spin text-muted-foreground", className)} />
   );
 
   if (center) {
-    return (
-      <div className="flex items-center justify-center">
-        {spinner}
-      </div>
-    );
+    return <div className="flex items-center justify-center">{spinner}</div>;
   }
 
   return spinner;

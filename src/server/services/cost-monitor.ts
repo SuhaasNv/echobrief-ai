@@ -1,20 +1,20 @@
 /**
  * Cost monitoring service.
- * 
+ *
  * Tracks daily AI usage costs and alerts when budgets are exceeded.
- * 
+ *
  * Features:
  * - Daily cost aggregation from usage_logs
  * - Budget threshold alerts (150% of target)
  * - Security event logging for cost spikes
  * - Automated checks via worker scheduler
- * 
+ *
  * Usage:
  *   import { checkCostBudget, getDailyCosts } from "./cost-monitor";
- *   
+ *
  *   // In worker scheduler (runs daily at 9am):
  *   await checkCostBudget();
- *   
+ *
  *   // Manual check:
  *   const costs = await getDailyCosts(new Date('2026-05-20'));
  *   console.log(`Today's costs: $${costs.total_usd.toFixed(2)}`);
@@ -32,19 +32,19 @@ export interface DailyCosts {
 
 /**
  * Get aggregated costs for a specific date.
- * 
+ *
  * Cost calculation:
  * - Transcription: $0.10/hour → $0.00002778/second
  * - OpenAI queries: ~$0.02/query (estimated average)
  * - Total stored in usage_logs.total_cost_usd
- * 
+ *
  * @param date - Date to query (defaults to today)
  * @returns Cost breakdown by service
  */
 export async function getDailyCosts(date: Date = new Date()): Promise<DailyCosts> {
   const sql = getSql();
   const dateStr = date.toISOString().slice(0, 10); // YYYY-MM-DD
-  
+
   const rows = await sql<
     Array<{
       transcription_cost: number;
@@ -59,9 +59,9 @@ export async function getDailyCosts(date: Date = new Date()): Promise<DailyCosts
     FROM usage_logs
     WHERE DATE(created_at) = ${dateStr}
   `;
-  
+
   const result = rows[0] || { transcription_cost: 0, openai_cost: 0, total_cost: 0 };
-  
+
   return {
     transcription_usd: result.transcription_cost,
     openai_usd: result.openai_cost,
@@ -72,13 +72,13 @@ export async function getDailyCosts(date: Date = new Date()): Promise<DailyCosts
 
 /**
  * Get monthly cost aggregation.
- * 
+ *
  * @param yearMonth - Format: "YYYY-MM" (e.g., "2026-05")
  * @returns Total costs for the month
  */
 export async function getMonthlyCosts(yearMonth: string): Promise<DailyCosts> {
   const sql = getSql();
-  
+
   const rows = await sql<
     Array<{
       transcription_cost: number;
@@ -93,9 +93,9 @@ export async function getMonthlyCosts(yearMonth: string): Promise<DailyCosts> {
     FROM usage_logs
     WHERE period = ${yearMonth}
   `;
-  
+
   const result = rows[0] || { transcription_cost: 0, openai_cost: 0, total_cost: 0 };
-  
+
   return {
     transcription_usd: result.transcription_cost,
     openai_usd: result.openai_cost,
@@ -106,10 +106,10 @@ export async function getMonthlyCosts(yearMonth: string): Promise<DailyCosts> {
 
 /**
  * Check if daily costs exceed budget threshold.
- * 
+ *
  * Alerts when costs reach 150% of configured budget.
  * Logs security event for investigation.
- * 
+ *
  * Environment Variable:
  *   DAILY_COST_BUDGET_USD=1000  # Default: $1000/day
  */
@@ -117,20 +117,22 @@ export async function checkCostBudget(): Promise<void> {
   const today = await getDailyCosts();
   const budget = parseFloat(process.env.DAILY_COST_BUDGET_USD || "1000");
   const threshold = budget * 1.5; // Alert at 150% of budget
-  
-  console.log(`[Cost Monitor] Daily costs: $${today.total_usd.toFixed(2)} / $${budget.toFixed(2)} budget`);
-  
+
+  console.log(
+    `[Cost Monitor] Daily costs: $${today.total_usd.toFixed(2)} / $${budget.toFixed(2)} budget`,
+  );
+
   if (today.total_usd > threshold) {
     // CRITICAL: Cost spike detected
     logCostSpike(
       "system", // No specific user - system-wide cost
       today.total_usd,
       budget,
-      "daily"
+      "daily",
     );
-    
+
     console.error(
-      `🚨 [Cost Monitor] CRITICAL: Daily costs ($${today.total_usd.toFixed(2)}) exceed 150% of budget ($${budget.toFixed(2)})`
+      `🚨 [Cost Monitor] CRITICAL: Daily costs ($${today.total_usd.toFixed(2)}) exceed 150% of budget ($${budget.toFixed(2)})`,
     );
     console.error(`   - Transcription: $${today.transcription_usd.toFixed(2)}`);
     console.error(`   - OpenAI: $${today.openai_usd.toFixed(2)}`);
@@ -138,7 +140,7 @@ export async function checkCostBudget(): Promise<void> {
   } else if (today.total_usd > budget) {
     // WARNING: Over budget but under critical threshold
     console.warn(
-      `⚠️  [Cost Monitor] WARNING: Daily costs ($${today.total_usd.toFixed(2)}) exceed budget ($${budget.toFixed(2)})`
+      `⚠️  [Cost Monitor] WARNING: Daily costs ($${today.total_usd.toFixed(2)}) exceed budget ($${budget.toFixed(2)})`,
     );
   }
 }
@@ -146,18 +148,18 @@ export async function checkCostBudget(): Promise<void> {
 /**
  * Get top spenders for a given date.
  * Useful for identifying abuse or runaway costs.
- * 
+ *
  * @param date - Date to query
  * @param limit - Number of top users to return (default: 10)
  * @returns Array of users with their daily costs
  */
 export async function getTopSpenders(
   date: Date = new Date(),
-  limit: number = 10
+  limit: number = 10,
 ): Promise<Array<{ user_id: string; total_cost_usd: number }>> {
   const sql = getSql();
   const dateStr = date.toISOString().slice(0, 10);
-  
+
   return await sql<Array<{ user_id: string; total_cost_usd: number }>>`
     SELECT 
       user_id,

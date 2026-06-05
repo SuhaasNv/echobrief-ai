@@ -53,15 +53,7 @@ export function StatsStrip() {
   );
 }
 
-function CountUp({
-  stat,
-  active,
-  delay,
-}: {
-  stat: Stat;
-  active: boolean;
-  delay: number;
-}) {
+function CountUp({ stat, active, delay }: { stat: Stat; active: boolean; delay: number }) {
   const reduceMotion = useReducedMotion();
   const [display, setDisplay] = useState(reduceMotion ? stat.value : 0);
 

@@ -1,6 +1,6 @@
 /**
  * Security headers middleware.
- * 
+ *
  * Provides defense-in-depth against common web vulnerabilities:
  * - Content Security Policy (CSP) - XSS protection
  * - X-Frame-Options - Clickjacking protection
@@ -48,9 +48,6 @@ export const securityHeaders: MiddlewareHandler<AppBindings> = async (c, next) =
 
   // HSTS only in production (avoid breaking local dev)
   if (getEnv().NODE_ENV === "production") {
-    c.header(
-      "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains; preload",
-    );
+    c.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   }
 };

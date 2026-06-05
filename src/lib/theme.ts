@@ -48,8 +48,7 @@ export function applyTheme(theme: Theme): ResolvedTheme {
 
   const doc = document as ViewTransitionDoc;
   const reduce =
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // View Transitions API — Chrome/Edge/Safari/FF (2024+). Single GPU snapshot
   // crossfade beats animating background-color on every element.

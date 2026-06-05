@@ -1,9 +1,9 @@
 /**
  * Test script for R2 cleanup functionality.
- * 
+ *
  * Run with:
  *   npx tsx scripts/test-r2-cleanup.ts
- * 
+ *
  * This will show what files would be deleted without actually deleting them
  * (dry run mode).
  */
@@ -16,7 +16,7 @@ const RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 async function testCleanup() {
   const env = process.env;
-  
+
   if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY) {
     console.log("❌ R2 credentials not configured");
     console.log("   Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY in .env");
@@ -68,7 +68,9 @@ async function testCleanup() {
           oldFiles++;
           oldSize += size;
           console.log(`   📁 ${obj.Key}`);
-          console.log(`      Age: ${Math.round((Date.now() - obj.LastModified.getTime()) / (1000 * 60 * 60 * 24))} days`);
+          console.log(
+            `      Age: ${Math.round((Date.now() - obj.LastModified.getTime()) / (1000 * 60 * 60 * 24))} days`,
+          );
           console.log(`      Size: ${(size / 1024 / 1024).toFixed(2)} MB`);
         }
       }
@@ -79,11 +81,15 @@ async function testCleanup() {
     console.log("");
     console.log("📊 Summary:");
     console.log(`   Total files: ${totalFiles} (${(totalSize / 1024 / 1024).toFixed(2)} MB)`);
-    console.log(`   Files older than ${RETENTION_DAYS} days: ${oldFiles} (${(oldSize / 1024 / 1024).toFixed(2)} MB)`);
-    
+    console.log(
+      `   Files older than ${RETENTION_DAYS} days: ${oldFiles} (${(oldSize / 1024 / 1024).toFixed(2)} MB)`,
+    );
+
     if (oldFiles > 0) {
       console.log("");
-      console.log(`✅ Cleanup would delete ${oldFiles} files and free ${(oldSize / 1024 / 1024).toFixed(2)} MB`);
+      console.log(
+        `✅ Cleanup would delete ${oldFiles} files and free ${(oldSize / 1024 / 1024).toFixed(2)} MB`,
+      );
     } else {
       console.log("");
       console.log("✅ No files to clean up");

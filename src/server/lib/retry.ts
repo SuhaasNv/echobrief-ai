@@ -1,15 +1,15 @@
 /**
  * Error retry wrapper with exponential backoff.
- * 
+ *
  * Provides resilient retry logic for transient failures in external services:
  * - OpenAI API calls
  * - AssemblyAI transcription
  * - Database queries (connection errors)
  * - Redis operations
- * 
+ *
  * Usage:
  *   import { withRetry } from "./retry";
- *   
+ *
  *   const result = await withRetry(
  *     () => fetch("https://api.external.com/data"),
  *     {
@@ -18,7 +18,7 @@
  *       onRetry: (attempt, error) => console.warn(`Retry ${attempt}:`, error)
  *     }
  *   );
- * 
+ *
  * Backoff Strategy:
  *   - Attempt 1: No delay
  *   - Attempt 2: 1000ms (1s)
@@ -44,16 +44,13 @@ export interface RetryOptions {
 
 /**
  * Retry a function with exponential backoff on failure.
- * 
+ *
  * @param fn - Async function to retry
  * @param options - Retry configuration
  * @returns Result from successful attempt
  * @throws Last error if all attempts fail
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
   const {
     maxAttempts = 3,
     backoffMs = 1000,
@@ -62,44 +59,44 @@ export async function withRetry<T>(
     onRetry,
     jitter = true,
   } = options;
-  
+
   let lastError: Error | null = null;
-  
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error as Error;
-      
+
       // Last attempt - throw error
       if (attempt === maxAttempts) {
         throw error;
       }
-      
+
       // Calculate delay with exponential backoff
       let delay = backoffMs * Math.pow(backoffMultiplier, attempt - 1);
       delay = Math.min(delay, maxBackoffMs);
-      
+
       // Add jitter to prevent thundering herd
       if (jitter) {
         delay = delay * (0.5 + Math.random() * 0.5);
       }
-      
+
       console.warn(
         `[Retry] Attempt ${attempt}/${maxAttempts} failed, retrying in ${Math.round(delay)}ms...`,
-        error instanceof Error ? error.message : error
+        error instanceof Error ? error.message : error,
       );
-      
+
       // Invoke callback
       if (onRetry) {
         onRetry(attempt, lastError);
       }
-      
+
       // Wait before next attempt
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-  
+
   // This should never be reached, but TypeScript doesn't know that
   throw lastError || new Error("Retry failed with unknown error");
 }
@@ -107,7 +104,7 @@ export async function withRetry<T>(
 /**
  * Retry with specific error type handling.
  * Only retries if the error matches a specific condition.
- * 
+ *
  * @param fn - Async function to retry
  * @param shouldRetry - Predicate to determine if error is retryable
  * @param options - Retry configuration
@@ -116,44 +113,44 @@ export async function withRetry<T>(
 export async function withConditionalRetry<T>(
   fn: () => Promise<T>,
   shouldRetry: (error: Error) => boolean,
-  options: RetryOptions = {}
+  options: RetryOptions = {},
 ): Promise<T> {
   const { maxAttempts = 3, backoffMs = 1000, onRetry } = options;
-  
+
   let lastError: Error | null = null;
-  
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error as Error;
-      
+
       // Check if error is retryable
       if (!shouldRetry(lastError)) {
         console.warn(`[Retry] Non-retryable error on attempt ${attempt}, throwing immediately`);
         throw error;
       }
-      
+
       // Last attempt - throw error
       if (attempt === maxAttempts) {
         throw error;
       }
-      
+
       const delay = backoffMs * Math.pow(2, attempt - 1);
-      
+
       console.warn(
         `[Retry] Attempt ${attempt}/${maxAttempts} failed with retryable error, retrying in ${delay}ms...`,
-        lastError.message
+        lastError.message,
       );
-      
+
       if (onRetry) {
         onRetry(attempt, lastError);
       }
-      
-      await new Promise(resolve => setTimeout(resolve, delay));
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-  
+
   throw lastError || new Error("Retry failed with unknown error");
 }
 

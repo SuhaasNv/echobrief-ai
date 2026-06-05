@@ -82,7 +82,7 @@ app.post("/password", zValidator("json", ChangePasswordRequest), async (c) => {
 
 app.post("/export", async (c) => {
   const user = c.get("user");
-  
+
   // Enqueue background job to build ZIP and email download link
   await enqueueExportJob({
     user_id: user.id,
@@ -126,7 +126,7 @@ app.delete("/me", async (c) => {
             Prefix: `${user.id}/`, // All audio files under userId/
             ContinuationToken: continuationToken,
             MaxKeys: 1000,
-          })
+          }),
         );
 
         const objects = listResponse.Contents ?? [];
@@ -140,7 +140,7 @@ app.delete("/me", async (c) => {
               Objects: objects.map((obj) => ({ Key: obj.Key })),
               Quiet: true,
             },
-          })
+          }),
         );
 
         const deleted = objects.length - (deleteResponse.Errors?.length ?? 0);
@@ -149,14 +149,16 @@ app.delete("/me", async (c) => {
         if (deleteResponse.Errors && deleteResponse.Errors.length > 0) {
           console.error(
             `[account-delete] R2 deletion errors for user ${user.id}:`,
-            deleteResponse.Errors.slice(0, 5)
+            deleteResponse.Errors.slice(0, 5),
           );
         }
 
         continuationToken = listResponse.NextContinuationToken;
       } while (continuationToken);
 
-      console.log(`[account-delete] deleted ${deletedCount} audio files from R2 for user ${user.id}`);
+      console.log(
+        `[account-delete] deleted ${deletedCount} audio files from R2 for user ${user.id}`,
+      );
     }
   } catch (err) {
     // Log R2 cleanup failures but don't block account deletion
@@ -166,9 +168,9 @@ app.delete("/me", async (c) => {
   // ---- 2. Delete user from database -----------------------------------------
   // ON DELETE CASCADE in migrations removes meetings, transcripts, chunks, etc.
   await sql`DELETE FROM users WHERE id = ${user.id}`;
-  
+
   // TODO: revoke Better Auth sessions (if using session-based auth).
-  
+
   return c.json({ ok: true });
 });
 

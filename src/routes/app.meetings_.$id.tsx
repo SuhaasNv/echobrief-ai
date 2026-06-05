@@ -23,7 +23,19 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useMeeting, useMeetingStatus, useActionItems, useRetryMeeting, useDeleteMeeting, usePatchMeeting, useMeetingAudioUrl, useShareMeeting, useFlashcards, useGenerateFlashcards, useDeleteFlashcard } from "@/lib/api/hooks";
+import {
+  useMeeting,
+  useMeetingStatus,
+  useActionItems,
+  useRetryMeeting,
+  useDeleteMeeting,
+  usePatchMeeting,
+  useMeetingAudioUrl,
+  useShareMeeting,
+  useFlashcards,
+  useGenerateFlashcards,
+  useDeleteFlashcard,
+} from "@/lib/api/hooks";
 import type { MeetingDetail, MeetingStatusResponse } from "@/lib/schemas";
 import { useActiveWorkspaceKind, useLabels } from "@/lib/workspace-store";
 import { Brain, Sparkle, GraduationCap } from "lucide-react";
@@ -69,7 +81,10 @@ function MeetingDetailPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           It may have been deleted, or you don't have access.
         </p>
-        <Link to="/app/meetings" className="mt-4 inline-block text-sm text-muted-foreground underline-offset-4 hover:underline">
+        <Link
+          to="/app/meetings"
+          className="mt-4 inline-block text-sm text-muted-foreground underline-offset-4 hover:underline"
+        >
           Back to meetings
         </Link>
       </div>
@@ -101,7 +116,8 @@ function MeetingDetailPage() {
               <EditableTitle id={meeting.id} title={meeting.title} />
               <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3 w-3" /> <span className="font-mono">{formatDuration(meeting.duration_sec)}</span>
+                  <Clock className="h-3 w-3" />{" "}
+                  <span className="font-mono">{formatDuration(meeting.duration_sec)}</span>
                 </span>
                 {meeting.transcript && (
                   <span className="inline-flex items-center gap-1">
@@ -140,10 +156,7 @@ function MeetingDetailPage() {
           transcriptProvided={meeting.transcript_provided}
         />
       ) : (
-        <CompleteBody
-          meeting={meeting}
-          actionItems={actionItemsQuery.data?.items ?? []}
-        />
+        <CompleteBody meeting={meeting} actionItems={actionItemsQuery.data?.items ?? []} />
       )}
 
       {confirmDelete && (
@@ -194,8 +207,14 @@ function EditableTitle({ id, title }: { id: string; title: string }) {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); save(); }
-            if (e.key === "Escape") { setEditing(false); setValue(title); }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              save();
+            }
+            if (e.key === "Escape") {
+              setEditing(false);
+              setValue(title);
+            }
           }}
           maxLength={200}
           className="w-full max-w-lg rounded-md border border-border/70 bg-background px-2 py-1 text-2xl font-semibold tracking-tight focus:border-border focus:outline-none"
@@ -207,11 +226,18 @@ function EditableTitle({ id, title }: { id: string; title: string }) {
           aria-label="Save"
           className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50"
         >
-          {patch.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+          {patch.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Check className="h-3.5 w-3.5" />
+          )}
         </button>
         <button
           type="button"
-          onClick={() => { setEditing(false); setValue(title); }}
+          onClick={() => {
+            setEditing(false);
+            setValue(title);
+          }}
           aria-label="Cancel"
           className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
         >
@@ -333,7 +359,11 @@ function ShareMenu({ meetingId, shareToken }: { meetingId: string; shareToken: s
                       aria-label="Copy link"
                       className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
+                      {copied ? (
+                        <Check className="h-3 w-3 text-success" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
                     </button>
                     <a
                       href={shareUrl}
@@ -352,7 +382,11 @@ function ShareMenu({ meetingId, shareToken }: { meetingId: string; shareToken: s
                       disabled={share.isPending}
                       className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs transition-colors hover:bg-accent disabled:opacity-60"
                     >
-                      {share.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                      {share.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3 w-3" />
+                      )}
                       Reset link
                     </button>
                     <button
@@ -361,7 +395,11 @@ function ShareMenu({ meetingId, shareToken }: { meetingId: string; shareToken: s
                       disabled={share.isPending}
                       className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border/70 bg-surface px-3 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60"
                     >
-                      {share.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2Off className="h-3 w-3" />}
+                      {share.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Link2Off className="h-3 w-3" />
+                      )}
                       Disable
                     </button>
                   </div>
@@ -373,7 +411,11 @@ function ShareMenu({ meetingId, shareToken }: { meetingId: string; shareToken: s
                   disabled={share.isPending}
                   className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  {share.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                  {share.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Link2 className="h-3 w-3" />
+                  )}
                   Create public link
                 </button>
               )}
@@ -435,7 +477,11 @@ function DeleteConfirm({
             disabled={pending}
             className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
           >
-            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+            {pending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Trash2 className="h-3 w-3" />
+            )}
             {pending ? "Deleting…" : "Delete meeting"}
           </button>
         </div>
@@ -511,7 +557,10 @@ function ProcessingState({
             className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand to-violet"
             initial={false}
             animate={{ width: `${percent}%` }}
-            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }}
+            transition={{
+              duration: 0.65,
+              ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+            }}
           />
           {/* shimmer effect while we're not at 100% */}
           {percent < 100 && (
@@ -536,8 +585,8 @@ function ProcessingState({
                     done
                       ? "bg-success/20 text-success"
                       : isCurrent
-                      ? "bg-brand/15 text-brand"
-                      : "border border-border/70 text-muted-foreground/60"
+                        ? "bg-brand/15 text-brand"
+                        : "border border-border/70 text-muted-foreground/60"
                   }`}
                 >
                   {done ? (
@@ -561,9 +610,12 @@ function ProcessingState({
 
         <div className="mt-6 flex items-center justify-between border-t border-border/60 pt-4 text-xs text-muted-foreground">
           <span>Auto-refreshes every 5 seconds.</span>
-          {status?.estimated_seconds_remaining != null && status.estimated_seconds_remaining > 0 && (
-            <span className="font-mono">~{Math.ceil(status.estimated_seconds_remaining)}s remaining</span>
-          )}
+          {status?.estimated_seconds_remaining != null &&
+            status.estimated_seconds_remaining > 0 && (
+              <span className="font-mono">
+                ~{Math.ceil(status.estimated_seconds_remaining)}s remaining
+              </span>
+            )}
         </div>
       </div>
     </div>
@@ -587,7 +639,8 @@ function FailedState({
           <div>
             <p className="text-sm font-medium">Processing failed.</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              EchoBrief couldn't process &ldquo;{meeting.title}&rdquo;. You can retry — most failures resolve on a second attempt.
+              EchoBrief couldn't process &ldquo;{meeting.title}&rdquo;. You can retry — most
+              failures resolve on a second attempt.
             </p>
           </div>
         </div>
@@ -596,7 +649,11 @@ function FailedState({
           disabled={retrying}
           className="mt-5 inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-60"
         >
-          {retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+          {retrying ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <RotateCcw className="h-3 w-3" />
+          )}
           {retrying ? "Retrying…" : "Retry processing"}
         </button>
       </div>
@@ -609,7 +666,13 @@ function CompleteBody({
   actionItems,
 }: {
   meeting: MeetingDetail;
-  actionItems: Array<{ id: string; description: string; assignee_name: string | null; due_date: string | null; completed: boolean }>;
+  actionItems: Array<{
+    id: string;
+    description: string;
+    assignee_name: string | null;
+    due_date: string | null;
+    completed: boolean;
+  }>;
 }) {
   const segments = meeting.transcript?.segments ?? [];
   const chapters = meeting.summary?.chapters ?? [];
@@ -648,118 +711,142 @@ function CompleteBody({
           </div>
         </div>
       )}
-    <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 md:px-8 lg:grid-cols-[220px_minmax(0,1fr)_360px]">
-      {/* Chapters */}
-      <aside className="hidden lg:block">
-        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Chapters</p>
-        <div className="mt-3 space-y-1">
-          {chapters.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No chapters extracted.</p>
-          ) : (
-            chapters.map((c) => (
-              <button
-                key={c.start_sec}
-                type="button"
-                onClick={() => seekTo(c.start_sec)}
-                disabled={!audio.data?.url}
-                className="group flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span className="mt-0.5 font-mono text-[10px] text-muted-foreground group-hover:text-brand">{formatTimestamp(c.start_sec)}</span>
-                <span className="text-foreground/90">{c.title}</span>
-              </button>
-            ))
-          )}
-        </div>
-      </aside>
-
-      {/* Transcript */}
-      <div className="min-w-0">
-        <div className="mb-4 flex items-center gap-2 rounded-md border border-border/60 bg-surface/60 px-2.5 py-1.5 text-sm text-muted-foreground">
-          <Search className="h-3.5 w-3.5" />
-          <input placeholder="Search transcript" className="w-full bg-transparent focus:outline-none" />
-        </div>
-        <div className="space-y-5 rounded-xl border border-border/60 bg-surface p-6">
-          {segments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No transcript available.</p>
-          ) : (
-            segments.map((seg, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: Math.min(i * 0.02, 0.4) }}
-                className="group flex gap-4"
-              >
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 md:px-8 lg:grid-cols-[220px_minmax(0,1fr)_360px]">
+        {/* Chapters */}
+        <aside className="hidden lg:block">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Chapters
+          </p>
+          <div className="mt-3 space-y-1">
+            {chapters.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No chapters extracted.</p>
+            ) : (
+              chapters.map((c) => (
                 <button
+                  key={c.start_sec}
                   type="button"
-                  onClick={() => seekTo(seg.start_sec)}
+                  onClick={() => seekTo(c.start_sec)}
                   disabled={!audio.data?.url}
-                  title={audio.data?.url ? "Play from here" : "No audio available"}
-                  className="mt-0.5 shrink-0 font-mono text-[11px] text-muted-foreground transition-colors hover:text-brand disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-muted-foreground"
+                  className="group flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {formatTimestamp(seg.start_sec)}
+                  <span className="mt-0.5 font-mono text-[10px] text-muted-foreground group-hover:text-brand">
+                    {formatTimestamp(c.start_sec)}
+                  </span>
+                  <span className="text-foreground/90">{c.title}</span>
                 </button>
-                <div className="min-w-0">
-                  {seg.speaker && <p className="text-xs font-medium text-muted-foreground">{seg.speaker}</p>}
-                  <p className="mt-0.5 text-sm leading-relaxed text-foreground/90">{seg.text}</p>
-                </div>
-              </motion.div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* AI Panel */}
-      <aside className="space-y-4">
-        {meeting.summary?.executive && (
-          <div className="rounded-xl border border-border/70 bg-surface-elevated p-5">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5 text-brand" />
-              <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">AI Summary</span>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed">{meeting.summary.executive}</p>
+              ))
+            )}
           </div>
-        )}
+        </aside>
 
-        {meeting.summary && meeting.summary.decisions.length > 0 && (
-          <div className="rounded-xl border border-border/70 bg-surface p-5">
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Decisions</p>
-            <ul className="mt-3 space-y-2 text-sm">
-              {meeting.summary.decisions.map((d, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand" />
-                  <span className="text-foreground/90">{d}</span>
-                </li>
-              ))}
-            </ul>
+        {/* Transcript */}
+        <div className="min-w-0">
+          <div className="mb-4 flex items-center gap-2 rounded-md border border-border/60 bg-surface/60 px-2.5 py-1.5 text-sm text-muted-foreground">
+            <Search className="h-3.5 w-3.5" />
+            <input
+              placeholder="Search transcript"
+              className="w-full bg-transparent focus:outline-none"
+            />
           </div>
-        )}
-
-        {actionItems.length > 0 && (
-          <div className="rounded-xl border border-border/70 bg-surface p-5">
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Action items</p>
-            <div className="mt-3 space-y-2">
-              {actionItems.map((a) => (
-                <div key={a.id} className="flex items-start gap-2 rounded-md border border-border/60 bg-background/40 p-2.5 text-xs">
-                  <CheckCircle2 className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${a.completed ? "text-success" : "text-muted-foreground"}`} />
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-foreground ${a.completed ? "line-through opacity-70" : ""}`}>{a.description}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                      {a.assignee_name ?? "Unassigned"}
-                      {a.due_date && ` · ${formatDate(a.due_date)}`}
-                    </p>
+          <div className="space-y-5 rounded-xl border border-border/60 bg-surface p-6">
+            {segments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No transcript available.</p>
+            ) : (
+              segments.map((seg, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.4) }}
+                  className="group flex gap-4"
+                >
+                  <button
+                    type="button"
+                    onClick={() => seekTo(seg.start_sec)}
+                    disabled={!audio.data?.url}
+                    title={audio.data?.url ? "Play from here" : "No audio available"}
+                    className="mt-0.5 shrink-0 font-mono text-[11px] text-muted-foreground transition-colors hover:text-brand disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-muted-foreground"
+                  >
+                    {formatTimestamp(seg.start_sec)}
+                  </button>
+                  <div className="min-w-0">
+                    {seg.speaker && (
+                      <p className="text-xs font-medium text-muted-foreground">{seg.speaker}</p>
+                    )}
+                    <p className="mt-0.5 text-sm leading-relaxed text-foreground/90">{seg.text}</p>
                   </div>
-                </div>
-              ))}
-            </div>
+                </motion.div>
+              ))
+            )}
           </div>
-        )}
+        </div>
 
-        <FlashcardsPanel meetingId={meeting.id} />
+        {/* AI Panel */}
+        <aside className="space-y-4">
+          {meeting.summary?.executive && (
+            <div className="rounded-xl border border-border/70 bg-surface-elevated p-5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-brand" />
+                <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  AI Summary
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed">{meeting.summary.executive}</p>
+            </div>
+          )}
 
-        {meeting.meeting_score && <MeetingScorePanel score={meeting.meeting_score} />}
-      </aside>
-    </div>
+          {meeting.summary && meeting.summary.decisions.length > 0 && (
+            <div className="rounded-xl border border-border/70 bg-surface p-5">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                Decisions
+              </p>
+              <ul className="mt-3 space-y-2 text-sm">
+                {meeting.summary.decisions.map((d, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-brand" />
+                    <span className="text-foreground/90">{d}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {actionItems.length > 0 && (
+            <div className="rounded-xl border border-border/70 bg-surface p-5">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                Action items
+              </p>
+              <div className="mt-3 space-y-2">
+                {actionItems.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-start gap-2 rounded-md border border-border/60 bg-background/40 p-2.5 text-xs"
+                  >
+                    <CheckCircle2
+                      className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${a.completed ? "text-success" : "text-muted-foreground"}`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`text-foreground ${a.completed ? "line-through opacity-70" : ""}`}
+                      >
+                        {a.description}
+                      </p>
+                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                        {a.assignee_name ?? "Unassigned"}
+                        {a.due_date && ` · ${formatDate(a.due_date)}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <FlashcardsPanel meetingId={meeting.id} />
+
+          {meeting.meeting_score && <MeetingScorePanel score={meeting.meeting_score} />}
+        </aside>
+      </div>
     </>
   );
 }
@@ -775,7 +862,9 @@ function MeetingScorePanel({ score }: { score: { total: number; explanation?: st
         <span className="text-2xl font-semibold tracking-tight">{score.total.toFixed(0)}</span>
         <span className="text-xs text-muted-foreground">/ 100</span>
       </div>
-      {score.explanation && <p className="mt-2 text-xs text-muted-foreground">{score.explanation}</p>}
+      {score.explanation && (
+        <p className="mt-2 text-xs text-muted-foreground">{score.explanation}</p>
+      )}
     </div>
   );
 }

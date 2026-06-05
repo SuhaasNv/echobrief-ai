@@ -1,15 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Sparkles,
-  ArrowUp,
-  Plus,
-  FileAudio,
-  Search,
-  Loader2,
-  CheckCircle2,
-} from "lucide-react";
+import { Sparkles, ArrowUp, Plus, FileAudio, Search, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { streamMeetingChat, useMeetings } from "@/lib/api/hooks";
 import { ApiError } from "@/lib/api/client";
@@ -57,7 +49,7 @@ function ChatPage() {
   );
 
   const selected = items.find((m) => m.id === selectedId) ?? null;
-  const messages: Msg[] = selectedId ? threads[selectedId] ?? [] : [];
+  const messages: Msg[] = selectedId ? (threads[selectedId] ?? []) : [];
 
   // Auto-select the first complete meeting once data lands.
   useEffect(() => {
@@ -132,7 +124,8 @@ function ChatPage() {
       });
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Chat failed";
+      const msg =
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Chat failed";
       toast.error(msg);
       setThreads((t) => {
         const cur = t[meetingId];
@@ -254,15 +247,20 @@ function ChatPage() {
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-violet shadow-glow">
                   <Sparkles className="h-5 w-5 text-white" />
                 </div>
-                <h1 className="mt-6 text-2xl font-semibold tracking-tight">Pick a {labels.meeting.singular.toLowerCase()} to chat with.</h1>
+                <h1 className="mt-6 text-2xl font-semibold tracking-tight">
+                  Pick a {labels.meeting.singular.toLowerCase()} to chat with.
+                </h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Select a {labels.meeting.singular.toLowerCase()} from the left and ask the AI anything about it —
-                  decisions, key topics, who said what, follow-ups for next time.
+                  Select a {labels.meeting.singular.toLowerCase()} from the left and ask the AI
+                  anything about it — decisions, key topics, who said what, follow-ups for next
+                  time.
                 </p>
               </div>
             ) : messages.length === 0 ? (
               <div className="mt-12 text-center">
-                <h2 className="text-lg font-medium">Ask anything about &ldquo;{selected.title}&rdquo;</h2>
+                <h2 className="text-lg font-medium">
+                  Ask anything about &ldquo;{selected.title}&rdquo;
+                </h2>
                 <p className="mt-1 text-sm text-muted-foreground">Try one of these:</p>
                 <div className="mx-auto mt-6 grid max-w-xl gap-2">
                   {suggestedPromptsFor(selected.title).map((p) => (
@@ -302,13 +300,21 @@ function ChatPage() {
                             {m.content === "" && m.streaming ? (
                               <div className="flex items-center gap-1.5 py-2 text-sm text-muted-foreground">
                                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand" />
-                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand" style={{ animationDelay: "150ms" }} />
-                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand" style={{ animationDelay: "300ms" }} />
+                                <span
+                                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand"
+                                  style={{ animationDelay: "150ms" }}
+                                />
+                                <span
+                                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand"
+                                  style={{ animationDelay: "300ms" }}
+                                />
                               </div>
                             ) : (
                               <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/95">
                                 {m.content}
-                                {m.streaming && <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-foreground/60" />}
+                                {m.streaming && (
+                                  <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-foreground/60" />
+                                )}
                               </div>
                             )}
                           </div>
@@ -326,14 +332,20 @@ function ChatPage() {
         {selected && (
           <div className="border-t border-border/60 bg-background/80 px-4 py-4 backdrop-blur md:px-8">
             <form
-              onSubmit={(e) => { e.preventDefault(); send(input); }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                send(input);
+              }}
               className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border/70 bg-surface p-2 transition-colors focus-within:border-border focus-within:bg-surface-elevated"
             >
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send(input);
+                  }
                 }}
                 rows={1}
                 placeholder={`Ask about "${selected.title}"…`}
@@ -344,11 +356,16 @@ function ChatPage() {
                 disabled={!input.trim() || sending}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-background transition-opacity disabled:opacity-30"
               >
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+                {sending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
               </button>
             </form>
             <p className="mx-auto mt-2 flex max-w-3xl items-center justify-center gap-1 text-center text-[11px] text-muted-foreground">
-              <CheckCircle2 className="h-3 w-3 text-success" /> Grounded on the meeting's transcript — answers cite real content.
+              <CheckCircle2 className="h-3 w-3 text-success" /> Grounded on the meeting's transcript
+              — answers cite real content.
             </p>
           </div>
         )}

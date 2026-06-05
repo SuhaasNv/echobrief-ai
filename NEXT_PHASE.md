@@ -10,6 +10,7 @@
 **Goal:** End-to-end working app from sign-up → upload audio → see transcript + summary + Q&A. No more mock data on any user-facing screen.
 
 ### 2.1 Better Auth integration
+
 - [ ] Install `better-auth` + `better-auth-react`
 - [ ] Generate Better Auth's schema migration; run on Railway Postgres
 - [ ] Mount Better Auth handler at `/api/auth/*` in `src/api.ts`
@@ -19,6 +20,7 @@
 - [ ] Protect `/app/*` routes with a `beforeLoad` guard that redirects to `/login` when unauthenticated
 
 ### 2.2 Replace mock data, page by page
+
 Each page below currently imports from `src/lib/mock-data.ts`. Convert one at a time so the rest keeps working.
 
 - [ ] `/app/` (Dashboard) → `useMeetings({ limit: 5 })`, `useActionItems({ completed: false })`, stat counts
@@ -31,17 +33,20 @@ Each page below currently imports from `src/lib/mock-data.ts`. Convert one at a 
 - [ ] `/app/settings` → `useMe()`, `useUpdateProfile()`, `useIntegrations()`
 
 ### 2.3 R2 setup
+
 - [ ] Create R2 bucket `echobrief-audio` in Cloudflare
 - [ ] Generate R2 API token (S3-compatible credentials)
 - [ ] CORS config on the bucket to allow PUT from frontend origin
 - [ ] Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` in Railway
 
 ### 2.4 Frontend → API URL config
+
 - [ ] Add `VITE_API_URL=https://api.echobrief.app/api/v1` env var
 - [ ] CORS in Hono needs the frontend origin in production
 - [ ] Vercel/Cloudflare deploy for frontend separate from Railway backend
 
 ### 2.5 Better empty states + skeletons
+
 - [ ] Skeleton components per route (Dashboard, Meetings list, Meeting detail)
 - [ ] Empty states: illustration + headline + 1-sentence guidance + CTA, on:
   - First-time dashboard (no meetings yet)
@@ -54,12 +59,14 @@ Each page below currently imports from `src/lib/mock-data.ts`. Convert one at a 
 ## Phase 3 — V2 differentiator features
 
 ### 3.1 Cross-meeting semantic Q&A (the killer demo)
+
 - [ ] Wire `/app/chat` to `streamSearch()` with live citations
 - [ ] Click citation → navigate to meeting + scroll to timestamp
 - [ ] Suggested-query chips on empty state (5 thoughtful prompts)
 - [ ] Conversation history in component state (no DB persistence in V2)
 
 ### 3.2 Integrations (OAuth flows)
+
 - [ ] Notion OAuth (set up app, get client_id/secret)
 - [ ] Linear OAuth
 - [ ] Google Calendar OAuth
@@ -68,6 +75,7 @@ Each page below currently imports from `src/lib/mock-data.ts`. Convert one at a 
 - [ ] Per-provider export adapters (action item → Notion DB entry / Linear issue / Calendar event)
 
 ### 3.3 Email generator UI
+
 - [ ] Modal/slide-out in meeting detail page
 - [ ] Type selector (Recap, Stakeholder, Sprint, Assignment)
 - [ ] Tone selector (Professional / Casual)
@@ -75,6 +83,7 @@ Each page below currently imports from `src/lib/mock-data.ts`. Convert one at a 
 - [ ] Copy to clipboard + "Open in Gmail" mailto link
 
 ### 3.4 Smart timeline view + meeting score
+
 - [ ] Chapter chips with hover preview on meeting detail
 - [ ] Score badge in meeting list rows
 - [ ] Score detail drawer with 5-component breakdown
@@ -85,6 +94,7 @@ Each page below currently imports from `src/lib/mock-data.ts`. Convert one at a 
 ## Phase 4 — V3 ambitious
 
 ### 4.1 Live transcription (voice agent)
+
 - [ ] AssemblyAI Universal-Streaming WebSocket integration
 - [ ] New route `/app/live` with start/stop button
 - [ ] WebSocket relay endpoint in the API (browser ↔ API ↔ AssemblyAI)
@@ -92,12 +102,14 @@ Each page below currently imports from `src/lib/mock-data.ts`. Convert one at a 
 - [ ] Save session as a regular meeting on stop
 
 ### 4.2 Team workspaces
+
 - [ ] Workspace switcher in sidebar
 - [ ] Invite by email flow (Resend transactional email)
 - [ ] Role-based access (admin / member / viewer)
 - [ ] Visibility toggle on meetings (private vs team)
 
 ### 4.3 Collaboration
+
 - [ ] Text selection → "Add comment" popover on transcript
 - [ ] @mention with email notification
 - [ ] Highlight categories (decision / risk / question / note)
@@ -134,6 +146,7 @@ Each page below currently imports from `src/lib/mock-data.ts`. Convert one at a 
 ## Definition of "shipped"
 
 A phase is shipped only when:
+
 1. `npm run build` and `npx tsc -p tsconfig.api.json --noEmit` both exit 0
 2. Tested at 375 / 768 / 1280 viewports
 3. Light + dark mode both render correctly

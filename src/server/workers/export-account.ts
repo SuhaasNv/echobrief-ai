@@ -10,7 +10,7 @@
  * GDPR compliance: Users can request a copy of their data via POST /account/export.
  */
 
-import * as archiver from "archiver";
+import archiver from "archiver";
 import { Readable } from "stream";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -55,99 +55,112 @@ export async function exportUserAccount(job: ExportJob): Promise<void> {
   console.log(`[export-account] starting export for user ${user_id}`);
 
   // ---- 1. Query all user data -----------------------------------------------
-  const [user, workspaces, meetings, transcripts, summaries, actionItems, pipelineLogs] = await Promise.all([
-    sql<Array<{ id: string; email: string; full_name: string | null; created_at: Date }>>`
+  const [user, workspaces, meetings, transcripts, summaries, actionItems, pipelineLogs] =
+    await Promise.all([
+      sql<Array<{ id: string; email: string; full_name: string | null; created_at: Date }>>`
       SELECT id, email, full_name, created_at FROM users WHERE id = ${user_id} LIMIT 1
     `,
-    sql<Array<{ workspace_id: string; workspace_name: string; role: string; joined_at: Date }>>`
+      sql<Array<{ workspace_id: string; workspace_name: string; role: string; joined_at: Date }>>`
       SELECT w.id as workspace_id, w.name as workspace_name, wm.role, wm.created_at as joined_at
       FROM workspaces w
       JOIN workspace_members wm ON wm.workspace_id = w.id
       WHERE wm.user_id = ${user_id}
       ORDER BY wm.created_at DESC
     `,
-    sql<Array<{
-      id: string;
-      workspace_id: string;
-      title: string;
-      status: string;
-      duration_sec: number | null;
-      meeting_score: any;
-      created_at: Date;
-      processed_at: Date | null;
-    }>>`
+      sql<
+        Array<{
+          id: string;
+          workspace_id: string;
+          title: string;
+          status: string;
+          duration_sec: number | null;
+          meeting_score: unknown;
+          created_at: Date;
+          processed_at: Date | null;
+        }>
+      >`
       SELECT id, workspace_id, title, status, duration_sec, meeting_score, created_at, processed_at
       FROM meetings
       WHERE user_id = ${user_id}
       ORDER BY created_at DESC
     `,
-    sql<Array<{
-      meeting_id: string;
-      raw_text: string;
-      language: string | null;
-      provider: string | null;
-      speakers: any;
-    }>>`
+      sql<
+        Array<{
+          meeting_id: string;
+          raw_text: string;
+          language: string | null;
+          provider: string | null;
+          speakers: unknown;
+        }>
+      >`
       SELECT t.meeting_id, t.raw_text, t.language, t.provider, t.speakers
       FROM transcripts t
       JOIN meetings m ON m.id = t.meeting_id
       WHERE m.user_id = ${user_id}
       ORDER BY t.created_at DESC
     `,
-    sql<Array<{
-      meeting_id: string;
-      executive: string;
-      key_topics: string[];
-      decisions: string[];
-      open_questions: string[];
-      chapters: any;
-      generated_at: Date;
-    }>>`
+      sql<
+        Array<{
+          meeting_id: string;
+          executive: string;
+          key_topics: string[];
+          decisions: string[];
+          open_questions: string[];
+          chapters: unknown;
+          generated_at: Date;
+        }>
+      >`
       SELECT s.meeting_id, s.executive, s.key_topics, s.decisions, s.open_questions, s.chapters, s.generated_at
       FROM summaries s
       JOIN meetings m ON m.id = s.meeting_id
       WHERE m.user_id = ${user_id}
       ORDER BY s.generated_at DESC
     `,
-    sql<Array<{
-      id: string;
-      meeting_id: string;
-      description: string;
-      assignee_name: string | null;
-      due_date: string | null;
-      timestamp_sec: number | null;
-      status: string;
-      completed_at: Date | null;
-      created_at: Date;
-    }>>`
+      sql<
+        Array<{
+          id: string;
+          meeting_id: string;
+          description: string;
+          assignee_name: string | null;
+          due_date: string | null;
+          timestamp_sec: number | null;
+          status: string;
+          completed_at: Date | null;
+          created_at: Date;
+        }>
+      >`
       SELECT id, meeting_id, description, assignee_name, due_date, timestamp_sec, status, completed_at, created_at
       FROM action_items
       WHERE user_id = ${user_id}
       ORDER BY created_at DESC
     `,
-    sql<Array<{
-      meeting_id: string;
-      step: string;
-      provider: string | null;
-      model: string | null;
-      duration_ms: number | null;
-      cost_usd: number | null;
-      status: string;
-      error: string | null;
-      created_at: Date;
-    }>>`
+      sql<
+        Array<{
+          meeting_id: string;
+          step: string;
+          provider: string | null;
+          model: string | null;
+          duration_ms: number | null;
+          cost_usd: number | null;
+          status: string;
+          error: string | null;
+          created_at: Date;
+        }>
+      >`
       SELECT meeting_id, step, provider, model, duration_ms, cost_usd, status, error, created_at
       FROM pipeline_logs
       WHERE user_id = ${user_id}
       ORDER BY created_at DESC
     `,
-  ]);
+    ]);
 
   if (user.length === 0) {
     throw new Error(`User ${user_id} not found`);
   }
 
-  console.log(`[export-account] queried data: ${meetings.length} meetings, ${actionItems.length} action items`);
+  console.log(
+    `[export-account] queried data: ${meetings.length} meetings, ${actionItems.length} action items`,
+  );
 
   // ---- 2. Build ZIP archive -------------------------------------------------
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -159,7 +172,7 @@ export async function exportUserAccount(job: ExportJob): Promise<void> {
   });
 
   // Track upload progress
-  archive.on("warning", (err: any) => {
+  archive.on("warning", (err: archiver.ArchiverError) => {
     if (err.code === "ENOENT") {
       console.warn("[export-account] archiver warning:", err);
     } else {
@@ -167,7 +180,7 @@ export async function exportUserAccount(job: ExportJob): Promise<void> {
     }
   });
 
-  archive.on("error", (err: any) => {
+  archive.on("error", (err: Error) => {
     throw err;
   });
 
@@ -203,7 +216,7 @@ export async function exportUserAccount(job: ExportJob): Promise<void> {
   // Convert archive stream to buffer for S3 upload
   const chunks: Buffer[] = [];
   const archiveStream = Readable.from(archive);
-  
+
   for await (const chunk of archiveStream) {
     chunks.push(Buffer.from(chunk));
   }
@@ -215,7 +228,7 @@ export async function exportUserAccount(job: ExportJob): Promise<void> {
       Key: zipKey,
       Body: zipBuffer,
       ContentType: "application/zip",
-    })
+    }),
   );
 
   console.log(`[export-account] ZIP uploaded (${(zipBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
@@ -227,7 +240,7 @@ export async function exportUserAccount(job: ExportJob): Promise<void> {
       Bucket: env.R2_BUCKET,
       Key: zipKey,
     }),
-    { expiresIn: EXPORT_TTL_SECONDS }
+    { expiresIn: EXPORT_TTL_SECONDS },
   );
 
   const expiresAt = new Date(Date.now() + EXPORT_TTL_SECONDS * 1000).toISOString();

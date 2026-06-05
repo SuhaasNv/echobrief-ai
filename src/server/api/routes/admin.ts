@@ -321,15 +321,29 @@ admin.get("/system", async (c) => {
   const env = getEnv();
   const sql = getSql();
 
-  const services: Array<{ name: string; status: "ok" | "fail" | "skipped"; latency_ms: number | null; detail?: string }> = [];
+  const services: Array<{
+    name: string;
+    status: "ok" | "fail" | "skipped";
+    latency_ms: number | null;
+    detail?: string;
+  }> = [];
 
   // Postgres
   const t1 = performance.now();
   try {
     await sql`SELECT 1`;
-    services.push({ name: "Postgres", status: "ok", latency_ms: Math.round(performance.now() - t1) });
+    services.push({
+      name: "Postgres",
+      status: "ok",
+      latency_ms: Math.round(performance.now() - t1),
+    });
   } catch (err) {
-    services.push({ name: "Postgres", status: "fail", latency_ms: null, detail: err instanceof Error ? err.message : "error" });
+    services.push({
+      name: "Postgres",
+      status: "fail",
+      latency_ms: null,
+      detail: err instanceof Error ? err.message : "error",
+    });
   }
 
   // Redis (via BullMQ's own connection — that's what the worker uses)
@@ -337,9 +351,18 @@ admin.get("/system", async (c) => {
   try {
     const conn = getQueueConnection() as unknown as Redis;
     const pong = await conn.ping();
-    services.push({ name: "Redis", status: pong === "PONG" ? "ok" : "fail", latency_ms: Math.round(performance.now() - t2) });
+    services.push({
+      name: "Redis",
+      status: pong === "PONG" ? "ok" : "fail",
+      latency_ms: Math.round(performance.now() - t2),
+    });
   } catch (err) {
-    services.push({ name: "Redis", status: "fail", latency_ms: null, detail: err instanceof Error ? err.message : "error" });
+    services.push({
+      name: "Redis",
+      status: "fail",
+      latency_ms: null,
+      detail: err instanceof Error ? err.message : "error",
+    });
   }
 
   // BullMQ workers
@@ -353,7 +376,12 @@ admin.get("/system", async (c) => {
       detail: `${workers.length} worker(s) connected`,
     });
   } catch (err) {
-    services.push({ name: "Worker", status: "fail", latency_ms: null, detail: err instanceof Error ? err.message : "error" });
+    services.push({
+      name: "Worker",
+      status: "fail",
+      latency_ms: null,
+      detail: err instanceof Error ? err.message : "error",
+    });
   }
 
   // R2 (not pinged here — adding a HEAD would burn class-A ops; we surface config presence)

@@ -12,6 +12,7 @@ This document catalogs every screen in EchoBrief, its purpose, layout, states, a
 ## Table of Contents
 
 ### Marketing / Auth
+
 1. [Landing Page](#s-01-landing-page)
 2. [Sign Up](#s-02-sign-up)
 3. [Log In](#s-03-log-in)
@@ -19,6 +20,7 @@ This document catalogs every screen in EchoBrief, its purpose, layout, states, a
 5. [Email Verification](#s-05-email-verification)
 
 ### Core App
+
 6. [Dashboard](#s-06-dashboard)
 7. [Upload](#s-07-upload)
 8. [Processing Status](#s-08-processing-status)
@@ -31,12 +33,14 @@ This document catalogs every screen in EchoBrief, its purpose, layout, states, a
 15. [Settings](#s-15-settings)
 
 ### V2 Screens (Planned)
+
 16. [Smart Timeline View](#s-16-smart-timeline-view)
 17. [Meeting Score Detail](#s-17-meeting-score-detail)
 18. [Integrations Hub](#s-18-integrations-hub)
 19. [Email Generator](#s-19-email-generator)
 
 ### V3 Screens (Planned)
+
 20. [Live Transcription](#s-20-live-transcription)
 21. [Team Workspace](#s-21-team-workspace)
 22. [Shared Meeting View](#s-22-shared-meeting-view)
@@ -48,20 +52,21 @@ This document catalogs every screen in EchoBrief, its purpose, layout, states, a
 **Layout grid:** 12-column, max-width 1280px, centered. Sidebar is 240px fixed; content area is fluid.
 
 **Breakpoints:**
+
 - Mobile: 375px (single column, sidebar collapses to bottom nav)
 - Tablet: 768px (sidebar becomes drawer, content full-width)
 - Desktop: 1280px (full sidebar + content side-by-side)
 
 **Status chips:**
 
-| Status | Color | Label |
-|--------|-------|-------|
-| Queued | Gray | Queued |
-| Transcribing | Blue (pulsing) | Transcribing... |
-| Analyzing | Violet (pulsing) | Analyzing... |
-| Indexing | Violet (pulsing) | Indexing... |
-| Complete | Green | Ready |
-| Failed | Red | Failed |
+| Status       | Color            | Label           |
+| ------------ | ---------------- | --------------- |
+| Queued       | Gray             | Queued          |
+| Transcribing | Blue (pulsing)   | Transcribing... |
+| Analyzing    | Violet (pulsing) | Analyzing...    |
+| Indexing     | Violet (pulsing) | Indexing...     |
+| Complete     | Green            | Ready           |
+| Failed       | Red              | Failed          |
 
 **Empty states:** Never blank. Every empty state has an illustration, a headline, a 1-sentence explanation, and a primary CTA.
 
@@ -74,6 +79,7 @@ This document catalogs every screen in EchoBrief, its purpose, layout, states, a
 **File:** `src/routes/index.tsx`
 
 ### Purpose
+
 Convert visitors to signups. Communicate the product value in 10 seconds. Show the product working.
 
 ### Layout
@@ -118,12 +124,14 @@ Convert visitors to signups. Communicate the product value in 10 seconds. Show t
 ```
 
 ### Key Interactions
+
 - Dashboard preview animates on scroll-into-view (simulated typing, section reveals)
 - Pricing tier toggle: Monthly / Annual (annual = 20% discount shown)
 - CTA buttons scroll to sign-up section or go to `/signup`
 - Sticky header on scroll
 
 ### States
+
 - Default
 - Scrolled (header becomes opaque)
 
@@ -161,6 +169,7 @@ Convert visitors to signups. Communicate the product value in 10 seconds. Show t
 ```
 
 ### Validation
+
 - Name: required, min 2 chars
 - Email: valid format, unique (checked on submit)
 - Password: min 8 chars, 1 uppercase, 1 number
@@ -168,6 +177,7 @@ Convert visitors to signups. Communicate the product value in 10 seconds. Show t
 - Submit disabled until all fields valid
 
 ### States
+
 - Default
 - Loading (spinner in button, fields disabled)
 - Field error (red border + message below field)
@@ -175,6 +185,7 @@ Convert visitors to signups. Communicate the product value in 10 seconds. Show t
 - Success → redirect to `/app/` + onboarding flow
 
 ### Mobile
+
 - Single column; right panel hidden
 - Google sign-in button full width
 
@@ -187,6 +198,7 @@ Convert visitors to signups. Communicate the product value in 10 seconds. Show t
 **File:** `src/routes/login.tsx`
 
 ### Layout
+
 Same two-column shell as Sign Up.
 
 ```
@@ -204,6 +216,7 @@ Same two-column shell as Sign Up.
 ```
 
 ### States
+
 - Default
 - Loading
 - Error: "Invalid email or password" (generic — don't reveal which field is wrong)
@@ -218,6 +231,7 @@ Same two-column shell as Sign Up.
 **File:** `src/routes/forgot-password.tsx`
 
 ### Layout
+
 Centered card (no two-column layout):
 
 ```
@@ -235,6 +249,7 @@ Centered card (no two-column layout):
 ```
 
 ### States
+
 - Default
 - Loading
 - Success: "Check your email for a reset link" (replace form with confirmation)
@@ -248,6 +263,7 @@ Centered card (no two-column layout):
 **Auth required:** No
 
 ### States
+
 - Verifying (spinner): "Verifying your email..."
 - Success: "Email verified. Taking you to your dashboard..." → auto-redirect to `/app/`
 - Error: "Link expired. Request a new one." + CTA button
@@ -261,6 +277,7 @@ Centered card (no two-column layout):
 **File:** `src/routes/app/index.tsx`
 
 ### Purpose
+
 Central hub. At-a-glance view of activity, pending work, and recent meetings.
 
 ### Layout
@@ -294,12 +311,14 @@ Central hub. At-a-glance view of activity, pending work, and recent meetings.
 ```
 
 ### States
+
 - Loading: skeleton loaders for each panel (not spinners — preserves layout)
 - Empty (new user): full-page empty state with illustration, headline "Process your first meeting", [Upload audio →] CTA
 - Populated: as above
 - Action item overdue: red badge on item, "Overdue" chip
 
 ### Key Interactions
+
 - Clicking a meeting row → `/app/meetings/:id`
 - Clicking "View all meetings" → `/app/meetings`
 - Checking off an action item → inline complete (optimistic update)
@@ -314,6 +333,7 @@ Central hub. At-a-glance view of activity, pending work, and recent meetings.
 **File:** `src/routes/app/upload.tsx`
 
 ### Purpose
+
 Primary entry point for adding new meetings to EchoBrief.
 
 ### Layout
@@ -351,16 +371,19 @@ Drop zone with dashed border, subtle hover animation.
 
 **State 2 — File selected (pre-upload):**
 Drop zone replaced by file card:
+
 ```
 ┌──────────────────────────────────────────┐
 │ 🎵 team-standup-may14.mp3               │
 │    47.2 MB · 1:23:04                   ✕ │
 └──────────────────────────────────────────┘
 ```
+
 Meeting details form appears below.
 
 **State 3 — Uploading:**
 Progress bar with percentage. Upload speed shown. Cancel button.
+
 ```
 Uploading...  ████████████░░░░░░  67%   2.1 MB/s   [Cancel]
 ```
@@ -372,11 +395,13 @@ Checkmark animation. Auto-transition to Processing Status screen after 1 second.
 Red border on drop zone, specific error message (file too large, wrong format, network error).
 
 ### Validation
+
 - Client-side: file type check before upload starts (MIME type + extension)
 - File size: warn at 200MB, block at 500MB
 - Audio duration: detect via `AudioContext`, warn if > 4 hours
 
 ### Mobile
+
 - No drag-and-drop (not supported on mobile); show only "Browse files" button
 - Camera/voice recorder option (record directly, V2)
 
@@ -413,11 +438,13 @@ Red border on drop zone, specific error message (file too large, wrong format, n
 ```
 
 ### States
+
 - Each step transitions: Waiting → In Progress (pulsing dot) → Complete (checkmark)
 - On completion: success animation, auto-redirect to Meeting Detail in 2 seconds
 - On failure: specific step shown as failed, retry button, support link
 
 ### Polling behavior
+
 Poll `GET /api/v1/meetings/:id/status` every 5 seconds. Show "Notify me by email" for users who close the tab — they'll be emailed on completion.
 
 ---
@@ -454,12 +481,14 @@ Poll `GET /api/v1/meetings/:id/status` every 5 seconds. Show "Notify me by email
 ```
 
 ### States
+
 - Loading: skeleton rows
 - Empty (no meetings): empty state with illustration + "Upload your first meeting"
 - Empty (filtered): "No meetings match your filters" + [Clear filters]
 - Populated: list with pagination
 
 ### Key Interactions
+
 - Clicking a row → `/app/meetings/:id`
 - Search: real-time filtering as user types (client-side for ≤ 100 meetings, server-side beyond)
 - Status filter, Date filter, Tag filter: independent, composable
@@ -475,6 +504,7 @@ Poll `GET /api/v1/meetings/:id/status` every 5 seconds. Show "Notify me by email
 **File:** `src/routes/app/meetings/$id.tsx`
 
 ### Purpose
+
 The most important screen. Where users spend most of their time.
 
 ### Layout
@@ -518,6 +548,7 @@ The most important screen. Where users spend most of their time.
 ```
 
 ### States
+
 - Loading: skeleton layout
 - Transcript tab: full scrollable transcript with speaker labels and timestamps
 - Summary tab: executive summary, topics, decisions, open questions
@@ -525,6 +556,7 @@ The most important screen. Where users spend most of their time.
 - Chat tab: per-meeting AI Q&A (F-07) — inline chat interface
 
 ### Key Interactions
+
 - Clicking timestamp in transcript → seeks audio player
 - Clicking timestamp in action item → seeks transcript + audio to that point
 - "Ask about this meeting" → opens Chat tab with focus on input
@@ -534,6 +566,7 @@ The most important screen. Where users spend most of their time.
 - Transcript search: `Cmd+F` style highlight + navigation
 
 ### Chat Sub-panel (F-07)
+
 ```
 ┌────────────────────────────────────────┐
 │  Ask anything about this meeting       │
@@ -564,6 +597,7 @@ The most important screen. Where users spend most of their time.
 **File:** `src/routes/app/chat.tsx`
 
 ### Purpose
+
 Ask questions across the entire meeting history. The "second brain" feature.
 
 ### Layout
@@ -607,6 +641,7 @@ Ask questions across the entire meeting history. The "second brain" feature.
 ```
 
 ### States
+
 - Empty state (no meetings): "Upload at least one meeting to start asking questions"
 - Empty state (meetings exist, no query): suggested query chips
 - Thinking: animated ellipsis while streaming starts
@@ -615,6 +650,7 @@ Ask questions across the entire meeting history. The "second brain" feature.
 - Error: "I couldn't find relevant context for that question. Try rephrasing."
 
 ### Key Interactions
+
 - Source citations → navigate to `/app/meetings/:id` at specific timestamp
 - Suggested queries → populate input and auto-submit
 - Clear conversation button
@@ -656,11 +692,13 @@ Ask questions across the entire meeting history. The "second brain" feature.
 ```
 
 ### States
+
 - All complete: celebration empty state "All caught up! 🎉"
 - Filter: by assignee, by meeting, by due date range
 - Export modal: select items → export to Notion/Linear/Jira (V2)
 
 ### Key Interactions
+
 - Checkbox: mark complete (optimistic update, strikethrough animation)
 - Item row click → expands inline to show full description + edit controls
 - Meeting link on each item → `/app/meetings/:id` at the source timestamp
@@ -675,9 +713,11 @@ Ask questions across the entire meeting history. The "second brain" feature.
 **File:** `src/routes/app/shared.tsx`
 
 ### Purpose
+
 Collaborative documents that are enriched with meeting context. V1 is read-only AI-generated notes; V2 is collaborative editing.
 
 ### Layout
+
 Simple document list view → document detail with rich text content pulled from meeting summaries and AI-generated briefs.
 
 ---
@@ -716,12 +756,14 @@ Simple document list view → document detail with rich text content pulled from
 ```
 
 ### Charts Used
+
 - Meetings over time: Recharts `AreaChart`
 - Meeting score trend: Recharts `LineChart`
 - Speaker participation: Recharts `PieChart`
 - Action completion: Recharts `BarChart`
 
 ### States
+
 - Insufficient data (< 3 meetings): explain minimum data needed + progress indicator
 - Date range picker: last 7d, 30d, 90d, custom range
 
@@ -749,6 +791,7 @@ Simple document list view → document detail with rich text content pulled from
 ```
 
 ### Tab: Profile
+
 - Avatar upload
 - Display name
 - Email (read-only, shows "change email" flow)
@@ -756,35 +799,42 @@ Simple document list view → document detail with rich text content pulled from
 - Language preference
 
 ### Tab: Workspace (V3)
+
 - Workspace name + logo
 - Invite members by email
 - Manage members (role, remove)
 - Workspace usage stats
 
 ### Tab: Integrations (V2)
+
 - List of supported integrations with connect/disconnect buttons
 - OAuth status (connected / not connected)
 - Test connection button
 
 ### Tab: Billing
+
 - Current plan display
 - Usage this month (meetings, hours, storage)
 - Upgrade/downgrade CTA
 - Invoice history
 
 ### Tab: Notifications
+
 - Email on: processing complete, @mentions, action item due soon
 - Browser push: opt-in
 
 ### Tab: API Keys
+
 - Generate + revoke API keys (developer access)
 - Usage per key
 
 ### Tab: Appearance
+
 - Accent color picker (within brand palette)
 - Compact mode toggle (reduces spacing)
 
 ### Tab: Danger Zone
+
 - Delete account (double-confirm modal: type "DELETE" to confirm)
 - Export all data (GDPR download)
 
@@ -796,6 +846,7 @@ Simple document list view → document detail with rich text content pulled from
 **Auth required:** Yes
 
 ### Layout
+
 Replaces transcript panel with a visual chapter-based timeline:
 
 ```
@@ -826,6 +877,7 @@ Accessible from Meeting Detail header. Shows the 5-component breakdown with expl
 **Route:** `/app/settings/integrations` (expanded from Settings tab)
 
 Full-page view showing all integrations with:
+
 - Connection status + last synced time
 - Configuration options per integration
 - Export history (what was sent where)
@@ -863,6 +915,7 @@ Modal or side panel triggered from Meeting Detail:
 **Auth required:** Yes
 
 ### Layout
+
 Full-screen focus mode:
 
 ```
@@ -900,6 +953,7 @@ Team-level view: all meetings across workspace, shared action items, member acti
 **Auth required:** No (public URL)
 
 Stripped-down read-only view of a specific meeting:
+
 - Title, date, duration
 - Summary only (transcript hidden by default, owner can enable it)
 - Action items (read-only)
@@ -910,27 +964,27 @@ Stripped-down read-only view of a specific meeting:
 
 ## Screen Inventory Summary
 
-| # | Screen | Route | V1 | V2 | V3 |
-|---|--------|-------|----|----|----|
-| S-01 | Landing Page | `/` | ✓ | | |
-| S-02 | Sign Up | `/signup` | ✓ | | |
-| S-03 | Log In | `/login` | ✓ | | |
-| S-04 | Forgot Password | `/forgot-password` | ✓ | | |
-| S-05 | Email Verification | `/verify-email` | ✓ | | |
-| S-06 | Dashboard | `/app/` | ✓ | | |
-| S-07 | Upload | `/app/upload` | ✓ | | |
-| S-08 | Processing Status | `/app/meetings/:id` (in-progress) | ✓ | | |
-| S-09 | Meetings List | `/app/meetings` | ✓ | | |
-| S-10 | Meeting Detail | `/app/meetings/:id` | ✓ | | |
-| S-11 | AI Chat (Cross-Meeting) | `/app/chat` | ✓ | | |
-| S-12 | Action Items | `/app/action-items` | ✓ | | |
-| S-13 | Shared Notes | `/app/shared` | ✓ | | |
-| S-14 | Analytics | `/app/analytics` | ✓ | | |
-| S-15 | Settings | `/app/settings` | ✓ | | |
-| S-16 | Smart Timeline View | `/app/meetings/:id?view=timeline` | | ✓ | |
-| S-17 | Meeting Score Detail | (modal) | | ✓ | |
-| S-18 | Integrations Hub | `/app/settings/integrations` | | ✓ | |
-| S-19 | Email Generator | (modal/panel) | | ✓ | |
-| S-20 | Live Transcription | `/app/live` | | | ✓ |
-| S-21 | Team Workspace | `/app/workspace` | | | ✓ |
-| S-22 | Shared Meeting View | `/share/:token` | ✓ | | |
+| #    | Screen                  | Route                             | V1  | V2  | V3  |
+| ---- | ----------------------- | --------------------------------- | --- | --- | --- |
+| S-01 | Landing Page            | `/`                               | ✓   |     |     |
+| S-02 | Sign Up                 | `/signup`                         | ✓   |     |     |
+| S-03 | Log In                  | `/login`                          | ✓   |     |     |
+| S-04 | Forgot Password         | `/forgot-password`                | ✓   |     |     |
+| S-05 | Email Verification      | `/verify-email`                   | ✓   |     |     |
+| S-06 | Dashboard               | `/app/`                           | ✓   |     |     |
+| S-07 | Upload                  | `/app/upload`                     | ✓   |     |     |
+| S-08 | Processing Status       | `/app/meetings/:id` (in-progress) | ✓   |     |     |
+| S-09 | Meetings List           | `/app/meetings`                   | ✓   |     |     |
+| S-10 | Meeting Detail          | `/app/meetings/:id`               | ✓   |     |     |
+| S-11 | AI Chat (Cross-Meeting) | `/app/chat`                       | ✓   |     |     |
+| S-12 | Action Items            | `/app/action-items`               | ✓   |     |     |
+| S-13 | Shared Notes            | `/app/shared`                     | ✓   |     |     |
+| S-14 | Analytics               | `/app/analytics`                  | ✓   |     |     |
+| S-15 | Settings                | `/app/settings`                   | ✓   |     |     |
+| S-16 | Smart Timeline View     | `/app/meetings/:id?view=timeline` |     | ✓   |     |
+| S-17 | Meeting Score Detail    | (modal)                           |     | ✓   |     |
+| S-18 | Integrations Hub        | `/app/settings/integrations`      |     | ✓   |     |
+| S-19 | Email Generator         | (modal/panel)                     |     | ✓   |     |
+| S-20 | Live Transcription      | `/app/live`                       |     |     | ✓   |
+| S-21 | Team Workspace          | `/app/workspace`                  |     |     | ✓   |
+| S-22 | Shared Meeting View     | `/share/:token`                   | ✓   |     |     |

@@ -89,7 +89,8 @@ export function UpgradeModal({ open, onClose, reason, currentTier = "free" }: Up
             const features = TIER_FEATURES[tier];
             const price =
               billingInterval === "annual" ? pricing.annual_price_usd : pricing.price_usd * 12;
-            const monthlyPrice = billingInterval === "annual" ? pricing.annual_price_usd / 12 : pricing.price_usd;
+            const monthlyPrice =
+              billingInterval === "annual" ? pricing.annual_price_usd / 12 : pricing.price_usd;
             const isSelected = selectedTier === tier;
             const isCurrent = currentTier === tier;
 
@@ -174,7 +175,10 @@ export function UpgradeModal({ open, onClose, reason, currentTier = "free" }: Up
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleUpgrade} disabled={upgrade.isPending || currentTier === selectedTier}>
+          <Button
+            onClick={handleUpgrade}
+            disabled={upgrade.isPending || currentTier === selectedTier}
+          >
             {upgrade.isPending ? "Processing..." : `Upgrade to ${TIER_PRICING[selectedTier].name}`}
           </Button>
         </div>

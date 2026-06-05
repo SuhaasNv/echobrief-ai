@@ -82,10 +82,12 @@ export interface StreamingTokenResult {
 
 const STREAMING_WS_URL = "wss://streaming.assemblyai.com/v3/ws";
 
-export async function createStreamingToken(opts: {
-  expiresInSeconds?: number;
-  maxSessionDurationSeconds?: number;
-} = {}): Promise<StreamingTokenResult> {
+export async function createStreamingToken(
+  opts: {
+    expiresInSeconds?: number;
+    maxSessionDurationSeconds?: number;
+  } = {},
+): Promise<StreamingTokenResult> {
   const env = getEnv();
   if (!env.ASSEMBLYAI_API_KEY) {
     return stubStreamingToken();
@@ -96,29 +98,21 @@ export async function createStreamingToken(opts: {
   // 300s opening window covers normal latency; 3-hour session covers the
   // longest reasonable lecture without forcing a mid-recording reconnect.
   const expiresIn = Math.min(Math.max(opts.expiresInSeconds ?? 300, 1), 600);
-  const maxSession = Math.min(
-    Math.max(opts.maxSessionDurationSeconds ?? 3 * 60 * 60, 60),
-    10_800,
-  );
+  const maxSession = Math.min(Math.max(opts.maxSessionDurationSeconds ?? 3 * 60 * 60, 60), 10_800);
 
   const params = new URLSearchParams({
     expires_in_seconds: String(expiresIn),
     max_session_duration_seconds: String(maxSession),
   });
 
-  const response = await fetch(
-    `https://streaming.assemblyai.com/v3/token?${params}`,
-    {
-      method: "GET",
-      headers: { Authorization: env.ASSEMBLYAI_API_KEY },
-    },
-  );
+  const response = await fetch(`https://streaming.assemblyai.com/v3/token?${params}`, {
+    method: "GET",
+    headers: { Authorization: env.ASSEMBLYAI_API_KEY },
+  });
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(
-      `AssemblyAI token request failed (${response.status}): ${text.slice(0, 200)}`,
-    );
+    throw new Error(`AssemblyAI token request failed (${response.status}): ${text.slice(0, 200)}`);
   }
 
   const data = (await response.json()) as { token?: string };
@@ -189,7 +183,7 @@ function normalize(t: Transcript, language: string): TranscriptionResult {
   }));
 
   const speakers = computeSpeakerStats(words);
-  const duration_sec = Math.floor((t.audio_duration ?? 0));
+  const duration_sec = Math.floor(t.audio_duration ?? 0);
   const cost_usd = (duration_sec / 60) * 0.0035; // ~$0.0035/min for "best" tier
 
   return {

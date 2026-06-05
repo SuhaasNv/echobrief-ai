@@ -37,7 +37,9 @@ async function postJson(path: string, body: unknown, token?: string) {
   });
 }
 
-async function createUserWithTier(tier: string): Promise<{ token: string; userId: string; workspaceId: string }> {
+async function createUserWithTier(
+  tier: string,
+): Promise<{ token: string; userId: string; workspaceId: string }> {
   const email = uniqueEmail();
   const signup = await postJson("/auth/signup", {
     email,
@@ -82,8 +84,10 @@ afterAll(async () => {
   await sql`DELETE FROM users WHERE email = ANY(${sql.array(createdEmails)})`;
 });
 
+import type { MiddlewareHandler } from "hono";
+
 // Create test app with quota middleware
-function createTestApp(middleware: any) {
+function createTestApp(middleware: MiddlewareHandler<AppBindings>) {
   const app = new Hono<AppBindings>();
   app.use("*", requireAuth); // Auth required first
   app.post("/test", middleware, async (c) => {

@@ -1,8 +1,8 @@
 /**
  * API Documentation Route
- * 
+ *
  * Serves human-readable API documentation at /api/v1/docs
- * 
+ *
  * Alternative to OpenAPI/Swagger (which has zod v4 dependency conflicts).
  * Provides simple, clear documentation for external integrations.
  */
@@ -15,7 +15,7 @@ const app = new Hono<AppBindings>();
 // API Documentation (HTML)
 app.get("/", (c) => {
   const baseUrl = process.env.APP_URL || "https://api.echobrief.ai";
-  
+
   return c.html(`
 <!DOCTYPE html>
 <html lang="en">

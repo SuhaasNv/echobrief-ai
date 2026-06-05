@@ -73,9 +73,7 @@ export function useHasFeature(feature: keyof SubscriptionData["features"]): bool
 /**
  * Check if user has reached their quota for a specific usage type.
  */
-export function useQuotaStatus(
-  usageType: "transcription_minutes" | "ai_queries" | "flashcards",
-): {
+export function useQuotaStatus(usageType: "transcription_minutes" | "ai_queries" | "flashcards"): {
   current: number;
   limit: number | null;
   percentage: number;
@@ -118,14 +116,19 @@ export function useUpgrade() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { tier: "student" | "pro" | "team"; billing_interval: "monthly" | "annual" }) => {
-      return apiRequest<{ message: string; tier: string; billing_interval: string; user_id: string }>(
-        "/subscription/upgrade",
-        {
-          method: "POST",
-          body: params,
-        }
-      );
+    mutationFn: async (params: {
+      tier: "student" | "pro" | "team";
+      billing_interval: "monthly" | "annual";
+    }) => {
+      return apiRequest<{
+        message: string;
+        tier: string;
+        billing_interval: string;
+        user_id: string;
+      }>("/subscription/upgrade", {
+        method: "POST",
+        body: params,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subscription"] });

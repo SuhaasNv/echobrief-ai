@@ -63,9 +63,7 @@ const TIER_LIMITS: Record<SubscriptionTier, Record<string, BucketConfig>> = {
  *
  * Hono's node adapter exposes the raw IncomingMessage via env.incoming.
  */
-export function clientIp<E extends { Variables: AppBindings["Variables"] }>(
-  c: Context<E>,
-): string {
+export function clientIp<E extends { Variables: AppBindings["Variables"] }>(c: Context<E>): string {
   const cf = c.req.header("cf-connecting-ip");
   if (cf) return cf.trim();
 
@@ -123,25 +121,25 @@ export function rateLimit(
     // Calculate rate limit info for headers
     const remaining = Math.max(0, cfg.max - count);
     const resetTime = (windowStart + 1) * cfg.window_sec;
-    
+
     // SECURITY: Always return rate limit headers (RFC 6585 standard)
     // Helps clients implement proper retry logic and avoid hammering the API
     c.header("X-RateLimit-Limit", String(cfg.max));
     c.header("X-RateLimit-Remaining", String(remaining));
     c.header("X-RateLimit-Reset", String(resetTime));
-    
+
     if (count > cfg.max) {
       const retryAfter = cfg.window_sec;
       const ip = clientIp(c);
-      
+
       // Log security event for rate limit violation
       logRateLimit(bucket, identifier, count, cfg.max, ip);
-      
+
       return c.json(
         {
           error: "rate_limited",
           message: `Too many requests. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`,
-          retry_after_seconds: retryAfter,  // Machine-readable for client retry logic
+          retry_after_seconds: retryAfter, // Machine-readable for client retry logic
           limit: cfg.max,
           window_seconds: cfg.window_sec,
         },

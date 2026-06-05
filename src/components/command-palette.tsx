@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   LayoutGrid,
@@ -118,16 +111,12 @@ function CommandPalette({
         <CommandEmpty>No results found.</CommandEmpty>
 
         <CommandGroup heading="Quick actions">
-          <CommandItem
-            onSelect={() => runAndClose(() => navigate({ to: "/app/upload" }))}
-          >
+          <CommandItem onSelect={() => runAndClose(() => navigate({ to: "/app/upload" }))}>
             <Upload className="h-3.5 w-3.5" />
             <span>Upload a new meeting</span>
             <CommandShortcut>U</CommandShortcut>
           </CommandItem>
-          <CommandItem
-            onSelect={() => runAndClose(() => navigate({ to: "/app/chat" }))}
-          >
+          <CommandItem onSelect={() => runAndClose(() => navigate({ to: "/app/chat" }))}>
             <Sparkles className="h-3.5 w-3.5" />
             <span>Ask AI across meetings</span>
           </CommandItem>
@@ -158,9 +147,7 @@ function CommandPalette({
                   key={m.id}
                   value={`meeting ${m.title} ${m.tags?.join(" ") ?? ""}`}
                   onSelect={() =>
-                    runAndClose(() =>
-                      navigate({ to: "/app/meetings/$id", params: { id: m.id } }),
-                    )
+                    runAndClose(() => navigate({ to: "/app/meetings/$id", params: { id: m.id } }))
                   }
                 >
                   <Mic className="h-3.5 w-3.5" />

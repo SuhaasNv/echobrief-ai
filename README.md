@@ -6,7 +6,7 @@
 
 **Turn meetings into memory.** EchoBrief ingests audio, produces transcripts, summaries, and action items, and gives you natural-language Q&A across everything you have captured—so decisions and follow-ups stay findable long after the call ends.
 
-*This repository ships the **web app** (TanStack Start + React), a **Node.js API** (Hono), and a **BullMQ worker** that runs transcription, embeddings, and analysis.*
+_This repository ships the **web app** (TanStack Start + React), a **Node.js API** (Hono), and a **BullMQ worker** that runs transcription, embeddings, and analysis._
 
 </div>
 
@@ -14,14 +14,14 @@
 
 ## Architecture
 
-| Piece | Runtime | Role |
-|--------|---------|------|
-| **Web** | TanStack Start (SSR) → Cloudflare Worker (`wrangler`) | UI and server-rendered routes |
-| **API** | Node 20 (`src/api.ts`) | REST API at `/api/v1` — meetings, chat, search, integrations |
-| **Worker** | Node 20 (`src/server/workers/main.ts`) | Queued jobs: transcribe, embed, analyze |
-| **Postgres** | Railway (or any Postgres) | App data, vectors, migrations in `/migrations` |
-| **Redis** | Railway (or any Redis) | BullMQ queues |
-| **Object storage** | Cloudflare R2 (S3-compatible) | Audio uploads |
+| Piece              | Runtime                                               | Role                                                         |
+| ------------------ | ----------------------------------------------------- | ------------------------------------------------------------ |
+| **Web**            | TanStack Start (SSR) → Cloudflare Worker (`wrangler`) | UI and server-rendered routes                                |
+| **API**            | Node 20 (`src/api.ts`)                                | REST API at `/api/v1` — meetings, chat, search, integrations |
+| **Worker**         | Node 20 (`src/server/workers/main.ts`)                | Queued jobs: transcribe, embed, analyze                      |
+| **Postgres**       | Railway (or any Postgres)                             | App data, vectors, migrations in `/migrations`               |
+| **Redis**          | Railway (or any Redis)                                | BullMQ queues                                                |
+| **Object storage** | Cloudflare R2 (S3-compatible)                         | Audio uploads                                                |
 
 Production layout is documented in [RAILWAY.md](./RAILWAY.md): API and worker share one Docker image with different start commands; the frontend deploys separately to Cloudflare.
 
@@ -65,11 +65,11 @@ Requires `DATABASE_URL` to be set. Migrations live in `migrations/` and are appl
 
 You typically want **three terminals**:
 
-| Terminal | Command | Purpose |
-|----------|---------|---------|
-| 1 | `npm run dev:api` | Hono API (`PORT` from `.env`, default `3000`) |
-| 2 | `npm run dev:worker` | BullMQ consumer for async processing |
-| 3 | `npm run dev` | Vite + TanStack Start (frontend) |
+| Terminal | Command              | Purpose                                       |
+| -------- | -------------------- | --------------------------------------------- |
+| 1        | `npm run dev:api`    | Hono API (`PORT` from `.env`, default `3000`) |
+| 2        | `npm run dev:worker` | BullMQ consumer for async processing          |
+| 3        | `npm run dev`        | Vite + TanStack Start (frontend)              |
 
 If the UI and API both try to bind to the same port, set a different `PORT` in `.env` for the API (for example `4000`) and point the client at that base URL wherever your app reads the API origin.
 
@@ -85,19 +85,19 @@ API routes are mounted at **`/api/v1`**.
 
 ## Scripts
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Frontend dev server (TanStack Start + Vite) |
-| `npm run dev:api` | API with `tsx` watch |
-| `npm run dev:worker` | Worker with `tsx` watch |
-| `npm run build` | Production build for the web app |
-| `npm run build:api` | Compile API + worker to `dist-api/` (`tsc -p tsconfig.api.json`) |
-| `npm run start:api` | Run compiled API: `node dist-api/api.js` |
-| `npm run start:worker` | Run compiled worker: `node dist-api/server/workers/main.js` |
-| `npm run migrate` | Apply SQL migrations |
-| `npm run typecheck` | TypeScript check |
-| `npm run lint` | ESLint |
-| `npm run format` | Prettier |
+| Script                 | Description                                                      |
+| ---------------------- | ---------------------------------------------------------------- |
+| `npm run dev`          | Frontend dev server (TanStack Start + Vite)                      |
+| `npm run dev:api`      | API with `tsx` watch                                             |
+| `npm run dev:worker`   | Worker with `tsx` watch                                          |
+| `npm run build`        | Production build for the web app                                 |
+| `npm run build:api`    | Compile API + worker to `dist-api/` (`tsc -p tsconfig.api.json`) |
+| `npm run start:api`    | Run compiled API: `node dist-api/api.js`                         |
+| `npm run start:worker` | Run compiled worker: `node dist-api/server/workers/main.js`      |
+| `npm run migrate`      | Apply SQL migrations                                             |
+| `npm run typecheck`    | TypeScript check                                                 |
+| `npm run lint`         | ESLint                                                           |
+| `npm run format`       | Prettier                                                         |
 
 ---
 
@@ -125,12 +125,12 @@ See [`.dev.vars.example`](./.dev.vars.example) for a complete checklist with gen
 
 ## Product and engineering docs
 
-| Document | Contents |
-|----------|----------|
-| [PRD.md](./PRD.md) | Product vision, features, user flows, API overview |
-| [TECHSTACK.md](./TECHSTACK.md) | Stack choices and rationale |
-| [USE_CASES.md](./USE_CASES.md) | Detailed scenarios |
-| [USER_SCREENS.md](./USER_SCREENS.md) | Screen-level behavior |
+| Document                             | Contents                                           |
+| ------------------------------------ | -------------------------------------------------- |
+| [PRD.md](./PRD.md)                   | Product vision, features, user flows, API overview |
+| [TECHSTACK.md](./TECHSTACK.md)       | Stack choices and rationale                        |
+| [USE_CASES.md](./USE_CASES.md)       | Detailed scenarios                                 |
+| [USER_SCREENS.md](./USER_SCREENS.md) | Screen-level behavior                              |
 
 ---
 

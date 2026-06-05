@@ -118,7 +118,11 @@ export function LiveRecorderPanel({ onComplete, defaultTitle }: LiveRecorderProp
   }, []);
 
   const transcriptText = useMemo(
-    () => segments.map((s) => s.text).join(" ").trim(),
+    () =>
+      segments
+        .map((s) => s.text)
+        .join(" ")
+        .trim(),
     [segments],
   );
 
@@ -221,9 +225,9 @@ export function LiveRecorderPanel({ onComplete, defaultTitle }: LiveRecorderProp
         </div>
         <h3 className="mt-4 text-base font-medium">Live recording isn't supported here</h3>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your browser is missing: {support.missing.join(", ")}. On iOS, update to
-          version 16 or newer. Or use the <strong>Audio / video</strong> tab to upload a
-          file recorded with another app.
+          Your browser is missing: {support.missing.join(", ")}. On iOS, update to version 16 or
+          newer. Or use the <strong>Audio / video</strong> tab to upload a file recorded with
+          another app.
         </p>
       </div>
     );
@@ -234,7 +238,8 @@ export function LiveRecorderPanel({ onComplete, defaultTitle }: LiveRecorderProp
       {/* Title input (visible during recording for context) */}
       <div className="space-y-1.5">
         <label htmlFor="live-title" className="text-xs text-muted-foreground">
-          {labels.meeting.singular} title <span className="text-muted-foreground/60">(optional)</span>
+          {labels.meeting.singular} title{" "}
+          <span className="text-muted-foreground/60">(optional)</span>
         </label>
         <input
           id="live-title"
@@ -319,7 +324,11 @@ export function LiveRecorderPanel({ onComplete, defaultTitle }: LiveRecorderProp
               disabled={saving}
               className="inline-flex h-9 items-center gap-1.5 rounded-full bg-destructive px-4 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />}
+              {saving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Square className="h-3.5 w-3.5" />
+              )}
               {saving ? "Saving…" : "Stop"}
             </button>
           </div>
@@ -341,8 +350,8 @@ export function LiveRecorderPanel({ onComplete, defaultTitle }: LiveRecorderProp
               <div className="space-y-1">
                 <p className="font-medium">Microphone access blocked</p>
                 <p className="text-destructive/80">
-                  Grant mic permission in your browser's address bar (click the lock
-                  icon next to the URL), then click the mic to try again.
+                  Grant mic permission in your browser's address bar (click the lock icon next to
+                  the URL), then click the mic to try again.
                 </p>
               </div>
             </div>
@@ -397,9 +406,7 @@ export function LiveRecorderPanel({ onComplete, defaultTitle }: LiveRecorderProp
         >
           {transcriptText.length === 0 ? (
             <p className="text-muted-foreground">
-              {isLive
-                ? "Listening for speech…"
-                : `Words will appear here as you speak.`}
+              {isLive ? "Listening for speech…" : `Words will appear here as you speak.`}
             </p>
           ) : (
             <p>
@@ -407,10 +414,7 @@ export function LiveRecorderPanel({ onComplete, defaultTitle }: LiveRecorderProp
                 seg.final ? (
                   <span key={seg.id}>{seg.text} </span>
                 ) : (
-                  <span
-                    key={seg.id}
-                    className="italic text-muted-foreground"
-                  >
+                  <span key={seg.id} className="italic text-muted-foreground">
                     {seg.text}{" "}
                   </span>
                 ),
@@ -475,11 +479,7 @@ function MicButton({
         onClick={handleClick}
         disabled={isBusy}
         aria-label={
-          recording || paused
-            ? "Stop recording"
-            : isBusy
-              ? "Starting…"
-              : "Start recording"
+          recording || paused ? "Stop recording" : isBusy ? "Starting…" : "Start recording"
         }
         className={`relative inline-flex h-24 w-24 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
           recording
@@ -516,9 +516,7 @@ function VolumeMeter({ level, muted }: { level: number; muted: boolean }) {
         return (
           <span
             key={i}
-            className={`w-1 rounded-sm transition-colors ${
-              isActive ? "bg-brand" : "bg-border/70"
-            }`}
+            className={`w-1 rounded-sm transition-colors ${isActive ? "bg-brand" : "bg-border/70"}`}
             style={{ height: `${Math.min(height, 22)}px` }}
           />
         );

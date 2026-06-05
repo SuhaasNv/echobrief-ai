@@ -247,7 +247,7 @@ export async function checkQuota(
   amount: number = 1,
   workspaceId: string | null = null,
 ): Promise<
-  | { allowed: true }
+  | { allowed: true; current: number; limit: number | null }
   | {
       allowed: false;
       tier: SubscriptionTier;
@@ -307,21 +307,24 @@ export async function checkQuota(
       break;
   }
 
-  return { allowed: true };
+  return { allowed: true, current, limit: limit === Infinity ? null : limit };
 }
 
 /**
  * Check if user can create another workspace.
  */
-export async function checkWorkspaceQuota(
-  userId: string,
-): Promise<{ allowed: true } | { allowed: false; tier: SubscriptionTier; limit: number; reason: string }> {
+export async function checkWorkspaceQuota(userId: string): Promise<
+  | { allowed: true; current: number; limit: number | null }
+  | {
+      allowed: false;
+      tier: SubscriptionTier;
+      current: number;
+      limit: number;
+      reason: string;
+    }
+> {
   const tier = await getUserTier(userId);
   const limits = TIER_LIMITS[tier];
-
-  if (limits.workspaces === null) {
-    return { allowed: true };
-  }
 
   const sql = getSql();
   const [{ count }] = await sql<[{ count: number }]>`
@@ -330,14 +333,15 @@ export async function checkWorkspaceQuota(
     WHERE owner_id = ${userId}
   `;
 
-  if (count >= limits.workspaces) {
+  if (limits.workspaces !== null && count >= limits.workspaces) {
     return {
       allowed: false,
       tier,
+      current: count,
       limit: limits.workspaces,
       reason: `Free tier allows ${limits.workspaces} workspace. Upgrade to create more.`,
     };
   }
 
-  return { allowed: true };
+  return { allowed: true, current: count, limit: limits.workspaces };
 }

@@ -15,23 +15,18 @@ import { UpgradeModal } from "./upgrade-modal";
 export function QuotaBanner() {
   const { data: subscription } = useSubscription();
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const transcriptionQuota = useQuotaStatus("transcription_minutes");
+  const aiQueryQuota = useQuotaStatus("ai_queries");
 
   // Only show for free tier
   if (!subscription || subscription.subscription.tier !== "free") {
     return null;
   }
 
-  const transcriptionQuota = useQuotaStatus("transcription_minutes");
-  const aiQueryQuota = useQuotaStatus("ai_queries");
-
   // Show warning if any quota is above 80%
-  const showWarning =
-    transcriptionQuota.percentage >= 80 ||
-    aiQueryQuota.percentage >= 80;
+  const showWarning = transcriptionQuota.percentage >= 80 || aiQueryQuota.percentage >= 80;
 
-  const showCritical =
-    transcriptionQuota.exceeded ||
-    aiQueryQuota.exceeded;
+  const showCritical = transcriptionQuota.exceeded || aiQueryQuota.exceeded;
 
   if (!showWarning && !showCritical) {
     return null;
@@ -54,7 +49,8 @@ export function QuotaBanner() {
                 <div>
                   <div className="flex justify-between mb-1">
                     <span>
-                      Transcription: {transcriptionQuota.current} / {transcriptionQuota.limit} minutes
+                      Transcription: {transcriptionQuota.current} / {transcriptionQuota.limit}{" "}
+                      minutes
                     </span>
                     <span>{transcriptionQuota.percentage.toFixed(0)}%</span>
                   </div>

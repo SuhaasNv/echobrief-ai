@@ -36,7 +36,7 @@ const PILLARS = [
   {
     Icon: Brain,
     title: "Cross-meeting memory",
-    body: "Vector search over every meeting you've ever uploaded. \"Did we decide on the auth approach?\" gets an answer with the exact 14-second clip cited.",
+    body: 'Vector search over every meeting you\'ve ever uploaded. "Did we decide on the auth approach?" gets an answer with the exact 14-second clip cited.',
   },
   {
     Icon: Workflow,
@@ -46,7 +46,7 @@ const PILLARS = [
   {
     Icon: Search,
     title: "Search that actually finds things",
-    body: "Not keyword search over transcripts. Semantic search over what was meant. \"Concerns about pricing\" pulls every moment a customer hedged on cost — even when they never said the word.",
+    body: 'Not keyword search over transcripts. Semantic search over what was meant. "Concerns about pricing" pulls every moment a customer hedged on cost — even when they never said the word.',
   },
 ];
 
@@ -70,10 +70,9 @@ function AboutPage() {
             <span className="text-gradient-brand">when they end.</span>
           </h1>
           <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
-            Knowledge workers spend ~22 hours a week in meetings. The decisions
-            made in those rooms drive everything — and the moment the call ends,
-            most of that signal disappears. EchoBrief is the layer that captures
-            it.
+            Knowledge workers spend ~22 hours a week in meetings. The decisions made in those rooms
+            drive everything — and the moment the call ends, most of that signal disappears.
+            EchoBrief is the layer that captures it.
           </p>
         </motion.div>
 
@@ -89,10 +88,7 @@ function AboutPage() {
             { value: "~30%", label: "Decisions forgotten within 7 days" },
             { value: "~60%", label: "Action items that go untracked" },
           ].map((s) => (
-            <div
-              key={s.label}
-              className="rounded-2xl border border-border/60 bg-surface/40 p-5"
-            >
+            <div key={s.label} className="rounded-2xl border border-border/60 bg-surface/40 p-5">
               <p className="font-mono text-3xl font-semibold tracking-tight text-foreground">
                 {s.value}
               </p>
@@ -109,9 +105,7 @@ function AboutPage() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           >
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">
-              Why now
-            </p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">Why now</p>
             <h2 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">
               Three things had to be true.
             </h2>
@@ -205,9 +199,7 @@ function AboutPage() {
           <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-brand/15 blur-3xl" />
           <div className="absolute -left-10 -bottom-10 h-64 w-64 rounded-full bg-violet/15 blur-3xl" />
           <div className="relative">
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">
-              Try it
-            </p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">Try it</p>
             <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">
               Upload a meeting. Watch it become something you can actually use.
             </h2>

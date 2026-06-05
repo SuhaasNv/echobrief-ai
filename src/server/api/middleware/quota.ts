@@ -14,12 +14,16 @@ import { HTTPException } from "hono/http-exception";
 import { checkQuota } from "../../services/usage-tracker";
 import type { AppBindings } from "../types";
 
+interface QuotaRequestBody {
+  durationSec?: number;
+}
+
 /**
  * Check if user has remaining transcription quota.
  *
  * SECURITY: This middleware expects the route to validate the body FIRST using
  * zValidator. It reads from c.req.valid("json") which contains validated data.
- * 
+ *
  * Attach this to upload endpoints AFTER zValidator:
  *   app.post("/upload", zValidator("json", schema), requireTranscriptionQuota, handler);
  *
@@ -27,21 +31,21 @@ import type { AppBindings } from "../types";
  */
 export const requireTranscriptionQuota = createMiddleware<AppBindings>(async (c, next) => {
   const user = c.get("user");
-  
+
   // SECURITY: Read validated body (set by zValidator middleware)
   // If route doesn't use zValidator, this will throw an error (fail-safe)
-  let body: any;
+  let body: QuotaRequestBody;
   try {
-    body = c.req.valid("json");
+    body = (c.req.valid as unknown as (target: string) => QuotaRequestBody)("json");
   } catch {
     // Fallback: parse body but validate strictly
-    body = await c.req.json();
+    body = (await c.req.json()) as QuotaRequestBody;
   }
-  
+
   const durationSec = body.durationSec ?? 0;
-  
+
   // SECURITY: Strict validation to prevent quota bypass attacks
-  if (typeof durationSec !== 'number') {
+  if (typeof durationSec !== "number") {
     throw new HTTPException(400, { message: "Invalid duration: must be a number" });
   }
   if (durationSec < 0) {
@@ -53,7 +57,7 @@ export const requireTranscriptionQuota = createMiddleware<AppBindings>(async (c,
   if (!Number.isFinite(durationSec)) {
     throw new HTTPException(400, { message: "Invalid duration: must be a finite number" });
   }
-  
+
   const minutes = Math.ceil(durationSec / 60);
 
   const result = await checkQuota(user.id, "transcription", minutes);

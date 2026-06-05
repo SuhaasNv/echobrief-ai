@@ -126,9 +126,7 @@ export class LiveRecorder extends EventTarget {
     // shown the user an error and can't continue from this state.
     this.cleanup();
     this.setState("error");
-    this.dispatchEvent(
-      new CustomEvent(EVENT_TARGETS.error, { detail: { message, recoverable } }),
-    );
+    this.dispatchEvent(new CustomEvent(EVENT_TARGETS.error, { detail: { message, recoverable } }));
   }
 
   async start(): Promise<void> {
@@ -178,7 +176,10 @@ export class LiveRecorder extends EventTarget {
     const sampleRate = this.opts.sampleRate ?? 16000;
     // AudioContext doesn't accept any sample rate on all browsers — pass it
     // as a hint, the browser may use a different rate.
-    this.audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)({
+    this.audioCtx = new (
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    )({
       sampleRate,
     });
     await this.audioCtx.resume();
@@ -203,7 +204,11 @@ export class LiveRecorder extends EventTarget {
         this.ws.send(buf);
         chunksSent++;
         if (chunksSent === 1 || chunksSent % 50 === 0) {
-          console.debug("[live-recorder] audio chunks sent", chunksSent, `(${buf.byteLength}B each)`);
+          console.debug(
+            "[live-recorder] audio chunks sent",
+            chunksSent,
+            `(${buf.byteLength}B each)`,
+          );
         }
       } else if (this.ws) {
         console.warn("[live-recorder] tried to send audio but WS not open", this.ws.readyState);
@@ -216,9 +221,7 @@ export class LiveRecorder extends EventTarget {
         sumSq += v * v;
       }
       const rms = Math.sqrt(sumSq / int.length);
-      this.dispatchEvent(
-        new CustomEvent(EVENT_TARGETS.level, { detail: Math.min(rms * 4, 1) }),
-      );
+      this.dispatchEvent(new CustomEvent(EVENT_TARGETS.level, { detail: Math.min(rms * 4, 1) }));
     };
 
     source.connect(this.workletNode);
@@ -267,7 +270,14 @@ export class LiveRecorder extends EventTarget {
 
   private handleWsMessage(e: MessageEvent): void {
     if (typeof e.data !== "string") return; // ignore binary echoes
-    let msg: { type?: string; transcript?: string; end_of_turn?: boolean; code?: string; message?: string; error?: string };
+    let msg: {
+      type?: string;
+      transcript?: string;
+      end_of_turn?: boolean;
+      code?: string;
+      message?: string;
+      error?: string;
+    };
     try {
       msg = JSON.parse(e.data) as typeof msg;
     } catch (err) {
@@ -287,12 +297,7 @@ export class LiveRecorder extends EventTarget {
     // "error" (lower), or simply a payload with an `error`/`code` field and
     // no type. Surface the first one we see — emitError calls cleanup() so
     // the mic is released immediately.
-    if (
-      msg.type === "Error" ||
-      msg.type === "error" ||
-      msg.error ||
-      (msg.code && msg.message)
-    ) {
+    if (msg.type === "Error" || msg.type === "error" || msg.error || (msg.code && msg.message)) {
       const detail = msg.message ?? msg.error ?? `code ${msg.code ?? "unknown"}`;
       this.emitError(`Transcription error: ${detail}`, false);
       return;
@@ -416,7 +421,10 @@ export class LiveRecorder extends EventTarget {
       else resolve(new Blob(this.blobChunks, { type: this.blobMime }));
     });
 
-    const totalMs = this.state === "paused" ? this.accumulatedMs : this.accumulatedMs + (Date.now() - this.startedAt);
+    const totalMs =
+      this.state === "paused"
+        ? this.accumulatedMs
+        : this.accumulatedMs + (Date.now() - this.startedAt);
     const result: RecorderResult = {
       blob: finalBlob,
       mime: this.blobMime,
@@ -449,10 +457,24 @@ export class LiveRecorder extends EventTarget {
       if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
         this.mediaRecorder.stop();
       }
-    } catch { /* ignore */ }
-    try { this.workletNode?.port.close(); } catch { /* ignore */ }
-    try { this.workletNode?.disconnect(); } catch { /* ignore */ }
-    try { this.audioCtx?.close(); } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
+    try {
+      this.workletNode?.port.close();
+    } catch {
+      /* ignore */
+    }
+    try {
+      this.workletNode?.disconnect();
+    } catch {
+      /* ignore */
+    }
+    try {
+      this.audioCtx?.close();
+    } catch {
+      /* ignore */
+    }
     // Stop every track so the browser's "recording" indicator clears.
     try {
       this.stream?.getTracks().forEach((t) => {
@@ -461,8 +483,14 @@ export class LiveRecorder extends EventTarget {
         // a paused MediaRecorder we couldn't stop above) keeps it alive.
         this.stream?.removeTrack(t);
       });
-    } catch { /* ignore */ }
-    try { this.ws?.close(); } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
+    try {
+      this.ws?.close();
+    } catch {
+      /* ignore */
+    }
     if (this.workletUrl) {
       URL.revokeObjectURL(this.workletUrl);
       this.workletUrl = null;

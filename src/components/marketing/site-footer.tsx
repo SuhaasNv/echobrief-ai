@@ -46,9 +46,7 @@ export function SiteFooter() {
         </div>
         {COLUMNS.map((c) => (
           <div key={c.title}>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground/70">
-              {c.title}
-            </p>
+            <p className="text-xs uppercase tracking-widest text-muted-foreground/70">{c.title}</p>
             <ul className="mt-4 space-y-2.5">
               {c.links.map((l) => (
                 <li key={l.label}>
@@ -76,9 +74,7 @@ export function SiteFooter() {
       </div>
       <div className="mx-auto flex flex-col items-start justify-between gap-2 border-t border-border/60 px-6 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center max-w-6xl">
         <span>© {new Date().getFullYear()} EchoBrief Labs</span>
-        <span className="font-mono">
-          Built with TanStack Start · OpenAI · AssemblyAI · Railway
-        </span>
+        <span className="font-mono">Built with TanStack Start · OpenAI · AssemblyAI · Railway</span>
       </div>
     </footer>
   );

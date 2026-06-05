@@ -6,7 +6,8 @@
  */
 
 const API_BASE_URL =
-  (typeof window !== "undefined" && (window as { __ECHOBRIEF_API_URL__?: string }).__ECHOBRIEF_API_URL__) ||
+  (typeof window !== "undefined" &&
+    (window as { __ECHOBRIEF_API_URL__?: string }).__ECHOBRIEF_API_URL__) ||
   (import.meta.env?.VITE_API_URL as string | undefined) ||
   "/api/v1";
 
@@ -65,7 +66,10 @@ async function apiRequestInternal<T>(
   opts: RequestOptions,
   isRetry: boolean,
 ): Promise<T> {
-  const url = new URL(`${API_BASE_URL}${path}`, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+  const url = new URL(
+    `${API_BASE_URL}${path}`,
+    typeof window !== "undefined" ? window.location.origin : "http://localhost",
+  );
   if (opts.query) {
     for (const [k, v] of Object.entries(opts.query)) {
       if (v !== undefined && v !== null) url.searchParams.set(k, String(v));

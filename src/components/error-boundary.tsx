@@ -1,9 +1,9 @@
 /**
  * React Error Boundary
- * 
+ *
  * Catches unhandled errors in the component tree and displays a fallback UI.
  * Prevents the entire app from crashing due to component errors.
- * 
+ *
  * Usage: Wrap your app or route components
  * <ErrorBoundary>
  *   <YourApp />
@@ -25,10 +25,7 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-export class ErrorBoundary extends React.Component<
-  ErrorBoundaryProps,
-  ErrorBoundaryState
-> {
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -88,11 +85,10 @@ export class ErrorBoundary extends React.Component<
 
             {/* Error message */}
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold tracking-tight">
-                Something went wrong
-              </h1>
+              <h1 className="text-2xl font-bold tracking-tight">Something went wrong</h1>
               <p className="text-sm text-muted-foreground">
-                An unexpected error occurred. You can try reloading the page or return to the home screen.
+                An unexpected error occurred. You can try reloading the page or return to the home
+                screen.
               </p>
             </div>
 
@@ -112,19 +108,11 @@ export class ErrorBoundary extends React.Component<
 
             {/* Action buttons */}
             <div className="flex gap-3">
-              <Button
-                onClick={this.handleReset}
-                variant="outline"
-                className="flex-1"
-              >
+              <Button onClick={this.handleReset} variant="outline" className="flex-1">
                 <RefreshCcw className="mr-2 h-4 w-4" />
                 Try again
               </Button>
-              <Button
-                onClick={this.handleGoHome}
-                variant="default"
-                className="flex-1"
-              >
+              <Button onClick={this.handleGoHome} variant="default" className="flex-1">
                 <Home className="mr-2 h-4 w-4" />
                 Go home
               </Button>

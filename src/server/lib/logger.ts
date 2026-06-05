@@ -1,13 +1,13 @@
 /**
  * Security event logging service.
- * 
+ *
  * Centralized logging for security-relevant events:
  * - Authentication failures
  * - Quota bypass attempts
  * - Rate limit violations
  * - Prompt injection detections
  * - Cost spikes
- * 
+ *
  * Usage:
  *   import { logSecurityEvent, logCostSpike } from "./logger";
  *   logSecurityEvent({ type: "quota_bypass_attempt", userId, details: {...} });
@@ -29,12 +29,12 @@ export interface SecurityEvent {
   userId?: string;
   ip?: string;
   requestId?: string;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
 }
 
 /**
  * Log a security event.
- * 
+ *
  * Logs to:
  * - Console (always, for local debugging and container logs)
  * - Sentry (if configured, for alerting and investigation)
@@ -45,17 +45,14 @@ export function logSecurityEvent(event: SecurityEvent) {
     ...event,
     timestamp: new Date().toISOString(),
   };
-  
+
   // Log to console (structured JSON for easy parsing)
   console.warn("[SECURITY]", JSON.stringify(logEntry));
-  
+
   // Send to Sentry for alerting
   if (isInitialized()) {
-    captureMessage(
-      `Security Event: ${event.type}`,
-      "warning"
-    );
-    
+    captureMessage(`Security Event: ${event.type}`, "warning");
+
     // Attach full context
     Sentry.setContext("security_event", logEntry);
   }
@@ -68,7 +65,7 @@ export function logCostSpike(
   userId: string,
   costUsd: number,
   budgetUsd: number,
-  period: string = "daily"
+  period: string = "daily",
 ) {
   logSecurityEvent({
     type: "cost_spike",
@@ -91,7 +88,7 @@ export function logRateLimit(
   identifier: string,
   count: number,
   limit: number,
-  ip?: string
+  ip?: string,
 ) {
   logSecurityEvent({
     type: "rate_limit_exceeded",
@@ -111,9 +108,9 @@ export function logRateLimit(
  */
 export function logQuotaBypass(
   userId: string,
-  attemptedValue: any,
+  attemptedValue: unknown,
   reason: string,
-  requestId?: string
+  requestId?: string,
 ) {
   logSecurityEvent({
     type: "quota_bypass_attempt",
@@ -134,7 +131,7 @@ export function logPromptInjection(
   userId: string,
   pattern: string,
   match: string,
-  inputLength: number
+  inputLength: number,
 ) {
   logSecurityEvent({
     type: "prompt_injection_detected",
@@ -150,11 +147,7 @@ export function logPromptInjection(
 /**
  * Log an authentication failure.
  */
-export function logAuthFailure(
-  reason: string,
-  identifier?: string,
-  ip?: string
-) {
+export function logAuthFailure(reason: string, identifier?: string, ip?: string) {
   logSecurityEvent({
     type: "auth_failure",
     userId: identifier,

@@ -123,7 +123,6 @@ export function AvatarUpload({
         } ${disabled || busy ? "cursor-not-allowed opacity-60" : ""}`}
       >
         {currentUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={currentUrl}
             alt="Profile"
@@ -143,11 +142,7 @@ export function AvatarUpload({
           whileHover={busy ? undefined : { opacity: 1 }}
           className="absolute inset-0 flex items-center justify-center bg-foreground/55 text-background"
         >
-          {busy ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <Camera className="h-5 w-5" />
-          )}
+          {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
         </motion.div>
       </div>
 

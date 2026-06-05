@@ -40,13 +40,13 @@ EchoBrief runs on a fully edge-native stack. The guiding principles behind every
 
 ### Core Framework
 
-| Technology | Version | Role |
-|-----------|---------|------|
-| React | 19.2 | UI rendering |
-| TypeScript | 5.8 | Type safety across all code |
-| TanStack Start | 1.x | Meta-framework: SSR, routing, data loading |
-| TanStack Router | 1.x | File-based routing with type-safe links |
-| TanStack Query | 5.x | Server state management, caching, background refetch |
+| Technology      | Version | Role                                                 |
+| --------------- | ------- | ---------------------------------------------------- |
+| React           | 19.2    | UI rendering                                         |
+| TypeScript      | 5.8     | Type safety across all code                          |
+| TanStack Start  | 1.x     | Meta-framework: SSR, routing, data loading           |
+| TanStack Router | 1.x     | File-based routing with type-safe links              |
+| TanStack Query  | 5.x     | Server state management, caching, background refetch |
 
 **Why TanStack Start over Next.js:**  
 TanStack Start is Cloudflare Workers-native. Next.js requires either Vercel or significant adapter work for edge deployment. TanStack Start ships a single Worker with SSR + API routes collocated — no separate deployment targets. File-based routing is equivalent in DX.
@@ -58,14 +58,14 @@ React 19 ships concurrent features and improved `use()` hook for async data. Tan
 
 ### Styling
 
-| Technology | Version | Role |
-|-----------|---------|------|
-| Tailwind CSS | 4.2 | Utility-first styling |
-| OKLCH color space | — | Perceptually-uniform color tokens |
-| tw-animate-css | 1.3 | Animation utilities |
-| tailwind-merge | 3.5 | Conflict-free class merging |
-| clsx | 2.1 | Conditional class composition |
-| class-variance-authority | 0.7 | Component variant management |
+| Technology               | Version | Role                              |
+| ------------------------ | ------- | --------------------------------- |
+| Tailwind CSS             | 4.2     | Utility-first styling             |
+| OKLCH color space        | —       | Perceptually-uniform color tokens |
+| tw-animate-css           | 1.3     | Animation utilities               |
+| tailwind-merge           | 3.5     | Conflict-free class merging       |
+| clsx                     | 2.1     | Conditional class composition     |
+| class-variance-authority | 0.7     | Component variant management      |
 
 **Tailwind 4 over 3:**  
 Tailwind 4 ships a Vite plugin (no PostCSS required), native CSS layer support, and significantly faster build times. Design tokens are CSS variables — no Tailwind config object, just `styles.css`.
@@ -76,16 +76,16 @@ Tailwind 4 ships a Vite plugin (no PostCSS required), native CSS layer support, 
 
 ### UI Components
 
-| Technology | Version | Role |
-|-----------|---------|------|
-| shadcn/ui | latest | Composable component system |
-| Radix UI | 1.x | Accessible headless primitives under shadcn |
-| Lucide React | 0.575 | 450+ icon set |
-| Framer Motion (motion/react) | 12.38 | Animations |
-| Recharts | 3.8 | Data visualization (charts, graphs) |
-| Vaul | 1.1 | Drawer primitives |
-| Embla Carousel | 8.6 | Carousel |
-| react-resizable-panels | 4.6 | Resizable panel layouts |
+| Technology                   | Version | Role                                        |
+| ---------------------------- | ------- | ------------------------------------------- |
+| shadcn/ui                    | latest  | Composable component system                 |
+| Radix UI                     | 1.x     | Accessible headless primitives under shadcn |
+| Lucide React                 | 0.575   | 450+ icon set                               |
+| Framer Motion (motion/react) | 12.38   | Animations                                  |
+| Recharts                     | 3.8     | Data visualization (charts, graphs)         |
+| Vaul                         | 1.1     | Drawer primitives                           |
+| Embla Carousel               | 8.6     | Carousel                                    |
+| react-resizable-panels       | 4.6     | Resizable panel layouts                     |
 
 **shadcn/ui vs. fully custom:**  
 shadcn/ui generates component code directly into the project (not a black-box node_module). We own the code, can modify it, and it's always ejectable. Built on Radix = WCAG 2.1 accessibility baked in for free (focus management, keyboard navigation, ARIA).
@@ -97,11 +97,11 @@ Always `import { motion } from 'motion/react'` — NOT `from 'framer-motion'`. T
 
 ### Forms & Validation
 
-| Technology | Version | Role |
-|-----------|---------|------|
-| React Hook Form | 7.71 | Performant, uncontrolled form state |
-| Zod | 3.24 | Schema validation (client + server shared schemas) |
-| @hookform/resolvers | 5.2 | Bridge between RHF and Zod |
+| Technology          | Version | Role                                               |
+| ------------------- | ------- | -------------------------------------------------- |
+| React Hook Form     | 7.71    | Performant, uncontrolled form state                |
+| Zod                 | 3.24    | Schema validation (client + server shared schemas) |
+| @hookform/resolvers | 5.2     | Bridge between RHF and Zod                         |
 
 **One schema, two uses:**  
 Define Zod schemas once in `src/lib/schemas/`. Use them for client-side form validation AND server-side API input validation. No duplication, guaranteed consistency.
@@ -110,9 +110,9 @@ Define Zod schemas once in `src/lib/schemas/`. Use them for client-side form val
 
 ### Fonts
 
-| Font | Use |
-|------|-----|
-| Inter | Body text, UI elements |
+| Font           | Use                                       |
+| -------------- | ----------------------------------------- |
+| Inter          | Body text, UI elements                    |
 | JetBrains Mono | Code blocks, timestamps, technical values |
 
 Loaded via CSS `@font-face` with `font-display: swap` — no layout shift on load.
@@ -123,11 +123,11 @@ Loaded via CSS `@font-face` with `font-display: swap` — no layout shift on loa
 
 ### API Framework
 
-| Technology | Role |
-|-----------|------|
-| Hono.js | HTTP router running on Cloudflare Workers |
-| TypeScript | All handler code typed end-to-end |
-| Zod | Request body + query param validation at API boundaries |
+| Technology | Role                                                    |
+| ---------- | ------------------------------------------------------- |
+| Hono.js    | HTTP router running on Cloudflare Workers               |
+| TypeScript | All handler code typed end-to-end                       |
+| Zod        | Request body + query param validation at API boundaries |
 
 **Why Hono over Express/Fastify:**  
 Hono is purpose-built for edge runtimes (Cloudflare Workers, Deno Deploy, Bun). Zero Node.js dependencies. 14KB bundle. First-class TypeScript types for request/response. Middleware ecosystem (auth, cors, rate limiting) works on Workers without polyfills.
@@ -139,11 +139,11 @@ tRPC couples the client and server too tightly — makes it hard to later expose
 
 ### File Upload
 
-| Technology | Role |
-|-----------|------|
-| Cloudflare R2 | Object storage (audio files) |
-| Presigned URLs | Direct client-to-R2 upload (no server proxy) |
-| Multipart upload | Chunked upload for files > 100MB |
+| Technology       | Role                                         |
+| ---------------- | -------------------------------------------- |
+| Cloudflare R2    | Object storage (audio files)                 |
+| Presigned URLs   | Direct client-to-R2 upload (no server proxy) |
+| Multipart upload | Chunked upload for files > 100MB             |
 
 **Upload flow:**  
 Client requests a presigned PUT URL from the API → uploads directly to R2 → sends confirmation to API → API triggers processing job. The app server never touches the audio binary, keeping Workers memory usage near zero.
@@ -155,13 +155,14 @@ Client requests a presigned PUT URL from the API → uploads directly to R2 → 
 
 ### Job Queue
 
-| Technology | Role |
-|-----------|------|
-| Cloudflare Queues | Async job dispatch and delivery |
+| Technology                    | Role                               |
+| ----------------------------- | ---------------------------------- |
+| Cloudflare Queues             | Async job dispatch and delivery    |
 | Cloudflare Workers (Consumer) | Job processor (AI pipeline worker) |
-| Dead Letter Queue | Failed jobs after 3 retries |
+| Dead Letter Queue             | Failed jobs after 3 retries        |
 
 **Processing pipeline jobs:**
+
 ```
 queue: echobrief-processing
 payload: { meeting_id, user_id, audio_url, language }
@@ -176,10 +177,10 @@ Cloudflare Queues is zero-ops and integrates natively with Workers. No Redis ins
 
 ### Email
 
-| Technology | Role |
-|-----------|------|
-| Resend | Transactional email (processing complete, invite, action item digest) |
-| React Email | Email template authoring in JSX |
+| Technology  | Role                                                                  |
+| ----------- | --------------------------------------------------------------------- |
+| Resend      | Transactional email (processing complete, invite, action item digest) |
+| React Email | Email template authoring in JSX                                       |
 
 ---
 
@@ -187,23 +188,24 @@ Cloudflare Queues is zero-ops and integrates natively with Workers. No Redis ins
 
 ### Speech-to-Text
 
-| Provider | Model | Use Case |
-|----------|-------|----------|
-| Deepgram | Nova-3 | Primary STT for all uploaded audio |
-| OpenAI Whisper | whisper-1 | Fallback if Deepgram fails |
+| Provider       | Model     | Use Case                           |
+| -------------- | --------- | ---------------------------------- |
+| Deepgram       | Nova-3    | Primary STT for all uploaded audio |
+| OpenAI Whisper | whisper-1 | Fallback if Deepgram fails         |
 
 **Why Deepgram over Whisper:**
 
-| | Deepgram Nova-3 | OpenAI Whisper API |
-|-|-----------------|-------------------|
-| Speed (1hr audio) | ~2–3 min | ~5–8 min |
-| Cost | $0.0043/min | $0.006/min |
-| Diarization | Native, accurate | Not supported natively |
-| Streaming (V3) | Yes (WebSocket) | No |
-| Word timestamps | Yes | Yes |
-| Accuracy (English) | 97%+ | 96%+ |
+|                    | Deepgram Nova-3  | OpenAI Whisper API     |
+| ------------------ | ---------------- | ---------------------- |
+| Speed (1hr audio)  | ~2–3 min         | ~5–8 min               |
+| Cost               | $0.0043/min      | $0.006/min             |
+| Diarization        | Native, accurate | Not supported natively |
+| Streaming (V3)     | Yes (WebSocket)  | No                     |
+| Word timestamps    | Yes              | Yes                    |
+| Accuracy (English) | 97%+             | 96%+                   |
 
 Deepgram features used:
+
 - `model=nova-3` — best accuracy
 - `diarize=true` — speaker labeling
 - `smart_format=true` — punctuation, capitalization, numerals
@@ -214,18 +216,20 @@ Deepgram features used:
 
 ### Language Models
 
-| Provider | Model | Use Case | Why |
-|----------|-------|----------|-----|
-| Anthropic | Claude 3.5 Sonnet | Summary, action items, Q&A, email gen | Best reasoning; structured JSON via tool_use is deterministic |
-| Anthropic | Claude 3.5 Haiku | Meeting score, re-ranking | 10x cheaper than Sonnet; good for classification/scoring tasks |
-| OpenAI | text-embedding-3-small | Vector embeddings | Best cost/quality ratio for embeddings; 1536d |
+| Provider  | Model                  | Use Case                              | Why                                                            |
+| --------- | ---------------------- | ------------------------------------- | -------------------------------------------------------------- |
+| Anthropic | Claude 3.5 Sonnet      | Summary, action items, Q&A, email gen | Best reasoning; structured JSON via tool_use is deterministic  |
+| Anthropic | Claude 3.5 Haiku       | Meeting score, re-ranking             | 10x cheaper than Sonnet; good for classification/scoring tasks |
+| OpenAI    | text-embedding-3-small | Vector embeddings                     | Best cost/quality ratio for embeddings; 1536d                  |
 
 **Why Claude over GPT-4:**
+
 - `tool_use` (Anthropic) produces more consistent structured JSON output than GPT-4's `function_calling` — critical for action item extraction where schema must be exact
 - 200k context window handles long meetings without chunking in most cases
 - Streaming API is clean and well-documented
 
 **Prompt engineering principles:**
+
 - Always use `tool_use` for structured outputs (never parse freeform JSON from text)
 - Include explicit "I don't know" instructions — prevent hallucination in meeting Q&A
 - For long meetings: map-reduce pattern (summarize chunks → synthesize)
@@ -246,6 +250,7 @@ Re-ranking search results    Haiku 3.5          Fast, cheap classifier
 ```
 
 **Cost controls:**
+
 - Batch summary + action item extraction in one API call (saves ~50% on Sonnet costs)
 - Cache meeting summaries — never re-generate unless transcript changes
 - Rate limit: 100 API calls/user/day (free tier), 1000/day (paid)
@@ -254,20 +259,22 @@ Re-ranking search results    Haiku 3.5          Fast, cheap classifier
 
 ### Vector Search
 
-| Technology | Role |
-|-----------|------|
-| pgvector (PostgreSQL extension) | Vector storage and similarity search |
-| OpenAI text-embedding-3-small | Generating 1536d embeddings |
-| IVFFlat index | Approximate nearest-neighbor search at scale |
+| Technology                      | Role                                         |
+| ------------------------------- | -------------------------------------------- |
+| pgvector (PostgreSQL extension) | Vector storage and similarity search         |
+| OpenAI text-embedding-3-small   | Generating 1536d embeddings                  |
+| IVFFlat index                   | Approximate nearest-neighbor search at scale |
 
 **Chunking strategy:**
+
 - Chunk size: ~200 words per chunk
 - Overlap: 50 words (prevents losing context at boundaries)
 - Each chunk stores: `content`, `start_sec`, `end_sec`, `meeting_id`, `user_id`, `embedding`
 
 **Index config:**
+
 ```sql
-CREATE INDEX ON transcript_chunks 
+CREATE INDEX ON transcript_chunks
   USING ivfflat (embedding vector_cosine_ops)
   WITH (lists = 100);
 -- lists = sqrt(row_count) is the rule of thumb
@@ -275,6 +282,7 @@ CREATE INDEX ON transcript_chunks
 ```
 
 **Query flow:**
+
 ```
 1. Embed query (OpenAI, ~50ms)
 2. ANN search: top-20 chunks by cosine similarity
@@ -290,14 +298,15 @@ CREATE INDEX ON transcript_chunks
 
 ### Primary Database
 
-| Technology | Version | Role |
-|-----------|---------|------|
-| PostgreSQL | 15+ | Primary relational database |
-| Supabase | — | Managed Postgres hosting + connection pooling |
-| pgvector | 0.7+ | Vector similarity search extension |
-| PgBouncer | — | Connection pooling (provided by Supabase) |
+| Technology | Version | Role                                          |
+| ---------- | ------- | --------------------------------------------- |
+| PostgreSQL | 15+     | Primary relational database                   |
+| Supabase   | —       | Managed Postgres hosting + connection pooling |
+| pgvector   | 0.7+    | Vector similarity search extension            |
+| PgBouncer  | —       | Connection pooling (provided by Supabase)     |
 
 **Why Supabase:**
+
 - Managed PostgreSQL with zero ops overhead
 - pgvector built-in
 - Row-Level Security (RLS) enforced at DB level — multi-tenant security without application-layer guards
@@ -305,6 +314,7 @@ CREATE INDEX ON transcript_chunks
 - Supabase Auth integrates directly — user JWTs verified by PostgreSQL RLS policies
 
 **Row-Level Security policy pattern:**
+
 ```sql
 -- Users can only see their own meetings
 CREATE POLICY "users_own_meetings" ON meetings
@@ -325,11 +335,12 @@ CREATE POLICY "workspace_meetings" ON meetings
 
 ### Object Storage
 
-| Technology | Role |
-|-----------|------|
+| Technology    | Role               |
+| ------------- | ------------------ |
 | Cloudflare R2 | Audio file storage |
 
 **Why R2 over S3:**
+
 - Zero egress fees (S3 charges ~$0.09/GB egress — significant for audio streaming)
 - Native Cloudflare Workers binding — no SDK, no credentials, no HTTP calls
 - S3-compatible API — can swap to S3 without code changes if needed
@@ -342,12 +353,13 @@ Proposal: keep audio files for 90 days post-upload, then delete (transcripts are
 
 ### Caching
 
-| Technology | Role |
-|-----------|------|
-| Cloudflare KV | Session tokens, rate limit counters, feature flags |
+| Technology     | Role                                                     |
+| -------------- | -------------------------------------------------------- |
+| Cloudflare KV  | Session tokens, rate limit counters, feature flags       |
 | TanStack Query | Client-side response caching with stale-while-revalidate |
 
 **KV usage:**
+
 - Rate limiting counters (key: `ratelimit:{user_id}:{window}`, TTL: 60s)
 - Processing job status cache (key: `job:{meeting_id}`, TTL: 5 minutes)
 - Feature flags (key: `feature:{name}`, read-heavy, write-rarely)
@@ -358,16 +370,17 @@ Proposal: keep audio files for 90 days post-upload, then delete (transcripts are
 
 ### Hosting
 
-| Service | What runs on it |
-|---------|----------------|
+| Service            | What runs on it                                   |
+| ------------------ | ------------------------------------------------- |
 | Cloudflare Workers | SSR frontend + API handlers + AI pipeline workers |
-| Cloudflare R2 | Audio file storage |
-| Cloudflare Queues | Async job dispatch |
-| Cloudflare KV | Edge cache + rate limiting |
-| Supabase | PostgreSQL + Auth + Realtime |
-| Resend | Transactional email |
+| Cloudflare R2      | Audio file storage                                |
+| Cloudflare Queues  | Async job dispatch                                |
+| Cloudflare KV      | Edge cache + rate limiting                        |
+| Supabase           | PostgreSQL + Auth + Realtime                      |
+| Resend             | Transactional email                               |
 
 **Why fully on Cloudflare:**
+
 - Workers have zero cold starts — critical for API endpoints users hit after uploading
 - Global edge network — Workers run in ~300 PoPs, near every user
 - Integrated services (R2, Queues, KV) eliminate cross-vendor networking latency
@@ -377,14 +390,15 @@ Proposal: keep audio files for 90 days post-upload, then delete (transcripts are
 
 ### Build & Bundler
 
-| Technology | Version | Role |
-|-----------|---------|------|
-| Vite | 7.3 | Frontend bundler |
-| @lovable.dev/vite-tanstack-config | — | Pre-configured Vite preset for TanStack Start |
-| @cloudflare/vite-plugin | 1.25 | Cloudflare Workers build target |
-| Bun | 1.x | Package manager + script runner |
+| Technology                        | Version | Role                                          |
+| --------------------------------- | ------- | --------------------------------------------- |
+| Vite                              | 7.3     | Frontend bundler                              |
+| @lovable.dev/vite-tanstack-config | —       | Pre-configured Vite preset for TanStack Start |
+| @cloudflare/vite-plugin           | 1.25    | Cloudflare Workers build target               |
+| Bun                               | 1.x     | Package manager + script runner               |
 
 **Why Bun over npm/pnpm:**
+
 - 3–30x faster installs than npm
 - `bunx` replaces `npx` without downloading packages every run
 - TypeScript runs natively without `ts-node`
@@ -422,11 +436,11 @@ Branch previews: Cloudflare Pages (for PR previews — separate from Workers pro
 
 ### Environments
 
-| Environment | Branch | URL |
-|------------|--------|-----|
-| Development | local | localhost:3000 |
-| Preview | pull requests | auto-generated via Cloudflare |
-| Production | main | echobrief.ai (TBD) |
+| Environment | Branch        | URL                           |
+| ----------- | ------------- | ----------------------------- |
+| Development | local         | localhost:3000                |
+| Preview     | pull requests | auto-generated via Cloudflare |
+| Production  | main          | echobrief.ai (TBD)            |
 
 **Environment variables:**  
 Managed via Cloudflare Secrets (production) and `.dev.vars` (local). Never committed to git.
@@ -449,14 +463,15 @@ R2_BUCKET_NAME=
 
 ### Authentication
 
-| Technology | Role |
-|-----------|------|
-| Supabase Auth | Identity provider + session management |
-| Google OAuth 2.0 | Social sign-in |
-| JWT | Session tokens |
-| httpOnly cookies | Token storage (no localStorage) |
+| Technology       | Role                                   |
+| ---------------- | -------------------------------------- |
+| Supabase Auth    | Identity provider + session management |
+| Google OAuth 2.0 | Social sign-in                         |
+| JWT              | Session tokens                         |
+| httpOnly cookies | Token storage (no localStorage)        |
 
 **Session flow:**
+
 ```
 User clicks "Sign in with Google"
     ↓
@@ -480,15 +495,15 @@ localStorage is accessible to any JavaScript on the page — XSS attack reads to
 
 ### API Security
 
-| Concern | Mitigation |
-|---------|-----------|
-| Unauthorized access | JWT required on all `/api/*` routes; Supabase RLS enforces row-level isolation |
-| Rate limiting | Per-user rate limits via Cloudflare KV (100 req/min general, 10 req/min AI endpoints) |
-| CORS | Strict origin allowlist in Hono CORS middleware |
-| Input validation | Zod schemas on all API request bodies and query params |
-| SQL injection | Parameterized queries via Supabase client (never raw string interpolation) |
-| Secrets | All API keys in Cloudflare Secrets, never in code or `.env` committed to git |
-| Audio access | R2 files only accessible via short-lived presigned URLs (1-hour TTL) |
+| Concern             | Mitigation                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| Unauthorized access | JWT required on all `/api/*` routes; Supabase RLS enforces row-level isolation        |
+| Rate limiting       | Per-user rate limits via Cloudflare KV (100 req/min general, 10 req/min AI endpoints) |
+| CORS                | Strict origin allowlist in Hono CORS middleware                                       |
+| Input validation    | Zod schemas on all API request bodies and query params                                |
+| SQL injection       | Parameterized queries via Supabase client (never raw string interpolation)            |
+| Secrets             | All API keys in Cloudflare Secrets, never in code or `.env` committed to git          |
+| Audio access        | R2 files only accessible via short-lived presigned URLs (1-hour TTL)                  |
 
 ### Data Privacy
 
@@ -503,15 +518,16 @@ localStorage is accessible to any JavaScript on the page — XSS attack reads to
 
 ### V2 Integrations (planned)
 
-| Integration | API | Use Case |
-|------------|-----|----------|
-| Notion | Notion API v1 | Export action items as database entries |
-| Linear | Linear API (GraphQL) | Export action items as issues |
-| Jira | Jira REST API v3 | Export action items as tickets |
-| Google Calendar | Google Calendar API v3 | Export deadlines as events |
-| Trello | Trello REST API | Export action items as cards |
+| Integration     | API                    | Use Case                                |
+| --------------- | ---------------------- | --------------------------------------- |
+| Notion          | Notion API v1          | Export action items as database entries |
+| Linear          | Linear API (GraphQL)   | Export action items as issues           |
+| Jira            | Jira REST API v3       | Export action items as tickets          |
+| Google Calendar | Google Calendar API v3 | Export deadlines as events              |
+| Trello          | Trello REST API        | Export action items as cards            |
 
 **OAuth pattern (same for all):**
+
 ```
 User clicks "Connect Notion"
     ↓
@@ -527,14 +543,15 @@ User sees "Notion connected" in settings
 ```
 
 **Export schema contract:**
+
 ```typescript
 interface ExportableActionItem {
-  title: string          // → task name in all providers
-  description: string    // → task body/notes
-  assignee?: string      // → assignee (best-effort match by name)
-  due_date?: string      // → ISO date string
-  source_meeting: string // → link to EchoBrief meeting
-  source_timestamp: number // → seconds offset in meeting
+  title: string; // → task name in all providers
+  description: string; // → task body/notes
+  assignee?: string; // → assignee (best-effort match by name)
+  due_date?: string; // → ISO date string
+  source_meeting: string; // → link to EchoBrief meeting
+  source_timestamp: number; // → seconds offset in meeting
 }
 ```
 
@@ -544,13 +561,14 @@ interface ExportableActionItem {
 
 ### Logging
 
-| Technology | Role |
-|-----------|------|
-| Cloudflare Workers Logs | Request logs, error traces |
-| Sentry (planned) | Error tracking + performance monitoring |
-| Custom structured logs | AI pipeline step logging (cost, latency, model used) |
+| Technology              | Role                                                 |
+| ----------------------- | ---------------------------------------------------- |
+| Cloudflare Workers Logs | Request logs, error traces                           |
+| Sentry (planned)        | Error tracking + performance monitoring              |
+| Custom structured logs  | AI pipeline step logging (cost, latency, model used) |
 
 **AI pipeline log structure:**
+
 ```json
 {
   "meeting_id": "uuid",
@@ -568,12 +586,12 @@ Every AI call is logged with cost and latency. This feeds a cost dashboard for t
 
 ### Error Handling
 
-| Layer | Strategy |
-|-------|---------|
-| Frontend | Error boundaries per route; user-facing messages via Sonner toasts |
-| API | Zod validation errors → 400 with field-level messages; unhandled → 500 with Sentry trace |
-| AI Pipeline | Retry with exponential backoff (3x); fallback provider; DLQ for permanent failures |
-| Upload | Chunked upload with per-chunk retry; resume support |
+| Layer       | Strategy                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------- |
+| Frontend    | Error boundaries per route; user-facing messages via Sonner toasts                       |
+| API         | Zod validation errors → 400 with field-level messages; unhandled → 500 with Sentry trace |
+| AI Pipeline | Retry with exponential backoff (3x); fallback provider; DLQ for permanent failures       |
+| Upload      | Chunked upload with per-chunk retry; resume support                                      |
 
 ---
 
@@ -581,13 +599,14 @@ Every AI call is logged with cost and latency. This feeds a cost dashboard for t
 
 ### Code Quality
 
-| Tool | Config | Role |
-|------|--------|------|
-| TypeScript | `strict: true` | Type checking |
-| ESLint | `eslint.config.js` | Linting (flat config format) |
-| Prettier | `.prettierrc` | Code formatting |
+| Tool       | Config             | Role                         |
+| ---------- | ------------------ | ---------------------------- |
+| TypeScript | `strict: true`     | Type checking                |
+| ESLint     | `eslint.config.js` | Linting (flat config format) |
+| Prettier   | `.prettierrc`      | Code formatting              |
 
 **TypeScript strict mode enforces:**
+
 - No implicit `any`
 - Strict null checks
 - No unchecked index access
@@ -624,6 +643,7 @@ import { AppShell } from '@/components/app/app-shell'
 ### Git Conventions
 
 **Branch naming:**
+
 ```
 feat/meeting-qa          # new feature
 fix/upload-chunk-retry   # bug fix
@@ -631,6 +651,7 @@ perf/vector-index-tune   # performance
 ```
 
 **Commit format (strict):**
+
 ```
 <type>: <description under 50 chars>
 
@@ -779,4 +800,4 @@ Browser (TanStack Query)
 
 ---
 
-*This document should be updated whenever a technology is added, replaced, or a significant architectural decision is made. Stale tech stack docs are worse than no tech stack docs.*
+_This document should be updated whenever a technology is added, replaced, or a significant architectural decision is made. Stale tech stack docs are worse than no tech stack docs._

@@ -1,12 +1,12 @@
 /**
  * Sentry monitoring middleware for Hono.
- * 
+ *
  * Tracks:
  * - Request errors (captured automatically)
  * - Response times (as metrics)
  * - Slow requests (logged as warnings)
  * - User context (from requireAuth middleware)
- * 
+ *
  * Mount AFTER requestId middleware, BEFORE routes.
  */
 
@@ -18,7 +18,7 @@ export const sentryMiddleware: MiddlewareHandler<AppBindings> = async (c, next) 
   const start = Date.now();
   const path = c.req.path;
   const method = c.req.method;
-  
+
   // Set Sentry context
   if (isInitialized()) {
     Sentry.setContext("request", {
@@ -27,7 +27,7 @@ export const sentryMiddleware: MiddlewareHandler<AppBindings> = async (c, next) 
       method,
       ip: c.req.header("x-forwarded-for") || c.req.header("x-real-ip"),
     });
-    
+
     // Set user context if available (populated by requireAuth)
     const user = c.get("user");
     if (user) {
@@ -37,7 +37,7 @@ export const sentryMiddleware: MiddlewareHandler<AppBindings> = async (c, next) 
       });
     }
   }
-  
+
   try {
     await next();
   } catch (error) {
@@ -47,24 +47,24 @@ export const sentryMiddleware: MiddlewareHandler<AppBindings> = async (c, next) 
       method,
       requestId: c.get("requestId"),
       userId: c.get("user")?.id,
-      workspaceId: c.get("workspace")?.id,
+      workspaceId: c.get("workspaceId"),
     });
-    
+
     // Re-throw to let errorHandler middleware handle response
     throw error;
   } finally {
     const duration = Date.now() - start;
     const status = c.res.status;
-    
+
     // Log slow requests
     if (duration > 1000) {
       console.warn(`[SLOW REQUEST] ${method} ${path} - ${duration}ms - ${status}`);
     }
-    
+
     // Track metrics (if Sentry enabled)
     if (isInitialized()) {
-      Sentry.metrics.distribution('api.response_time', duration, {
-        tags: {
+      Sentry.metrics.distribution("api.response_time", duration, {
+        attributes: {
           endpoint: path,
           method,
           status: String(status),
@@ -82,21 +82,21 @@ export const metricsMiddleware: MiddlewareHandler<AppBindings> = async (c, next)
   const start = Date.now();
   const path = c.req.path;
   const method = c.req.method;
-  
+
   await next();
-  
+
   const duration = Date.now() - start;
   const status = c.res.status;
-  
+
   // Log slow requests
   if (duration > 1000) {
     console.warn(`[SLOW REQUEST] ${method} ${path} - ${duration}ms - ${status}`);
   }
-  
+
   // Track metrics (if Sentry enabled)
   if (isInitialized()) {
-    Sentry.metrics.distribution('api.response_time', duration, {
-      tags: {
+    Sentry.metrics.distribution("api.response_time", duration, {
+      attributes: {
         endpoint: path,
         method,
         status: String(status),

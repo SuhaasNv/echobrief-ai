@@ -1,15 +1,16 @@
 import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Clock, FileAudio, Sparkles, CheckSquare, Upload, ArrowRight } from "lucide-react";
 import {
-  AreaChart,
-  Area,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  Tooltip,
-} from "recharts";
+  ArrowUpRight,
+  Clock,
+  FileAudio,
+  Sparkles,
+  CheckSquare,
+  Upload,
+  ArrowRight,
+} from "lucide-react";
+import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { useMe, useMeetings, useActionItems } from "@/lib/api/hooks";
 import { useLabels } from "@/lib/workspace-store";
 import { formatDate, formatDuration, getTodayFormatted } from "@/lib/date-utils";
@@ -72,30 +73,46 @@ function Dashboard() {
       delta: null,
       icon: CheckSquare,
     },
-    { label: "Hours transcribed", value: totalHours > 0 ? totalHours.toFixed(1) : "—", delta: null, icon: Clock },
+    {
+      label: "Hours transcribed",
+      value: totalHours > 0 ? totalHours.toFixed(1) : "—",
+      delta: null,
+      icon: Clock,
+    },
     { label: "AI summaries", value: "—", delta: null, icon: Sparkles },
   ];
 
   const recentMeetings = meetingsQuery.data?.items.slice(0, 4) ?? [];
   const openActions = openActionsQuery.data?.items.slice(0, 5) ?? [];
-  const meetingsReady = meetingsQuery.data?.items.filter((m) => m.status === "complete").length ?? 0;
+  const meetingsReady =
+    meetingsQuery.data?.items.filter((m) => m.status === "complete").length ?? 0;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">{today}</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
+            {today}
+          </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            {meQuery.data ? `Good to see you, ${firstName(meQuery.data.name, meQuery.data.email)}.` : "Welcome back."}
+            {meQuery.data
+              ? `Good to see you, ${firstName(meQuery.data.name, meQuery.data.email)}.`
+              : "Welcome back."}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {meetingsQuery.isLoading || openActionsQuery.isLoading ? (
               "Loading your workspace…"
             ) : (
               <>
-                You have <span className="text-foreground">{meetingsReady} {labels.meeting.singular.toLowerCase()}{meetingsReady === 1 ? "" : "s"} ready</span> and{" "}
+                You have{" "}
                 <span className="text-foreground">
-                  {openActions.length} {labels.actions.singular.toLowerCase()}{openActions.length === 1 ? "" : "s"}
+                  {meetingsReady} {labels.meeting.singular.toLowerCase()}
+                  {meetingsReady === 1 ? "" : "s"} ready
+                </span>{" "}
+                and{" "}
+                <span className="text-foreground">
+                  {openActions.length} {labels.actions.singular.toLowerCase()}
+                  {openActions.length === 1 ? "" : "s"}
                 </span>{" "}
                 waiting.
               </>
@@ -127,7 +144,9 @@ function Dashboard() {
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-semibold tracking-tight">{s.value}</span>
               {s.delta && (
-                <span className={`text-xs ${s.delta.startsWith("-") ? "text-muted-foreground" : "text-success"}`}>
+                <span
+                  className={`text-xs ${s.delta.startsWith("-") ? "text-muted-foreground" : "text-success"}`}
+                >
                   {s.delta}
                 </span>
               )}
@@ -144,7 +163,9 @@ function Dashboard() {
               <h3 className="text-base font-medium">Activity</h3>
               <p className="text-xs text-muted-foreground">Hours transcribed · last 7 days</p>
             </div>
-            <span className="rounded-full bg-accent px-2.5 py-1 font-mono text-[10px] text-muted-foreground">{weekHours.toFixed(1)} hrs</span>
+            <span className="rounded-full bg-accent px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
+              {weekHours.toFixed(1)} hrs
+            </span>
           </div>
           <div className="mt-6 h-56">
             <ResponsiveContainer width="100%" height="100%">
@@ -155,10 +176,19 @@ function Dashboard() {
                     <stop offset="100%" stopColor="oklch(0.68 0.16 255)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="d" tickLine={false} axisLine={false} stroke="oklch(0.62 0.012 264)" tick={{ fontSize: 11 }} />
+                <XAxis
+                  dataKey="d"
+                  tickLine={false}
+                  axisLine={false}
+                  stroke="oklch(0.62 0.012 264)"
+                  tick={{ fontSize: 11 }}
+                />
                 <YAxis hide />
                 <Tooltip
-                  formatter={(v) => [`${typeof v === "number" ? v.toFixed(2) : v} hrs`, "transcribed"]}
+                  formatter={(v) => [
+                    `${typeof v === "number" ? v.toFixed(2) : v} hrs`,
+                    "transcribed",
+                  ]}
                   cursor={{ stroke: "oklch(1 0 0 / 0.1)" }}
                   contentStyle={{
                     background: "oklch(0.17 0.009 264)",
@@ -167,7 +197,13 @@ function Dashboard() {
                     fontSize: 12,
                   }}
                 />
-                <Area type="monotone" dataKey="h" stroke="oklch(0.68 0.16 255)" strokeWidth={2} fill="url(#area)" />
+                <Area
+                  type="monotone"
+                  dataKey="h"
+                  stroke="oklch(0.68 0.16 255)"
+                  strokeWidth={2}
+                  fill="url(#area)"
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -176,18 +212,26 @@ function Dashboard() {
         <div className="rounded-xl border border-border/70 bg-surface p-6">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-medium">{labels.actions.plural}</h3>
-            <Link to="/app/action-items" className="text-xs text-muted-foreground hover:text-foreground">
+            <Link
+              to="/app/action-items"
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
               View all →
             </Link>
           </div>
-        {openActionsQuery.isLoading ? (
-          <div className="mt-6 flex justify-center"><LoadingSpinner size="md" /></div>
-        ) : openActions.length === 0 ? (
+          {openActionsQuery.isLoading ? (
+            <div className="mt-6 flex justify-center">
+              <LoadingSpinner size="md" />
+            </div>
+          ) : openActions.length === 0 ? (
             <p className="mt-6 text-center text-xs text-muted-foreground">No open actions.</p>
           ) : (
             <div className="mt-4 space-y-1.5">
               {openActions.map((a) => (
-                <div key={a.id} className="group flex items-start gap-2.5 rounded-md p-2 transition-colors hover:bg-accent/60">
+                <div
+                  key={a.id}
+                  className="group flex items-start gap-2.5 rounded-md p-2 transition-colors hover:bg-accent/60"
+                >
                   <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border/80" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{a.description}</p>
@@ -212,11 +256,15 @@ function Dashboard() {
           </Link>
         </div>
         {meetingsQuery.isLoading ? (
-          <div className="mt-6 flex justify-center"><LoadingSpinner size="lg" /></div>
+          <div className="mt-6 flex justify-center">
+            <LoadingSpinner size="lg" />
+          </div>
         ) : recentMeetings.length === 0 ? (
           <div className="mt-4 rounded-xl border border-dashed border-border/70 bg-surface/40 py-12 text-center">
             <p className="text-sm font-medium">No {labels.meeting.plural.toLowerCase()} yet.</p>
-            <p className="mt-1 text-xs text-muted-foreground">Upload your first recording to get started.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Upload your first recording to get started.
+            </p>
           </div>
         ) : (
           <div className="mt-4 overflow-hidden rounded-xl border border-border/70 bg-surface">
@@ -232,12 +280,15 @@ function Dashboard() {
                     <p className="truncate text-sm font-medium">{m.title}</p>
                     {m.status !== "complete" && m.status !== "failed" && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] text-warning">
-                        <span className="h-1 w-1 animate-pulse rounded-full bg-warning" /> Processing
+                        <span className="h-1 w-1 animate-pulse rounded-full bg-warning" />{" "}
+                        Processing
                       </span>
                     )}
                   </div>
                   {m.summary_excerpt && (
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{m.summary_excerpt}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {m.summary_excerpt}
+                    </p>
                   )}
                 </div>
                 <div className="hidden text-right text-xs text-muted-foreground md:block">
@@ -262,7 +313,9 @@ function Dashboard() {
           </div>
           <div>
             <p className="text-sm font-medium">Ask EchoBrief about your meetings</p>
-            <p className="text-xs text-muted-foreground">"What did we decide about pricing this quarter?"</p>
+            <p className="text-xs text-muted-foreground">
+              "What did we decide about pricing this quarter?"
+            </p>
           </div>
         </div>
         <ArrowRight className="h-4 w-4 text-muted-foreground" />

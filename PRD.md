@@ -36,6 +36,7 @@ EchoBrief is an AI meeting intelligence platform that transforms unstructured au
 **Core value proposition:** Upload any audio → get a transcript, AI summary, extracted action items, and a ChatGPT-style interface to query the meeting's content — instantly.
 
 **Strategic differentiation:**
+
 - Not a transcription tool. A knowledge system.
 - The killer feature: ask natural-language questions about any meeting, ever.
 - Built for professional teams who have too many meetings and too little recall.
@@ -47,18 +48,19 @@ EchoBrief is an AI meeting intelligence platform that transforms unstructured au
 ### The Gap
 
 Knowledge workers spend an average of 21.5 hours per week in meetings (2025 data). Of that time:
+
 - **~30%** of decisions made in meetings are forgotten within a week
 - **~60%** of action items from meetings go untracked
 - There is no searchable, queryable record of what was decided and why
 
 ### What Exists Today
 
-| Tool | What it does | What it misses |
-|------|-------------|----------------|
-| Otter.ai | Transcription + basic summary | No queryable AI, no action intelligence |
-| Fireflies.ai | Transcription + CRM sync | Expensive, no semantic search |
-| Notion AI | Notes + AI assist | Not meeting-native, no audio |
-| Rev.com | High-accuracy transcription | No intelligence layer |
+| Tool         | What it does                  | What it misses                          |
+| ------------ | ----------------------------- | --------------------------------------- |
+| Otter.ai     | Transcription + basic summary | No queryable AI, no action intelligence |
+| Fireflies.ai | Transcription + CRM sync      | Expensive, no semantic search           |
+| Notion AI    | Notes + AI assist             | Not meeting-native, no audio            |
+| Rev.com      | High-accuracy transcription   | No intelligence layer                   |
 
 ### The Opportunity
 
@@ -73,6 +75,7 @@ None of these products treat meetings as **long-term organizational memory**. Th
 **Name:** Maya, 28, Product Manager at a 40-person startup  
 **Pain:** 8 meetings per day. Takes notes during some, loses context from others. Action items fall through the cracks. Her team uses Notion for docs but nothing captures meeting decisions.  
 **Jobs to be done:**
+
 - Capture what was decided without being the designated note-taker
 - Know who owns what after a meeting ends
 - Be able to answer "wait, didn't we discuss this?" when it comes up again
@@ -86,6 +89,7 @@ None of these products treat meetings as **long-term organizational memory**. Th
 **Name:** Dev, 25, Senior SWE at a distributed team  
 **Pain:** Joins 4 standups, 2 planning sessions, and 1 incident debrief per week across 3 time zones. Misses context constantly.  
 **Jobs to be done:**
+
 - Catch up on meetings he missed asynchronously
 - Know exactly what technical decisions were made without reading 200-line transcripts
 - Find the exact moment someone explained a system design choice
@@ -99,6 +103,7 @@ None of these products treat meetings as **long-term organizational memory**. Th
 **Name:** Alex, 34, Co-founder, 12-person startup  
 **Pain:** Every conversation with investors, advisors, customers has context that gets lost. Wants to know what his team committed to.  
 **Jobs to be done:**
+
 - "What did we tell the investor last month?"
 - "What did the customer say their main complaint was?"
 - Weekly brief from all team calls without reading anything
@@ -111,29 +116,29 @@ None of these products treat meetings as **long-term organizational memory**. Th
 
 ### V1 Goals (0–3 months post-launch)
 
-| Goal | Metric | Target |
-|------|--------|--------|
-| Users can successfully process audio | Upload-to-transcript success rate | ≥ 95% |
-| AI output is useful | Summary accuracy rating (1–5) | ≥ 4.0 avg |
-| Action items are extracted correctly | Precision of extracted tasks | ≥ 80% |
-| Time to value | Time from upload to full results | ≤ 90 seconds for 1hr audio |
-| Retention signal | % users returning within 7 days | ≥ 40% |
+| Goal                                 | Metric                            | Target                     |
+| ------------------------------------ | --------------------------------- | -------------------------- |
+| Users can successfully process audio | Upload-to-transcript success rate | ≥ 95%                      |
+| AI output is useful                  | Summary accuracy rating (1–5)     | ≥ 4.0 avg                  |
+| Action items are extracted correctly | Precision of extracted tasks      | ≥ 80%                      |
+| Time to value                        | Time from upload to full results  | ≤ 90 seconds for 1hr audio |
+| Retention signal                     | % users returning within 7 days   | ≥ 40%                      |
 
 ### V2 Goals (3–6 months)
 
-| Goal | Metric | Target |
-|------|--------|--------|
-| Q&A is accurate | Answer relevance rating | ≥ 4.2 avg |
-| Search is used | % sessions that use search | ≥ 30% |
-| Integration adoption | % users with ≥ 1 integration connected | ≥ 25% |
+| Goal                 | Metric                                 | Target    |
+| -------------------- | -------------------------------------- | --------- |
+| Q&A is accurate      | Answer relevance rating                | ≥ 4.2 avg |
+| Search is used       | % sessions that use search             | ≥ 30%     |
+| Integration adoption | % users with ≥ 1 integration connected | ≥ 25%     |
 
 ### V3 Goals (6–12 months)
 
-| Goal | Metric | Target |
-|------|--------|--------|
-| Team adoption | Avg team size on paid plans | ≥ 4 users |
-| Retention | Monthly churn | ≤ 5% |
-| Real-time usage | % meetings using live mode | ≥ 20% |
+| Goal            | Metric                      | Target    |
+| --------------- | --------------------------- | --------- |
+| Team adoption   | Avg team size on paid plans | ≥ 4 users |
+| Retention       | Monthly churn               | ≤ 5%      |
+| Real-time usage | % meetings using live mode  | ≥ 20%     |
 
 ---
 
@@ -169,6 +174,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a new user, I can sign up and log in so that my meetings are private and tied to my account.
 
 **Acceptance criteria:**
+
 - Google OAuth sign-in works
 - Email + password signup works with email verification
 - Session persists across browser restarts
@@ -176,6 +182,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - Password reset flow works end-to-end
 
 **Technical notes:**
+
 - Supabase Auth (handles OAuth, sessions, JWT)
 - JWT stored in httpOnly cookie (not localStorage)
 - TanStack Router: protect all `/app` routes via a `beforeLoad` guard in `src/routes/app/route.tsx`
@@ -191,6 +198,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **Max duration:** 4 hours
 
 **Acceptance criteria:**
+
 - Drag-and-drop and click-to-browse both work
 - File type validation happens before upload starts (client + server)
 - Upload progress is shown in real-time (percentage)
@@ -200,6 +208,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - User receives email notification when processing completes
 
 **Technical notes:**
+
 - Upload directly to Cloudflare R2 (presigned URL flow — never proxy file through app server)
 - Chunked upload via tus protocol or Cloudflare's multipart API
 - Job ID returned on upload; polling via TanStack Query to check processing status
@@ -212,6 +221,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As the system, when a file is uploaded, I should transcribe it accurately so that all downstream AI features work.
 
 **Acceptance criteria:**
+
 - Transcription starts automatically after upload completes
 - Word-level timestamps are captured (needed for timeline feature in V2)
 - Transcript is stored as structured JSON (segments with start/end times)
@@ -219,11 +229,13 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - If transcription fails, user is notified with option to retry
 
 **Technical notes:**
+
 - **Provider:** AssemblyAI with "universal" speech model (best latency/accuracy tradeoff)
 - **Fallback:** OpenAI Whisper (self-hosted or API) if AssemblyAI fails
 - Worker pattern: `processing` job
 - Worker pulls job, calls AssemblyAI, stores structured transcript to PostgreSQL
 - AssemblyAI response shape:
+
 ```json
 {
   "words": [{ "word": "hello", "start": 0.0, "end": 0.4, "confidence": 0.99 }],
@@ -238,24 +250,28 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a user, after my meeting is transcribed, I want an AI-generated summary and list of action items so I don't have to read the full transcript.
 
 **Summary format:**
+
 - 3–5 sentence executive summary
 - Key discussion topics (bulleted, max 5)
 - Decisions made (bulleted)
 - Open questions / blockers
 
 **Action item format:**
+
 - Task description
 - Assignee (extracted from context if mentioned)
 - Deadline (extracted or null)
 - Source: which part of the meeting it came from (timestamp)
 
 **Acceptance criteria:**
+
 - Summary generated within 30 seconds of transcript completion
 - Action items are distinct (no duplicates), actionable (not vague)
 - Each action item links to the transcript timestamp where it was mentioned
 - User can mark action items complete, edit description, reassign owner
 
 **Technical notes:**
+
 - **Model:** OpenAI GPT-5 (cost-effective for batch analysis with structured outputs via json_schema mode)
 - **Prompt:** structured JSON output via tool_use (Anthropic tool calling), not freeform text
 - Summary prompt: feed full transcript in chunks (handle >100k token meetings via map-reduce)
@@ -269,6 +285,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a user, I can open any meeting and see its transcript, summary, and action items in a clean, readable interface.
 
 **Layout:**
+
 ```
 ┌─────────────────────────────────────────────┐
 │  Meeting Title · Date · Duration · Tags     │
@@ -282,6 +299,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 ```
 
 **Acceptance criteria:**
+
 - Transcript is searchable (Cmd+F style in-page search)
 - Clicking a timestamp seeks the audio player to that point (if audio still available)
 - Summary section is copyable with one click
@@ -296,12 +314,14 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a user, I can see an overview of my recent activity so I know what I've processed and what needs my attention.
 
 **Panels:**
+
 1. **Stats bar:** Total meetings, hours transcribed, open action items, this week's processing
 2. **Recent meetings:** Last 5, with status chip and quick action
 3. **Pending action items:** Overdue + due-soon items sorted by urgency
 4. **Activity chart:** Meetings per day (last 30 days) — uses Recharts
 
 **Acceptance criteria:**
+
 - Dashboard loads within 1 second (data fetched server-side via TanStack Start loaders)
 - Empty states are informative, not blank (guide user to upload their first meeting)
 
@@ -312,22 +332,26 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a user, I can ask natural language questions about a specific meeting and get sourced answers.
 
 **Example queries:**
+
 - "What did we decide about the launch date?"
 - "Who is responsible for the API migration?"
 - "What were the main concerns raised?"
 
 **Answer format:**
+
 - Direct answer (2–4 sentences)
 - Source quotes from transcript (with timestamps)
 - Confidence signal (if low confidence, say so)
 
 **Acceptance criteria:**
+
 - Response streams in real-time (no waiting for full answer)
 - Answers include clickable timestamp references
 - System prompt is grounded only in the meeting transcript (no hallucination from training data)
 - User can ask follow-up questions in the same thread
 
 **Technical notes:**
+
 - **Model:** OpenAI GPT-5 with streaming (`stream=true`)
 - System prompt includes full transcript (chunked for long meetings)
 - Long meetings (>1hr): use retrieval — embed transcript chunks, retrieve top-K, pass to GPT-5
@@ -344,11 +368,13 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a user, I can ask questions across ALL my meetings and get sourced answers, making my meeting history a searchable knowledge base.
 
 **Example queries:**
+
 - "Did we ever decide on a pricing model?"
 - "Find all times we discussed the AWS migration"
 - "What did customers complain about in sales calls?"
 
 **Acceptance criteria:**
+
 - Search queries all meetings in user's account (not just one)
 - Results ranked by semantic relevance, not just keyword match
 - Each result shows the meeting name, date, and relevant excerpt
@@ -356,6 +382,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - Results load within 3 seconds
 
 **Technical notes:**
+
 - Embed all transcript chunks at ingest time using `text-embedding-3-small` (OpenAI) or Cohere embeddings
 - Store vectors in **pgvector** (PostgreSQL extension) — collocated with main DB
 - Query flow: embed the user query → cosine similarity search → retrieve top 20 chunks → re-rank → pass to GPT-5 with context
@@ -368,12 +395,14 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a user, I want the transcript to attribute each line to the correct speaker so I can understand who said what.
 
 **Acceptance criteria:**
+
 - Speaker labels appear in transcript ("Speaker 1", "Speaker 2")
 - Users can rename speakers ("Speaker 1" → "Maya")
 - Speaker names persist across meetings if same speaker detected
 - Per-speaker stats shown on meeting detail page (talk time, word count)
 
 **Technical notes:**
+
 - AssemblyAI supports diarization natively via speaker labels in the Universal model
 - Speaker identity matching across meetings: store speaker embeddings, cosine-compare on new meetings
 
@@ -386,6 +415,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **Integrations priority:** Notion > Linear > Google Calendar > Jira > Trello
 
 **Acceptance criteria:**
+
 - OAuth connection flow for each integration (connect once, use forever)
 - User selects which action items to export before exporting
 - Export maps: assignee → user in destination tool, deadline → due date, description → task title
@@ -393,6 +423,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - User can see which items have already been exported (and to where)
 
 **Technical notes:**
+
 - Notion API: create a database entry per action item
 - Linear API: create an issue
 - Google Calendar: create event with attendees
@@ -405,17 +436,20 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a user, after a meeting I can generate a follow-up email with a single click.
 
 **Email types:**
+
 - Meeting recap (for all attendees)
 - Stakeholder update (executive summary only)
 - Sprint summary (engineering-focused)
 - Action item assignment (individual DMs to assignees)
 
 **Acceptance criteria:**
+
 - User selects email type and can edit before copying/sending
 - Email references real names, dates, and decisions from the meeting
 - Tone is professional and specific (not generic AI fluff)
 
 **Technical notes:**
+
 - GPT-5 prompt includes summary + action items + participant names
 - Output via streaming into an editable textarea
 
@@ -426,12 +460,14 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a user, instead of reading a raw transcript, I can see the meeting broken into chapters by topic so I can navigate directly to what I care about.
 
 **Acceptance criteria:**
+
 - Chapters are auto-generated (AI segments by topic shift)
 - Each chapter shows: topic title, time range, 1-sentence summary
 - Clicking a chapter jumps transcript to that point
 - Chapter titles are editable by the user
 
 **Technical notes:**
+
 - AI-generated chapters via GPT-5: segment transcript into logical topic blocks
 - Prompt: "Given this transcript, identify 5–10 topic segments with titles and time ranges"
 - Structured JSON output via tool_use
@@ -443,6 +479,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a user, I can see an AI-generated effectiveness score for each meeting so I can understand meeting quality over time.
 
 **Score components (weighted):**
+
 - Participation balance: are multiple speakers contributing? (25%)
 - Actionability: were clear next steps defined? (25%)
 - Focus: did the meeting stay on topic? (20%)
@@ -450,6 +487,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 - Time efficiency: did the meeting end on time? (15%)
 
 **Acceptance criteria:**
+
 - Score shown as a number (e.g. 7.4/10) with sub-scores
 - Score explained in 2–3 sentences
 - Trend chart on dashboard: average score over last 30 days
@@ -465,12 +503,14 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a user running a meeting, I can get a live transcript and live action item suggestions as the meeting happens.
 
 **Acceptance criteria:**
+
 - Works via browser tab (no install required)
 - Latency < 2 seconds for transcript updates
 - Live action items appear in sidebar as detected
 - Recording auto-saved on session end
 
 **Technical notes:**
+
 - WebSocket connection for streaming audio to AssemblyAI Streaming API
 - Action item detection: run GPT-5-mini on rolling 30-second windows
 - Store session data to same pipeline as uploaded audio on completion
@@ -482,6 +522,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a team admin, I can invite teammates so we can share, collaborate on, and search across all our team's meetings.
 
 **Acceptance criteria:**
+
 - Workspace creation: name, logo, invite via email
 - Role-based access: Admin (full control), Member (can upload + view), Viewer (read-only)
 - Meetings can be marked Private (only owner) or Team (all workspace members)
@@ -495,6 +536,7 @@ Dashboard                      Smart timeline view             Enterprise SSO
 **User story:** As a team member, I can leave comments and highlights on transcript sections so we can annotate meetings together.
 
 **Acceptance criteria:**
+
 - Select text in transcript → add comment
 - Tag a teammate in a comment (@mention)
 - Highlight sections in different colors (decision, risk, question)
@@ -596,15 +638,15 @@ User clicks citation → opens meeting at timestamp
 
 ### Component Responsibilities
 
-| Component | Responsibility | Technology |
-|-----------|---------------|------------|
-| Frontend | UI, routing, data display | TanStack Start + React 19 |
-| API Layer | Auth, REST endpoints, job dispatch | Cloudflare Workers (Hono.js) |
-| Audio Storage | Raw audio files | Cloudflare R2 |
-| Database | Meetings, transcripts, users, vectors | PostgreSQL (Supabase) + pgvector |
-| Job Queue | Async processing pipeline | Cloudflare Queues |
-| AI Worker | STT + analysis + embeddings | Cloudflare Workers |
-| Cache | Session cache, rate limiting | Cloudflare KV |
+| Component     | Responsibility                        | Technology                       |
+| ------------- | ------------------------------------- | -------------------------------- |
+| Frontend      | UI, routing, data display             | TanStack Start + React 19        |
+| API Layer     | Auth, REST endpoints, job dispatch    | Cloudflare Workers (Hono.js)     |
+| Audio Storage | Raw audio files                       | Cloudflare R2                    |
+| Database      | Meetings, transcripts, users, vectors | PostgreSQL (Supabase) + pgvector |
+| Job Queue     | Async processing pipeline             | Cloudflare Queues                |
+| AI Worker     | STT + analysis + embeddings           | Cloudflare Workers               |
+| Cache         | Session cache, rate limiting          | Cloudflare KV                    |
 
 ### Why This Stack
 
@@ -620,6 +662,7 @@ User clicks citation → opens meeting at timestamp
 ## 9. Data Models
 
 ### Users
+
 ```sql
 CREATE TABLE users (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -631,6 +674,7 @@ CREATE TABLE users (
 ```
 
 ### Workspaces (V3)
+
 ```sql
 CREATE TABLE workspaces (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -648,6 +692,7 @@ CREATE TABLE workspace_members (
 ```
 
 ### Meetings
+
 ```sql
 CREATE TABLE meetings (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -666,6 +711,7 @@ CREATE TABLE meetings (
 ```
 
 ### Transcripts
+
 ```sql
 CREATE TABLE transcripts (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -677,6 +723,7 @@ CREATE TABLE transcripts (
 ```
 
 ### Summaries
+
 ```sql
 CREATE TABLE summaries (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -691,6 +738,7 @@ CREATE TABLE summaries (
 ```
 
 ### Action Items
+
 ```sql
 CREATE TABLE action_items (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -708,6 +756,7 @@ CREATE TABLE action_items (
 ```
 
 ### Transcript Chunks (Vector Search)
+
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -723,7 +772,7 @@ CREATE TABLE transcript_chunks (
   created_at  TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX ON transcript_chunks 
+CREATE INDEX ON transcript_chunks
   USING ivfflat (embedding vector_cosine_ops)
   WITH (lists = 100);
 ```
@@ -861,13 +910,13 @@ User query: "What did we decide about pricing?"
 
 ### Cost Estimates (per 1-hour meeting)
 
-| Step | Provider | Cost |
-|------|----------|------|
-| Transcription | AssemblyAI Universal | ~$0.10-0.15 |
-| Summary + Action Items | OpenAI GPT-5 (1 call, structured) | ~$0.12 |
-| Embeddings (100 chunks) | OpenAI text-embedding-3-small | ~$0.002 |
-| Meeting Score | OpenAI GPT-5-mini | ~$0.01 |
-| **Total per meeting** | | **~$0.23** |
+| Step                    | Provider                          | Cost        |
+| ----------------------- | --------------------------------- | ----------- |
+| Transcription           | AssemblyAI Universal              | ~$0.10-0.15 |
+| Summary + Action Items  | OpenAI GPT-5 (1 call, structured) | ~$0.12      |
+| Embeddings (100 chunks) | OpenAI text-embedding-3-small     | ~$0.002     |
+| Meeting Score           | OpenAI GPT-5-mini                 | ~$0.01      |
+| **Total per meeting**   |                                   | **~$0.23**  |
 
 At a $20/month plan with 30 meetings/month → COGS = ~$7/user/month → ~65% gross margin (target).
 
@@ -876,17 +925,20 @@ At a $20/month plan with 30 meetings/month → COGS = ~$7/user/month → ~65% gr
 ## 12. Non-Functional Requirements
 
 ### Performance
+
 - **Time to first transcript:** ≤ 5 minutes for 1-hour audio
 - **Dashboard load:** ≤ 1 second (SSR with data loaders)
 - **Chat response first token:** ≤ 1 second (streaming)
 - **Semantic search latency:** ≤ 3 seconds for queries across 1,000 meetings
 
 ### Reliability
+
 - **Pipeline success rate:** ≥ 99% (with retry logic and fallback providers)
 - **API uptime:** ≥ 99.9% (Cloudflare Workers SLA)
 - **Job retry policy:** exponential backoff, max 3 retries, dead-letter queue for failed jobs
 
 ### Security
+
 - Audio files stored in private R2 bucket, only accessible via short-lived presigned URLs
 - JWTs validated on every API request (Supabase JWT verification middleware)
 - Integration OAuth tokens encrypted at rest (AES-256)
@@ -895,12 +947,14 @@ At a $20/month plan with 30 meetings/month → COGS = ~$7/user/month → ~65% gr
 - GDPR: user data deletion endpoint removes all meetings, transcripts, embeddings, audio
 
 ### Scalability
+
 - Cloudflare Workers: scales to 0, no cold starts, globally distributed
 - PostgreSQL: Supabase handles connection pooling (PgBouncer)
 - pgvector with IVFFlat index: handles up to ~1M vectors per user efficiently
 - R2: no egress fees, unlimited storage
 
 ### Accessibility
+
 - WCAG 2.1 AA compliance
 - All interactive elements keyboard-navigable
 - `prefers-reduced-motion` respected in all animations
@@ -910,25 +964,25 @@ At a $20/month plan with 30 meetings/month → COGS = ~$7/user/month → ~65% gr
 
 ## 13. Risks & Mitigations
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| AssemblyAI accuracy poor for non-English or accented speech | Medium | High | Allow user to correct transcript inline; add language selection via API parameter |
-| OpenAI API rate limits during processing spikes | Low | Medium | Queue-based architecture absorbs spikes; implement exponential backoff with retries |
-| Vector search quality poor for short meetings | Medium | Medium | Fall back to full-text search (PostgreSQL `tsvector`) if meeting < 5 minutes |
-| R2 presigned URL expiry before large file upload completes | Low | Medium | Generate URL with 2-hour TTL; implement resumable upload |
-| AI hallucination in meeting Q&A | Medium | High | Ground prompt with explicit transcript context; add "I don't know" escape hatch; display source quotes |
-| Cost overrun from heavy processing users | Medium | Medium | Rate limiting per plan tier; processing caps; alert on unusual usage |
-| Supabase pgvector performance at scale | Low | Medium | Tune IVFFlat list count; evaluate migration to dedicated vector DB if needed |
+| Risk                                                        | Likelihood | Impact | Mitigation                                                                                             |
+| ----------------------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------ |
+| AssemblyAI accuracy poor for non-English or accented speech | Medium     | High   | Allow user to correct transcript inline; add language selection via API parameter                      |
+| OpenAI API rate limits during processing spikes             | Low        | Medium | Queue-based architecture absorbs spikes; implement exponential backoff with retries                    |
+| Vector search quality poor for short meetings               | Medium     | Medium | Fall back to full-text search (PostgreSQL `tsvector`) if meeting < 5 minutes                           |
+| R2 presigned URL expiry before large file upload completes  | Low        | Medium | Generate URL with 2-hour TTL; implement resumable upload                                               |
+| AI hallucination in meeting Q&A                             | Medium     | High   | Ground prompt with explicit transcript context; add "I don't know" escape hatch; display source quotes |
+| Cost overrun from heavy processing users                    | Medium     | Medium | Rate limiting per plan tier; processing caps; alert on unusual usage                                   |
+| Supabase pgvector performance at scale                      | Low        | Medium | Tune IVFFlat list count; evaluate migration to dedicated vector DB if needed                           |
 
 ---
 
 ## 14. Open Questions
 
-| Question | Owner | Target Resolution |
-|----------|-------|------------------|
-| Should YouTube URL support be in V1 or V2? (requires yt-dlp or third-party extraction) | Suhaas | V1 planning |
-| Should speaker names persist across meetings automatically, or require manual confirmation? | Suhaas | V2 design |
-| What is the retention policy for audio files? (Storage cost grows fast) | Suhaas | Before V1 launch |
-| Should the AI Q&A conversation history be persisted to DB? | Suhaas | V1 design |
-| Multi-tenancy model: is V3 workspace the unit of billing, or individual users? | Suhaas | V3 planning |
-| How do we handle meeting recordings that contain PII (HR conversations, legal calls)? | Suhaas | Before V1 launch |
+| Question                                                                                    | Owner  | Target Resolution |
+| ------------------------------------------------------------------------------------------- | ------ | ----------------- |
+| Should YouTube URL support be in V1 or V2? (requires yt-dlp or third-party extraction)      | Suhaas | V1 planning       |
+| Should speaker names persist across meetings automatically, or require manual confirmation? | Suhaas | V2 design         |
+| What is the retention policy for audio files? (Storage cost grows fast)                     | Suhaas | Before V1 launch  |
+| Should the AI Q&A conversation history be persisted to DB?                                  | Suhaas | V1 design         |
+| Multi-tenancy model: is V3 workspace the unit of billing, or individual users?              | Suhaas | V3 planning       |
+| How do we handle meeting recordings that contain PII (HR conversations, legal calls)?       | Suhaas | Before V1 launch  |

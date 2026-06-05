@@ -25,7 +25,9 @@ if (!ADMIN_EMAIL) {
   process.exit(1);
 }
 if (!ADMIN_PASSWORD || ADMIN_PASSWORD.length < 8) {
-  console.error("ADMIN_PASSWORD is not set or is shorter than 8 characters. Add it to .env, then re-run.");
+  console.error(
+    "ADMIN_PASSWORD is not set or is shorter than 8 characters. Add it to .env, then re-run.",
+  );
   process.exit(1);
 }
 

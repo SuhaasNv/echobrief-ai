@@ -117,9 +117,7 @@ app.get("/flashcards/review", zValidator("query", ReviewQuery), async (c) => {
   const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
-  const items = await sql<
-    Array<FlashcardRow & { meeting_title: string }>
-  >`
+  const items = await sql<Array<FlashcardRow & { meeting_title: string }>>`
     SELECT f.*, m.title AS meeting_title
     FROM flashcards f
     JOIN meetings m ON m.id = f.meeting_id

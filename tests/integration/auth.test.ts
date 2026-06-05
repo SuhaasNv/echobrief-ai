@@ -10,7 +10,7 @@ import api from "@/server/api";
 import { getSql } from "@/server/db";
 
 const TEST_PREFIX = `vitest-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-let createdEmails: string[] = [];
+const createdEmails: string[] = [];
 
 function uniqueEmail(): string {
   const e = `${TEST_PREFIX}-${createdEmails.length}@test.echobrief.local`;
@@ -35,7 +35,11 @@ afterAll(async () => {
 describe("POST /auth/signup", () => {
   it("creates a user and returns a JWT", async () => {
     const email = uniqueEmail();
-    const res = await postJson("/auth/signup", { email, password: "testpassword12", name: "Vitest User" });
+    const res = await postJson("/auth/signup", {
+      email,
+      password: "testpassword12",
+      name: "Vitest User",
+    });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.token).toBeTypeOf("string");
@@ -47,7 +51,11 @@ describe("POST /auth/signup", () => {
   it("rejects duplicate email with 409", async () => {
     const email = uniqueEmail();
     await postJson("/auth/signup", { email, password: "testpassword12", name: "First" });
-    const res = await postJson("/auth/signup", { email, password: "testpassword12", name: "Second" });
+    const res = await postJson("/auth/signup", {
+      email,
+      password: "testpassword12",
+      name: "Second",
+    });
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.error).toBe("conflict");
@@ -60,7 +68,10 @@ describe("POST /auth/signup", () => {
   });
 
   it("rejects invalid email format", async () => {
-    const res = await postJson("/auth/signup", { email: "not-an-email", password: "testpassword12" });
+    const res = await postJson("/auth/signup", {
+      email: "not-an-email",
+      password: "testpassword12",
+    });
     expect(res.status).toBe(400);
   });
 });
@@ -115,7 +126,11 @@ describe("requireAuth middleware", () => {
 
   it("returns the user on /account/me with a valid token", async () => {
     const email = uniqueEmail();
-    const signup = await postJson("/auth/signup", { email, password: "testpassword12", name: "Me Test" });
+    const signup = await postJson("/auth/signup", {
+      email,
+      password: "testpassword12",
+      name: "Me Test",
+    });
     const { token } = await signup.json();
 
     const res = await api.request("/account/me", {

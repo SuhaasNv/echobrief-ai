@@ -19,23 +19,23 @@ const SUSPICIOUS_PATTERNS = [
   /disregard\s+(all\s+)?(previous|above|prior)/gi,
   /forget\s+(everything|all)\s+(you|that)/gi,
   /new\s+instructions:/gi,
-  
+
   // Role manipulation
   /you\s+are\s+now\s+(a\s+)?/gi,
   /act\s+as\s+(a\s+)?/gi,
   /pretend\s+(you\s+are|to\s+be)/gi,
   /roleplay\s+as/gi,
-  
+
   // System prompt injection attempts
   /<\/?system>/gi,
   /<\/?prompt>/gi,
   /<\/?instruction>/gi,
-  
+
   // Template injection patterns
   /\{\{.*system.*\}\}/gi,
   /%%.*system.*%%/gi,
   /\$\{.*system.*\}/gi,
-  
+
   // Command injection attempts
   /execute\s+(the\s+following|this)\s+command/gi,
   /run\s+(the\s+following|this)\s+(code|script)/gi,
@@ -46,13 +46,13 @@ const SUSPICIOUS_PATTERNS = [
  * Prevents token exhaustion attacks and DoS.
  */
 const MAX_LENGTHS = {
-  transcript: 500_000,      // 500K chars ≈ 80K words ≈ 100K tokens
-  title: 200,              // Meeting/lecture titles
-  description: 2_000,      // Meeting descriptions
-  chatMessage: 10_000,     // User chat messages
-  actionItem: 500,         // Action item descriptions
-  flashcardQuestion: 500,  // Flashcard questions
-  flashcardAnswer: 2_000,  // Flashcard answers
+  transcript: 500_000, // 500K chars ≈ 80K words ≈ 100K tokens
+  title: 200, // Meeting/lecture titles
+  description: 2_000, // Meeting descriptions
+  chatMessage: 10_000, // User chat messages
+  actionItem: 500, // Action item descriptions
+  flashcardQuestion: 500, // Flashcard questions
+  flashcardAnswer: 2_000, // Flashcard answers
 };
 
 export interface SanitizeOptions {
@@ -64,28 +64,25 @@ export interface SanitizeOptions {
 
 /**
  * Sanitize user-provided transcript text for LLM processing.
- * 
+ *
  * This is the most critical sanitization point since transcripts
  * go directly into LLM prompts and could contain adversarial content.
  */
-export function sanitizeTranscript(
-  text: string,
-  options: SanitizeOptions = {}
-): string {
+export function sanitizeTranscript(text: string, options: SanitizeOptions = {}): string {
   const {
     maxLength = MAX_LENGTHS.transcript,
     stripHtml = true,
     checkSuspiciousPatterns = true,
     logSecurityEvents = true,
   } = options;
-  
+
   let sanitized = text;
-  
+
   // 1. Strip HTML/XML tags that could break prompt structure
   if (stripHtml) {
     sanitized = sanitized.replace(/<\/?[^>]+(>|$)/g, "");
   }
-  
+
   // 2. Check for and redact suspicious patterns
   if (checkSuspiciousPatterns) {
     for (const pattern of SUSPICIOUS_PATTERNS) {
@@ -97,14 +94,14 @@ export function sanitizeTranscript(
             "unknown", // userId not available in sanitization context
             pattern.source,
             matches[0],
-            text.length
+            text.length,
           );
         }
         sanitized = sanitized.replace(pattern, "[REDACTED - POLICY VIOLATION]");
       }
     }
   }
-  
+
   // 3. Truncate to prevent token exhaustion
   if (sanitized.length > maxLength) {
     if (logSecurityEvents) {
@@ -117,7 +114,7 @@ export function sanitizeTranscript(
     }
     sanitized = sanitized.slice(0, maxLength) + "\n\n[TRUNCATED FOR LENGTH]";
   }
-  
+
   return sanitized;
 }
 
@@ -127,8 +124,8 @@ export function sanitizeTranscript(
  */
 export function sanitizeTitle(title: string): string {
   return title
-    .replace(/<\/?[^>]+(>|$)/g, "")  // Strip HTML
-    .slice(0, MAX_LENGTHS.title)      // Limit length
+    .replace(/<\/?[^>]+(>|$)/g, "") // Strip HTML
+    .slice(0, MAX_LENGTHS.title) // Limit length
     .trim();
 }
 
@@ -148,10 +145,10 @@ export function sanitizeDescription(description: string): string {
  */
 export function sanitizeChatMessage(message: string): string {
   let sanitized = message;
-  
+
   // Strip HTML
   sanitized = sanitized.replace(/<\/?[^>]+(>|$)/g, "");
-  
+
   // Check for prompt injection
   for (const pattern of SUSPICIOUS_PATTERNS) {
     if (pattern.test(sanitized)) {
@@ -159,12 +156,12 @@ export function sanitizeChatMessage(message: string): string {
       sanitized = sanitized.replace(pattern, "[REDACTED]");
     }
   }
-  
+
   // Truncate
   if (sanitized.length > MAX_LENGTHS.chatMessage) {
     sanitized = sanitized.slice(0, MAX_LENGTHS.chatMessage);
   }
-  
+
   return sanitized.trim();
 }
 
@@ -194,7 +191,7 @@ export function sanitizeFlashcard(text: string, isAnswer: boolean = false): stri
  * Useful for logging/monitoring without redaction.
  */
 export function containsSuspiciousPatterns(text: string): boolean {
-  return SUSPICIOUS_PATTERNS.some(pattern => pattern.test(text));
+  return SUSPICIOUS_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 /**
@@ -203,22 +200,22 @@ export function containsSuspiciousPatterns(text: string): boolean {
  */
 export function getSecurityScore(text: string): number {
   let score = 100;
-  
+
   // Deduct points for suspicious patterns
-  const suspiciousCount = SUSPICIOUS_PATTERNS.filter(p => p.test(text)).length;
+  const suspiciousCount = SUSPICIOUS_PATTERNS.filter((p) => p.test(text)).length;
   score -= suspiciousCount * 20;
-  
+
   // Deduct points for excessive length
   if (text.length > MAX_LENGTHS.transcript) {
     score -= 30;
   } else if (text.length > MAX_LENGTHS.transcript * 0.8) {
     score -= 10;
   }
-  
+
   // Deduct points for HTML/XML content
   if (/<\/?[^>]+>/.test(text)) {
     score -= 15;
   }
-  
+
   return Math.max(0, score);
 }

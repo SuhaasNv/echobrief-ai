@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Test subscription API endpoint.
- * 
+ *
  * Usage:
  *   DATABASE_URL=postgres://... node scripts/test-subscription-api.mjs
  */
@@ -55,7 +55,7 @@ async function testSubscriptionEndpoint() {
 
     // 5. Test usage tracking functions
     console.log("\n✓ Testing usage tracker functions...");
-    
+
     // Import the usage tracker (this requires the module to work in Node)
     console.log("  Note: Full API testing requires running the dev server");
     console.log("  Run: npm run dev:api");
@@ -66,8 +66,9 @@ async function testSubscriptionEndpoint() {
     console.log("  1. Start the API server: npm run dev:api");
     console.log("  2. Get an auth token by logging in");
     console.log("  3. Test the endpoint:");
-    console.log('     curl -H "Authorization: Bearer <token>" http://localhost:3000/api/v1/subscription');
-    
+    console.log(
+      '     curl -H "Authorization: Bearer <token>" http://localhost:3000/api/v1/subscription',
+    );
   } catch (err) {
     console.error("❌ Test failed:", err.message);
     throw err;

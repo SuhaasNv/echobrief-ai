@@ -23,12 +23,20 @@ async function postJson(path: string, body: unknown) {
 beforeAll(async () => {
   // Create a regular user via the auth flow
   userEmail = `${TEST_PREFIX}-user@test.echobrief.local`;
-  const uResp = await postJson("/auth/signup", { email: userEmail, password: "testpassword12", name: "Regular" });
+  const uResp = await postJson("/auth/signup", {
+    email: userEmail,
+    password: "testpassword12",
+    name: "Regular",
+  });
   userToken = (await uResp.json()).token;
 
   // Create an admin user by inserting with is_admin=true, then logging in via the normal flow
   adminEmail = `${TEST_PREFIX}-admin@test.echobrief.local`;
-  const aResp = await postJson("/auth/signup", { email: adminEmail, password: "testpassword12", name: "Admin" });
+  const aResp = await postJson("/auth/signup", {
+    email: adminEmail,
+    password: "testpassword12",
+    name: "Admin",
+  });
   const aBody = await aResp.json();
   expect(aResp.status).toBe(200);
 
@@ -71,7 +79,11 @@ describe("admin gating", () => {
     const body = await res.json();
     expect(Array.isArray(body.items)).toBe(true);
     // Our test admin should be in the list
-    expect(body.items.some((u: { email: string; is_admin: boolean }) => u.email === adminEmail && u.is_admin === true)).toBe(true);
+    expect(
+      body.items.some(
+        (u: { email: string; is_admin: boolean }) => u.email === adminEmail && u.is_admin === true,
+      ),
+    ).toBe(true);
   });
 
   it("returns runtime info on /admin/system", async () => {
@@ -84,6 +96,8 @@ describe("admin gating", () => {
     expect(body.runtime.node_version).toMatch(/^v\d+/);
     expect(Array.isArray(body.services)).toBe(true);
     // Postgres should always come back ok if this test is running
-    expect(body.services.find((s: { name: string; status: string }) => s.name === "Postgres")?.status).toBe("ok");
+    expect(
+      body.services.find((s: { name: string; status: string }) => s.name === "Postgres")?.status,
+    ).toBe("ok");
   });
 });

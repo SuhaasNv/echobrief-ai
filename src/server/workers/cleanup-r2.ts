@@ -40,14 +40,14 @@ function getClient(): S3Client {
 export async function cleanupOldAudioFiles(): Promise<number> {
   const env = getEnv();
   const bucket = env.R2_BUCKET;
-  
+
   if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY) {
     console.warn("[r2-cleanup] R2 not configured, skipping cleanup");
     return 0;
   }
 
   console.log(`[r2-cleanup] starting cleanup (retention: ${RETENTION_DAYS} days)`);
-  
+
   const cutoffDate = new Date(Date.now() - RETENTION_MS);
   const client = getClient();
   let deletedCount = 0;

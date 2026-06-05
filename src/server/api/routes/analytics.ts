@@ -76,9 +76,7 @@ app.get("/summary", async (c) => {
   `;
 
   // Meeting trend (last 30 days)
-  const trendData = await sql<
-    Array<{ date: string; count: string }>
-  >`
+  const trendData = await sql<Array<{ date: string; count: string }>>`
     SELECT
       DATE(m.created_at) AS date,
       COUNT(*)::TEXT AS count

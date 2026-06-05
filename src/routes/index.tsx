@@ -65,7 +65,10 @@ function Landing() {
           <motion.h1
             initial="hidden"
             animate="show"
-            variants={{ ...fadeUp, show: { ...fadeUp.show, transition: { duration: 0.9, ease, delay: 0.05 } } }}
+            variants={{
+              ...fadeUp,
+              show: { ...fadeUp.show, transition: { duration: 0.9, ease, delay: 0.05 } },
+            }}
             className="text-balance text-4xl font-semibold leading-[1.04] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
           >
             <span className="text-gradient">Your meetings finally become</span>
@@ -84,17 +87,23 @@ function Landing() {
           <motion.p
             initial="hidden"
             animate="show"
-            variants={{ ...fadeUp, show: { ...fadeUp.show, transition: { duration: 0.9, ease, delay: 0.15 } } }}
+            variants={{
+              ...fadeUp,
+              show: { ...fadeUp.show, transition: { duration: 0.9, ease, delay: 0.15 } },
+            }}
             className="mx-auto mt-6 max-w-2xl text-balance text-base leading-relaxed text-muted-foreground md:text-lg"
           >
-            Upload calls, voice notes, and meetings. Get instant summaries, action items, and AI-powered
-            answers across every conversation.
+            Upload calls, voice notes, and meetings. Get instant summaries, action items, and
+            AI-powered answers across every conversation.
           </motion.p>
 
           <motion.div
             initial="hidden"
             animate="show"
-            variants={{ ...fadeUp, show: { ...fadeUp.show, transition: { duration: 0.9, ease, delay: 0.25 } } }}
+            variants={{
+              ...fadeUp,
+              show: { ...fadeUp.show, transition: { duration: 0.9, ease, delay: 0.25 } },
+            }}
             className="mt-10 flex flex-wrap items-center justify-center gap-3"
           >
             <Button asChild size="lg" className="group h-11 rounded-full px-5 text-sm font-medium">
@@ -195,13 +204,15 @@ function Landing() {
             variants={fadeUp}
             className="mx-auto max-w-2xl text-center"
           >
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">Capabilities</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">
+              Capabilities
+            </p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
               An AI layer over every conversation your team has.
             </h2>
             <p className="mt-4 text-muted-foreground">
-              EchoBrief turns raw audio into structured knowledge — accurate transcripts, decisions, action items,
-              and answers, available the moment a call ends.
+              EchoBrief turns raw audio into structured knowledge — accurate transcripts, decisions,
+              action items, and answers, available the moment a call ends.
             </p>
           </motion.div>
 
@@ -258,17 +269,40 @@ function Landing() {
       {/* Workflow */}
       <section className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp} className="max-w-2xl">
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-violet">Workflow</p>
+          <motion.div
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={fadeUp}
+            className="max-w-2xl"
+          >
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-violet">
+              Workflow
+            </p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
               From audio to answers in three steps.
             </h2>
           </motion.div>
           <div className="mt-14 grid gap-6 md:grid-cols-3">
             {[
-              { n: "01", icon: Upload, title: "Upload or connect", body: "Drop MP3, WAV, MP4, or sync Zoom, Meet, and Teams. Live recording works too." },
-              { n: "02", icon: Brain, title: "EchoBrief processes", body: "Transcription, diarization, topic segmentation, and summarization in under a minute." },
-              { n: "03", icon: FileText, title: "Search, share, ship", body: "Ask questions, export action items, share decisions — all from a single workspace." },
+              {
+                n: "01",
+                icon: Upload,
+                title: "Upload or connect",
+                body: "Drop MP3, WAV, MP4, or sync Zoom, Meet, and Teams. Live recording works too.",
+              },
+              {
+                n: "02",
+                icon: Brain,
+                title: "EchoBrief processes",
+                body: "Transcription, diarization, topic segmentation, and summarization in under a minute.",
+              },
+              {
+                n: "03",
+                icon: FileText,
+                title: "Search, share, ship",
+                body: "Ask questions, export action items, share decisions — all from a single workspace.",
+              },
             ].map((s, i) => (
               <motion.div
                 key={s.n}
@@ -293,8 +327,15 @@ function Landing() {
       {/* AI Chat showcase */}
       <section className="px-6 py-24">
         <div className="mx-auto grid max-w-6xl gap-12 md:grid-cols-2 md:items-center">
-          <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp}>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">Ask EchoBrief</p>
+          <motion.div
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={fadeUp}
+          >
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">
+              Ask EchoBrief
+            </p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
               A research assistant that's listened to every meeting you've had.
             </h2>
@@ -308,7 +349,10 @@ function Landing() {
                 "Summarize every conversation with Acme Corp.",
                 "List blockers David mentioned this month.",
               ].map((q) => (
-                <div key={q} className="flex items-center gap-2 rounded-lg border border-border/70 bg-surface px-3 py-2 text-sm">
+                <div
+                  key={q}
+                  className="flex items-center gap-2 rounded-lg border border-border/70 bg-surface px-3 py-2 text-sm"
+                >
                   <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="font-mono text-xs text-muted-foreground">→</span>
                   <span>{q}</span>
@@ -335,18 +379,30 @@ function Landing() {
                   <Sparkles className="h-3 w-3 text-white" />
                 </div>
                 <div className="text-sm leading-relaxed">
-                  Across <span className="text-brand">4 meetings</span>, the team made three pricing decisions:
+                  Across <span className="text-brand">4 meetings</span>, the team made three pricing
+                  decisions:
                   <ol className="mt-2 space-y-1.5 text-foreground/90">
-                    <li>1. Move the Pro tier from $24 → <span className="text-foreground font-medium">$29</span> on Sep 1.</li>
-                    <li>2. Introduce a <span className="text-foreground font-medium">Team plan</span> at $79/seat.</li>
+                    <li>
+                      1. Move the Pro tier from $24 →{" "}
+                      <span className="text-foreground font-medium">$29</span> on Sep 1.
+                    </li>
+                    <li>
+                      2. Introduce a <span className="text-foreground font-medium">Team plan</span>{" "}
+                      at $79/seat.
+                    </li>
                     <li>3. Sunset the legacy Starter tier by EOY.</li>
                   </ol>
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {["Pricing Sync · Aug 12", "Exec Review · Aug 19", "Sales QBR · Aug 26"].map((c) => (
-                      <span key={c} className="rounded-md border border-border/60 bg-background/40 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-                        {c}
-                      </span>
-                    ))}
+                    {["Pricing Sync · Aug 12", "Exec Review · Aug 19", "Sales QBR · Aug 26"].map(
+                      (c) => (
+                        <span
+                          key={c}
+                          className="rounded-md border border-border/60 bg-background/40 px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                        >
+                          {c}
+                        </span>
+                      ),
+                    )}
                   </div>
                 </div>
               </div>
@@ -369,7 +425,9 @@ function Landing() {
             variants={fadeUp}
             className="mx-auto max-w-2xl text-center"
           >
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">Loved by teams</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">
+              Loved by teams
+            </p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
               The teams that ship fastest run on EchoBrief.
             </h2>
@@ -428,21 +486,74 @@ function Landing() {
       {/* Pricing */}
       <section id="pricing" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp} className="text-center">
+          <motion.div
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={fadeUp}
+            className="text-center"
+          >
             <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">Pricing</p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">Pay for what you record.</h2>
+            <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
+              Pay for what you record.
+            </h2>
           </motion.div>
           <div className="mt-14 grid gap-5 md:grid-cols-4">
             {[
-              { name: "Free", price: "$0", desc: "For solo work and casual notes.", cta: "Start free", features: ["5 hrs / month", "10 AI queries", "1 workspace", "30-day history"], featured: false },
-              { name: "Student", price: "$7", desc: "For students with .edu email.", cta: "Start trial", features: ["Unlimited hours", "Unlimited AI queries", "Flashcards", "1-year history"], featured: false },
-              { name: "Pro", price: "$14", desc: "For builders and operators.", cta: "Start trial", features: ["Everything in Student", "Integrations", "Email generation", "2-year history"], featured: true },
-              { name: "Team", price: "$29", desc: "For teams of 5+.", cta: "Talk to sales", features: ["Everything in Pro", "Shared workspaces", "Unlimited history", "Priority support"], featured: false },
+              {
+                name: "Free",
+                price: "$0",
+                desc: "For solo work and casual notes.",
+                cta: "Start free",
+                features: ["5 hrs / month", "10 AI queries", "1 workspace", "30-day history"],
+                featured: false,
+              },
+              {
+                name: "Student",
+                price: "$7",
+                desc: "For students with .edu email.",
+                cta: "Start trial",
+                features: [
+                  "Unlimited hours",
+                  "Unlimited AI queries",
+                  "Flashcards",
+                  "1-year history",
+                ],
+                featured: false,
+              },
+              {
+                name: "Pro",
+                price: "$14",
+                desc: "For builders and operators.",
+                cta: "Start trial",
+                features: [
+                  "Everything in Student",
+                  "Integrations",
+                  "Email generation",
+                  "2-year history",
+                ],
+                featured: true,
+              },
+              {
+                name: "Team",
+                price: "$29",
+                desc: "For teams of 5+.",
+                cta: "Talk to sales",
+                features: [
+                  "Everything in Pro",
+                  "Shared workspaces",
+                  "Unlimited history",
+                  "Priority support",
+                ],
+                featured: false,
+              },
             ].map((p) => (
               <div
                 key={p.name}
                 className={`relative rounded-2xl border p-7 ${
-                  p.featured ? "border-brand/40 bg-surface-elevated shadow-elegant" : "border-border/70 bg-surface"
+                  p.featured
+                    ? "border-brand/40 bg-surface-elevated shadow-elegant"
+                    : "border-border/70 bg-surface"
                 }`}
               >
                 {p.featured && (
@@ -458,7 +569,11 @@ function Landing() {
                   </div>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{p.desc}</p>
-                <Button asChild className="mt-5 w-full rounded-full" variant={p.featured ? "default" : "outline"}>
+                <Button
+                  asChild
+                  className="mt-5 w-full rounded-full"
+                  variant={p.featured ? "default" : "outline"}
+                >
                   <Link to="/signup">{p.cta}</Link>
                 </Button>
                 <ul className="mt-6 space-y-2 text-sm">
@@ -498,7 +613,12 @@ function Landing() {
                   Start Transcribing <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="h-11 rounded-full border-border/80 bg-background/40 px-5">
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="h-11 rounded-full border-border/80 bg-background/40 px-5"
+              >
                 <Link to="/app">Open the app</Link>
               </Button>
             </div>

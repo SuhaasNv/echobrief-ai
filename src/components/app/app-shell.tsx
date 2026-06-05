@@ -109,10 +109,7 @@ export function AppShell() {
       >
         {/* Inner container at the natural width so children don't reflow as
             the outer wrapper shrinks — gives the slide-in/out a clean feel. */}
-        <div
-          className="flex h-screen flex-col"
-          style={{ width: SIDEBAR_WIDTH }}
-        >
+        <div className="flex h-screen flex-col" style={{ width: SIDEBAR_WIDTH }}>
           <div className="flex h-14 items-center px-3">
             <Logo />
           </div>
@@ -237,7 +234,9 @@ function loadDismissed(): Set<string> {
     const raw = localStorage.getItem(DISMISSED_KEY);
     if (!raw) return new Set();
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? new Set(parsed.filter((v): v is string => typeof v === "string")) : new Set();
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((v): v is string => typeof v === "string"))
+      : new Set();
   } catch {
     return new Set();
   }
@@ -305,7 +304,11 @@ function NotificationsBell() {
       <AnimatePresence>
         {open && (
           <>
-            <div role="presentation" onClick={() => setOpen(false)} className="fixed inset-0 z-40" />
+            <div
+              role="presentation"
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40"
+            />
             <motion.div
               initial={{ opacity: 0, y: -4, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -340,17 +343,23 @@ function NotificationsBell() {
                 ) : (
                   items.map((m) => {
                     const Icon =
-                      m.status === "complete" ? CheckCircle2 :
-                      m.status === "failed" ? AlertTriangle :
-                      FileAudio;
+                      m.status === "complete"
+                        ? CheckCircle2
+                        : m.status === "failed"
+                          ? AlertTriangle
+                          : FileAudio;
                     const colorClass =
-                      m.status === "complete" ? "text-success" :
-                      m.status === "failed" ? "text-destructive" :
-                      "text-muted-foreground";
+                      m.status === "complete"
+                        ? "text-success"
+                        : m.status === "failed"
+                          ? "text-destructive"
+                          : "text-muted-foreground";
                     const label =
-                      m.status === "complete" ? "ready to read" :
-                      m.status === "failed" ? "processing failed" :
-                      `processing · ${m.status}`;
+                      m.status === "complete"
+                        ? "ready to read"
+                        : m.status === "failed"
+                          ? "processing failed"
+                          : `processing · ${m.status}`;
                     return (
                       <div
                         key={m.id}
@@ -450,7 +459,11 @@ function ProfileMenu() {
       <AnimatePresence>
         {open && (
           <>
-            <div role="presentation" onClick={() => setOpen(false)} className="fixed inset-0 z-40" />
+            <div
+              role="presentation"
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40"
+            />
             <motion.div
               initial={{ opacity: 0, y: -4, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -498,4 +511,3 @@ function ProfileMenu() {
     </div>
   );
 }
-

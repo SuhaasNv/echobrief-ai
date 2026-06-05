@@ -86,15 +86,22 @@ function MeetingsPage() {
         </div>
       ) : isError ? (
         <div className="mt-12 rounded-xl border border-border/70 bg-surface p-10 text-center">
-          <p className="text-sm font-medium">Could not load {labels.meeting.plural.toLowerCase()}.</p>
-          <button onClick={() => refetch()} className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:underline">
+          <p className="text-sm font-medium">
+            Could not load {labels.meeting.plural.toLowerCase()}.
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:underline"
+          >
             Try again
           </button>
         </div>
       ) : data && data.items.length === 0 ? (
         <div className="mt-12 rounded-xl border border-dashed border-border/70 bg-surface/40 py-16 text-center">
           <p className="text-sm font-medium">No {labels.meeting.plural.toLowerCase()} yet.</p>
-          <p className="mt-1 text-xs text-muted-foreground">Upload your first recording to get started.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Upload your first recording to get started.
+          </p>
           <Link
             to="/app/upload"
             className="mt-4 inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background"
@@ -122,68 +129,79 @@ function MeetingsPage() {
                 params={{ id: m.id }}
                 className="block rounded-xl border border-border/70 bg-surface p-5 transition-colors hover:bg-surface-elevated"
               >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-medium">{m.title}</h3>
-                    {m.status === "complete" ? (
-                      <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] text-success">Ready</span>
-                    ) : m.status === "failed" ? (
-                      <span className="rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] text-destructive">
-                        Failed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] text-warning">
-                        <span className="h-1 w-1 animate-pulse rounded-full bg-warning" /> Processing
-                      </span>
-                    )}
-                    {m.tags.map((t) => (
-                      <span key={t} className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                  {m.summary_excerpt && (
-                    <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{m.summary_excerpt}</p>
-                  )}
-
-                  {/* Inline progress bar for processing meetings */}
-                  {m.status !== "complete" && m.status !== "failed" && (
-                    <div className="mt-3 max-w-md">
-                      <div className="relative h-1 w-full overflow-hidden rounded-full bg-muted/30">
-                        <motion.div
-                          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand to-violet"
-                          initial={false}
-                          animate={{ width: `${STATUS_PERCENT[m.status] ?? 5}%` }}
-                          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }}
-                        />
-                        <motion.div
-                          className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-foreground/15 to-transparent"
-                          animate={{ x: ["-30%", "330%"] }}
-                          transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
-                          style={{ left: 0 }}
-                        />
-                      </div>
-                      <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
-                        {STATUS_LABEL[m.status] ?? m.status} · {STATUS_PERCENT[m.status] ?? 5}%
-                      </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-medium">{m.title}</h3>
+                      {m.status === "complete" ? (
+                        <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] text-success">
+                          Ready
+                        </span>
+                      ) : m.status === "failed" ? (
+                        <span className="rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] text-destructive">
+                          Failed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] text-warning">
+                          <span className="h-1 w-1 animate-pulse rounded-full bg-warning" />{" "}
+                          Processing
+                        </span>
+                      )}
+                      {m.tags.map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                        >
+                          {t}
+                        </span>
+                      ))}
                     </div>
-                  )}
+                    {m.summary_excerpt && (
+                      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                        {m.summary_excerpt}
+                      </p>
+                    )}
 
-                  <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="font-mono">{formatDate(m.created_at)}</span>
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> {formatDuration(m.duration_sec)}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Users className="h-3 w-3" /> {m.participant_count}
-                    </span>
-                    <span>
-                      {m.action_item_count} action{m.action_item_count === 1 ? "" : "s"}
-                    </span>
+                    {/* Inline progress bar for processing meetings */}
+                    {m.status !== "complete" && m.status !== "failed" && (
+                      <div className="mt-3 max-w-md">
+                        <div className="relative h-1 w-full overflow-hidden rounded-full bg-muted/30">
+                          <motion.div
+                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand to-violet"
+                            initial={false}
+                            animate={{ width: `${STATUS_PERCENT[m.status] ?? 5}%` }}
+                            transition={{
+                              duration: 0.55,
+                              ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+                            }}
+                          />
+                          <motion.div
+                            className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-foreground/15 to-transparent"
+                            animate={{ x: ["-30%", "330%"] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
+                            style={{ left: 0 }}
+                          />
+                        </div>
+                        <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
+                          {STATUS_LABEL[m.status] ?? m.status} · {STATUS_PERCENT[m.status] ?? 5}%
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="font-mono">{formatDate(m.created_at)}</span>
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> {formatDuration(m.duration_sec)}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Users className="h-3 w-3" /> {m.participant_count}
+                      </span>
+                      <span>
+                        {m.action_item_count} action{m.action_item_count === 1 ? "" : "s"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
               </Link>
             </div>
           ))}
@@ -203,8 +221,8 @@ function MeetingsPage() {
             </div>
             <h3 className="mt-4 text-base font-semibold">Delete this meeting?</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              &ldquo;{confirmDelete.title}&rdquo; and all its transcript, summary, and action items will be
-              removed. This can&apos;t be undone.
+              &ldquo;{confirmDelete.title}&rdquo; and all its transcript, summary, and action items
+              will be removed. This can&apos;t be undone.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button

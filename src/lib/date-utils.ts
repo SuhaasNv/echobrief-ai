@@ -1,6 +1,6 @@
 /**
  * Date formatting utilities
- * 
+ *
  * Consolidated date/time formatting functions used across the application.
  * Prevents duplicate implementations and ensures consistent display.
  */
@@ -14,13 +14,13 @@
 export function formatDate(iso: string, includeYear = false): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  
+
   const options: Intl.DateTimeFormatOptions = {
     month: "short",
     day: "numeric",
     ...(includeYear && { year: "numeric" }),
   };
-  
+
   return d.toLocaleDateString(undefined, options);
 }
 
@@ -56,7 +56,7 @@ export function formatUptime(sec: number): string {
   const days = Math.floor(sec / 86400);
   const hours = Math.floor((sec % 86400) / 3600);
   const minutes = Math.floor((sec % 3600) / 60);
-  
+
   if (days > 0) return `${days}d ${hours}h`;
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
@@ -91,7 +91,7 @@ export function isOverdue(due: string | null): boolean {
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  
+
   return d.toLocaleString(undefined, {
     month: "short",
     day: "numeric",

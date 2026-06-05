@@ -54,7 +54,7 @@ export function WorkspaceSwitcher() {
   // to the oldest workspace. Used both for active-state display and for the
   // auto-select on first paint.
   const defaultWorkspace = preferredKind
-    ? workspaces.find((w) => w.kind === preferredKind) ?? workspaces[0]
+    ? (workspaces.find((w) => w.kind === preferredKind) ?? workspaces[0])
     : workspaces[0];
   const active = workspaces.find((w) => w.id === activeId) ?? defaultWorkspace;
   const activeColor = (active?.color ?? "brand") as WorkspaceColor;
@@ -132,7 +132,11 @@ export function WorkspaceSwitcher() {
       <AnimatePresence>
         {open && (
           <>
-            <div role="presentation" onClick={() => setOpen(false)} className="fixed inset-0 z-40" />
+            <div
+              role="presentation"
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40"
+            />
             <motion.div
               initial={{ opacity: 0, y: -4, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}

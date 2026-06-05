@@ -15,7 +15,14 @@ export function Logo({ className = "" }: { className?: string }) {
   return (
     <Link to={target} className={`group inline-flex items-center gap-2 ${className}`}>
       <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-md bg-foreground text-background">
-        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+        <svg
+          viewBox="0 0 16 16"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        >
           <path d="M2 8 Q4 4 6 8 T10 8 T14 8" />
           <path d="M2 11 Q4 9 6 11 T10 11 T14 11" opacity="0.55" />
         </svg>

@@ -213,7 +213,9 @@ export async function streamGroundedAnswer(params: {
 }): Promise<ReadableStream<Uint8Array>> {
   const env = getEnv();
   if (!env.OPENAI_API_KEY) {
-    return stubStream("[OpenAI API key not configured — set OPENAI_API_KEY in .env to enable AI chat.]");
+    return stubStream(
+      "[OpenAI API key not configured — set OPENAI_API_KEY in .env to enable AI chat.]",
+    );
   }
 
   const client = getClient();

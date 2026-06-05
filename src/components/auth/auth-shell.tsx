@@ -271,7 +271,10 @@ function PreviewCard({ reduceMotion }: { reduceMotion: boolean }) {
           { t: "Draft engineering rollout doc", who: "David · Tomorrow" },
           { t: "Partner outreach top 5", who: "Priya · Fri" },
         ].map((a) => (
-          <div key={a.t} className="flex items-start gap-2 rounded-md bg-background/40 px-2.5 py-1.5">
+          <div
+            key={a.t}
+            className="flex items-start gap-2 rounded-md bg-background/40 px-2.5 py-1.5"
+          >
             <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[11px] text-foreground/90">{a.t}</p>
@@ -301,8 +304,12 @@ function StatStrip() {
           transition={{ delay: 0.7 + i * 0.05, duration: 0.4 }}
           className="bg-surface px-3 py-3 text-center"
         >
-          <p className="font-mono text-base font-semibold tracking-tight text-gradient">{s.value}</p>
-          <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
+          <p className="font-mono text-base font-semibold tracking-tight text-gradient">
+            {s.value}
+          </p>
+          <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+            {s.label}
+          </p>
         </motion.div>
       ))}
     </div>

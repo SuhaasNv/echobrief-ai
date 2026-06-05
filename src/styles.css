@@ -176,8 +176,10 @@
   --sidebar-ring: oklch(0.58 0.18 255);
 
   --gradient-glow: radial-gradient(60% 60% at 50% 0%, oklch(0.58 0.18 255 / 0.12), transparent 70%);
-  --shadow-elegant: 0 1px 0 0 oklch(1 0 0 / 0.5) inset, 0 10px 40px -20px oklch(0.15 0.008 264 / 0.15);
-  --shadow-glow: 0 0 0 1px oklch(0.58 0.18 255 / 0.25), 0 10px 40px -10px oklch(0.58 0.18 255 / 0.25);
+  --shadow-elegant:
+    0 1px 0 0 oklch(1 0 0 / 0.5) inset, 0 10px 40px -20px oklch(0.15 0.008 264 / 0.15);
+  --shadow-glow:
+    0 0 0 1px oklch(0.58 0.18 255 / 0.25), 0 10px 40px -10px oklch(0.58 0.18 255 / 0.25);
 }
 
 /* View Transitions API — used by applyTheme() in src/lib/theme.ts.
@@ -224,12 +226,18 @@
     background-size: 56px 56px;
     opacity: 0.04;
   }
-  .light .bg-grid { opacity: 0.06; }
+  .light .bg-grid {
+    opacity: 0.06;
+  }
   .bg-grid-fade {
     mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 75%);
   }
   .text-gradient {
-    background: linear-gradient(180deg, var(--color-foreground) 0%, var(--color-muted-foreground) 100%);
+    background: linear-gradient(
+      180deg,
+      var(--color-foreground) 0%,
+      var(--color-muted-foreground) 100%
+    );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -252,13 +260,21 @@
   .shadow-elegant {
     box-shadow: var(--shadow-elegant);
   }
-  .scrollbar-hide::-webkit-scrollbar { display: none; }
-  .scrollbar-hide { scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    scrollbar-width: none;
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 .shimmer {
   background: linear-gradient(
@@ -273,7 +289,9 @@
 
 /* Respect reduced motion globally */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
@@ -282,10 +300,17 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
-.animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
 
 /* ────────────────────────────────────────────────────────────────
    DataGridHero — generative animated grid background.
@@ -339,11 +364,21 @@
 }
 
 @keyframes cell-pulse {
-  from { opacity: var(--opacity-min, 0.05); }
-  to   { opacity: var(--opacity-max, 0.22); }
+  from {
+    opacity: var(--opacity-min, 0.05);
+  }
+  to {
+    opacity: var(--opacity-max, 0.22);
+  }
 }
 
 @keyframes caret-blink {
-  0%, 50%   { opacity: 1; }
-  50.01%, 100% { opacity: 0; }
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
 }

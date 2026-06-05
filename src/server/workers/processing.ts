@@ -18,15 +18,16 @@ import { createSignedReadUrl } from "../services/r2";
 import { transcribeAudioUrl, type TranscriptionWord } from "../services/assemblyai";
 import { analyzeMeeting, scoreMeeting } from "../services/llm";
 import { embedChunks } from "../services/openai";
-import {
-  sendProcessingCompleteEmail,
-  sendProcessingFailedEmail,
-} from "../services/resend";
+import { sendProcessingCompleteEmail, sendProcessingFailedEmail } from "../services/resend";
 import { chunkTranscript, chunkRawText } from "../lib/chunking";
 import { getEnv } from "../env";
 import { logTranscription, logAIQuery } from "../services/usage-tracker";
 
-interface SpeakerStat { label: string; talk_time_sec: number; word_count: number }
+interface SpeakerStat {
+  label: string;
+  talk_time_sec: number;
+  word_count: number;
+}
 
 export async function processMeeting(job: ProcessingJob): Promise<void> {
   const sql = getSql();
@@ -316,6 +317,11 @@ async function logStep(
     // The meeting (or user) may have been deleted between job enqueue and the
     // log write — FK violation 23503 lands here. Logging is best-effort; never
     // let it crash the worker.
-    console.warn("[log-step-failed]", job.meeting_id, entry.step, err instanceof Error ? err.message : err);
+    console.warn(
+      "[log-step-failed]",
+      job.meeting_id,
+      entry.step,
+      err instanceof Error ? err.message : err,
+    );
   }
 }

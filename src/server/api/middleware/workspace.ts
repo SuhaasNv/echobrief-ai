@@ -33,10 +33,7 @@ export const requireWorkspace: MiddlewareHandler<AppBindings> = async (c, next) 
       LIMIT 1
     `;
     if (rows.length === 0) {
-      return c.json(
-        { error: "forbidden", message: "Not a member of this workspace" },
-        403,
-      );
+      return c.json({ error: "forbidden", message: "Not a member of this workspace" }, 403);
     }
     workspaceId = rows[0].workspace_id;
     workspaceKind = rows[0].kind;
@@ -49,10 +46,7 @@ export const requireWorkspace: MiddlewareHandler<AppBindings> = async (c, next) 
       LIMIT 1
     `;
     if (rows.length === 0) {
-      return c.json(
-        { error: "no_workspace", message: "User has no workspace yet" },
-        409,
-      );
+      return c.json({ error: "no_workspace", message: "User has no workspace yet" }, 409);
     }
     workspaceId = rows[0].id;
     workspaceKind = rows[0].kind;

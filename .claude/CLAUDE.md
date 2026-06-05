@@ -18,13 +18,13 @@ EchoBrief is an AI meeting intelligence platform: upload audio (meeting recordin
 
 Three live components, all running locally and verified end-to-end:
 
-| Component | Runtime | Port | Status |
-|---|---|---|---|
-| Frontend SSR | Vite / TanStack Start | 8080 | Live, mock data |
-| API (Hono) | Node.js (tsx) | 4000 | Live, queries Railway Postgres + Redis |
-| BullMQ worker | Node.js (tsx) | — | Live, consumes `processing` queue |
-| Postgres | Railway (managed) | — | Live, 11 tables + pgvector + RPC |
-| Redis | Railway (managed) | — | Live, rate-limit + queue |
+| Component     | Runtime               | Port | Status                                 |
+| ------------- | --------------------- | ---- | -------------------------------------- |
+| Frontend SSR  | Vite / TanStack Start | 8080 | Live, mock data                        |
+| API (Hono)    | Node.js (tsx)         | 4000 | Live, queries Railway Postgres + Redis |
+| BullMQ worker | Node.js (tsx)         | —    | Live, consumes `processing` queue      |
+| Postgres      | Railway (managed)     | —    | Live, 11 tables + pgvector + RPC       |
+| Redis         | Railway (managed)     | —    | Live, rate-limit + queue               |
 
 **Frontend pages still use `src/lib/mock-data.ts`** — that's the next phase's job. The backend works against the real Railway DB; the frontend doesn't call it yet.
 
@@ -60,6 +60,7 @@ Audio storage: **Cloudflare R2** via S3-compatible API (`@aws-sdk/client-s3` + p
 ## Tech Stack — what's actually installed
 
 ### Frontend
+
 - **React 19** + **TypeScript 5.8** (strict mode)
 - **TanStack Start** — meta-framework, SSR
 - **TanStack Router** — file-based routes in `src/routes/`
@@ -74,6 +75,7 @@ Audio storage: **Cloudflare R2** via S3-compatible API (`@aws-sdk/client-s3` + p
 - **sonner** — toast notifications
 
 ### API + Worker (Node)
+
 - **Hono 4** — HTTP framework
 - **@hono/node-server** — Node adapter
 - **@hono/zod-validator** — request validation
@@ -88,6 +90,7 @@ Audio storage: **Cloudflare R2** via S3-compatible API (`@aws-sdk/client-s3` + p
 - **dotenv** + **tsx** — env loading + TS runtime
 
 ### Tooling
+
 - **Vite 7** (frontend bundler)
 - **concurrently** — runs all three dev servers (`npm run dev:all`)
 - **wrangler** — frontend SSR deploys to Cloudflare Workers (separate target from the API)
@@ -207,24 +210,24 @@ scripts/
 
 ## Routes — current state
 
-| Route | Type | Status | Notes |
-|---|---|---|---|
-| `/` | Marketing | ✅ Live | Animated count-up stats, marquee, hero |
-| `/login` | Auth | ✅ Styled | Loading state, validation, toasts. Not yet calling Better Auth |
-| `/signup` | Auth | ✅ Styled | Password strength meter, validation |
-| `/forgot-password` | Auth | ✅ UI | Not wired |
-| `/about` | Marketing | ✅ Real content | Timeline, pillars, stats |
-| `/privacy` | Marketing | ✅ Real content | TL;DR card, sub-processor table |
-| `/terms` | Marketing | ✅ Real content | 7 clauses, plain + collapsible legal |
-| `/app/` | App | Mock data | Dashboard |
-| `/app/meetings` | App | Mock data | List + filters |
-| `/app/meetings/$id` | App | Mock data | Detail with tabs |
-| `/app/upload` | App | Mock data | Drag-drop UI |
-| `/app/chat` | App | Mock data | Cross-meeting Q&A UI |
-| `/app/action-items` | App | Mock data | Task list |
-| `/app/shared` | App | Mock data | Shared notes |
-| `/app/analytics` | App | Mock data | Charts |
-| `/app/settings` | App | Mock data | Tabs |
+| Route               | Type      | Status          | Notes                                                          |
+| ------------------- | --------- | --------------- | -------------------------------------------------------------- |
+| `/`                 | Marketing | ✅ Live         | Animated count-up stats, marquee, hero                         |
+| `/login`            | Auth      | ✅ Styled       | Loading state, validation, toasts. Not yet calling Better Auth |
+| `/signup`           | Auth      | ✅ Styled       | Password strength meter, validation                            |
+| `/forgot-password`  | Auth      | ✅ UI           | Not wired                                                      |
+| `/about`            | Marketing | ✅ Real content | Timeline, pillars, stats                                       |
+| `/privacy`          | Marketing | ✅ Real content | TL;DR card, sub-processor table                                |
+| `/terms`            | Marketing | ✅ Real content | 7 clauses, plain + collapsible legal                           |
+| `/app/`             | App       | Mock data       | Dashboard                                                      |
+| `/app/meetings`     | App       | Mock data       | List + filters                                                 |
+| `/app/meetings/$id` | App       | Mock data       | Detail with tabs                                               |
+| `/app/upload`       | App       | Mock data       | Drag-drop UI                                                   |
+| `/app/chat`         | App       | Mock data       | Cross-meeting Q&A UI                                           |
+| `/app/action-items` | App       | Mock data       | Task list                                                      |
+| `/app/shared`       | App       | Mock data       | Shared notes                                                   |
+| `/app/analytics`    | App       | Mock data       | Charts                                                         |
+| `/app/settings`     | App       | Mock data       | Tabs                                                           |
 
 API endpoints (all under `/api/v1`, all `/api/v1/health` excluded require Bearer JWT):
 
@@ -285,36 +288,39 @@ npm run lint
 
 `.env` is gitignored. `.dev.vars.example` is the template. Required:
 
-| Variable | Used by | Notes |
-|---|---|---|
-| `DATABASE_URL` | API + worker | Railway Postgres proxy URL in dev, internal URL in prod |
-| `REDIS_URL` | API + worker | Same pattern |
-| `BETTER_AUTH_SECRET` | API auth middleware | 32+ chars. Generate: `openssl rand -base64 32` |
-| `ASSEMBLYAI_API_KEY` | Worker | Empty → service returns stubs |
-| `OPENAI_API_KEY` | Worker + API | Empty → service returns stubs |
-| `OPENAI_MODEL_PRIMARY` | Worker + API | Default `gpt-5` |
-| `OPENAI_MODEL_LIGHT` | Worker + API | Default `gpt-5-mini` |
-| `RESEND_API_KEY` | Worker | Empty → emails logged to console |
-| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | API + worker | Audio storage |
-| `INTEGRATION_TOKEN_ENCRYPTION_KEY` | API | 32-byte base64 for AES-256-GCM |
-| `APP_URL` | API + worker | Frontend origin (`http://localhost:8080` in dev) |
-| `PORT` | API | `4000` locally; Railway provides its own |
+| Variable                                                                    | Used by             | Notes                                                   |
+| --------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------- |
+| `DATABASE_URL`                                                              | API + worker        | Railway Postgres proxy URL in dev, internal URL in prod |
+| `REDIS_URL`                                                                 | API + worker        | Same pattern                                            |
+| `BETTER_AUTH_SECRET`                                                        | API auth middleware | 32+ chars. Generate: `openssl rand -base64 32`          |
+| `ASSEMBLYAI_API_KEY`                                                        | Worker              | Empty → service returns stubs                           |
+| `OPENAI_API_KEY`                                                            | Worker + API        | Empty → service returns stubs                           |
+| `OPENAI_MODEL_PRIMARY`                                                      | Worker + API        | Default `gpt-5`                                         |
+| `OPENAI_MODEL_LIGHT`                                                        | Worker + API        | Default `gpt-5-mini`                                    |
+| `RESEND_API_KEY`                                                            | Worker              | Empty → emails logged to console                        |
+| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | API + worker        | Audio storage                                           |
+| `INTEGRATION_TOKEN_ENCRYPTION_KEY`                                          | API                 | 32-byte base64 for AES-256-GCM                          |
+| `APP_URL`                                                                   | API + worker        | Frontend origin (`http://localhost:8080` in dev)        |
+| `PORT`                                                                      | API                 | `4000` locally; Railway provides its own                |
 
 ---
 
 ## Code Conventions
 
 ### Routing (TanStack Router)
+
 - Routes auto-generate from `src/routes/`. Never edit `routeTree.gen.ts`.
 - Use `Link` from `@tanstack/react-router`. Hash-link with `<Link to="/" hash="features">`.
 - Use `useParams()`, `useSearch()`, `useNavigate()` from `@tanstack/react-router`.
 
 ### Data Fetching
+
 - **API calls go through `src/lib/api/hooks.ts`** — never call `apiRequest` from a component directly.
 - Query keys live in `qk` object — use them so invalidations work.
 - For streaming endpoints (chat, search, email): use the `streamMeetingChat`, `streamSearch`, `streamEmail` async functions; they return `{ stream: AsyncGenerator<string>, response: Response }`.
 
 ### Animations
+
 - Import: `from "framer-motion"`. We're on the framer-motion package, not the `motion/react` rename.
 - GPU-only properties: `opacity`, `x`, `y`, `scale`, `rotate`. Never animate `width`, `height`, `top`, `left`.
 - Ease curve: `[0.22, 1, 0.36, 1]`. TypeScript-wise, framer-motion 12 needs it typed as `[number, number, number, number]` — use `as const` or explicit tuple cast.
@@ -322,20 +328,24 @@ npm run lint
 - Always respect `useReducedMotion()` for non-essential motion.
 
 ### Database (postgres.js)
+
 - One singleton per process via `getSql()` from `@/server/db`.
-- Tagged-template literals: ``` sql`SELECT * FROM meetings WHERE id = ${id}` ``` — auto-parameterized.
+- Tagged-template literals: `` sql`SELECT * FROM meetings WHERE id = ${id}` `` — auto-parameterized.
 - Every read includes `WHERE user_id = ${user.id}` (no Supabase RLS on Railway).
 - JSONB inserts: `${JSON.stringify(obj)}::jsonb` (avoid `sql.json()` — its types fight us).
 - Vectors: `${\`[\${vec.join(",")}]\`}::vector` — pgvector accepts the bracketed string literal.
 
 ### shadcn/ui
+
 - Do not modify `src/components/ui/*`. Wrap them instead.
 - Add new components: `npx shadcn@latest add <component>`.
 
 ### Forms
+
 - React Hook Form + Zod. The Zod schemas live in `src/lib/schemas.ts` and are reused by the API for input validation — keep them as the single source of truth.
 
 ### Types
+
 - **No `any`**. Use `unknown` and narrow, or generics.
 - Schemas in `src/lib/schemas.ts` export both the Zod object AND a `type` alias via `z.infer<typeof X>`.
 - Database row types are in `src/server/db/types.ts` — keep them in sync with migrations.
@@ -345,6 +355,7 @@ npm run lint
 ## What's Done (changelog)
 
 ### Backend foundation
+
 - Three Railway migrations applied (`0001` schema, `0002` RLS no-op, `0003` `match_transcript_chunks` RPC)
 - Hono API with full route coverage (meetings, action-items, chat, search, integrations, account, generate, share)
 - JWT auth middleware (jose, HS256)
@@ -354,6 +365,7 @@ npm run lint
 - E2E verified: signed JWT → GET `/account/me` → 200 with seeded user from Railway
 
 ### Frontend polish
+
 - Light + dark + system theme system with no-flash boot
 - Command palette (Cmd+K) with cross-route navigation
 - Animated count-up stats + marquee logos on landing
@@ -363,6 +375,7 @@ npm run lint
 - Toast system (sonner) globally mounted
 
 ### Tooling
+
 - `npm run dev:all` starts all three services with color-coded logs
 - `tsconfig.api.json` for Node-target typecheck
 - `Dockerfile` + `railway.json` for the API/worker

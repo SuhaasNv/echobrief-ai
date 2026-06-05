@@ -30,9 +30,8 @@ function TermsPage() {
             <span className="text-gradient-brand">written like a human did it.</span>
           </h1>
           <p className="mt-5 max-w-2xl text-base text-muted-foreground">
-            We're not going to make you scroll through ten pages of capital
-            letters. Here are the seven things that matter, with plain-English
-            translations underneath.
+            We're not going to make you scroll through ten pages of capital letters. Here are the
+            seven things that matter, with plain-English translations underneath.
           </p>
         </motion.div>
 
@@ -48,9 +47,9 @@ function TermsPage() {
             The deal in one sentence
           </p>
           <p className="mt-3 text-xl leading-relaxed tracking-tight text-foreground">
-            You give us audio. We give you a transcript, a summary, action items,
-            and the ability to ask questions about every meeting you've ever
-            uploaded. You can take your data and leave whenever you want.
+            You give us audio. We give you a transcript, a summary, action items, and the ability to
+            ask questions about every meeting you've ever uploaded. You can take your data and leave
+            whenever you want.
           </p>
         </motion.div>
 
@@ -118,9 +117,7 @@ function TermsPage() {
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           className="mt-16 rounded-2xl border border-border/60 bg-gradient-to-br from-surface to-background p-6"
         >
-          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">
-            Questions
-          </p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">Questions</p>
           <p className="mt-2 text-sm text-foreground">
             Genuinely confused by something? That's a bug in our writing. Email{" "}
             <a

@@ -90,8 +90,7 @@ export function useUpdateWorkspace() {
 export function useDeleteWorkspace() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      apiRequest<{ ok: true }>(`/workspaces/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => apiRequest<{ ok: true }>(`/workspaces/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.workspaces }),
   });
 }
@@ -119,8 +118,7 @@ export interface FlashcardWithMeeting extends Flashcard {
 export function useFlashcards(meetingId: string | undefined) {
   return useQuery({
     queryKey: ["flashcards", "meeting", meetingId] as const,
-    queryFn: () =>
-      apiRequest<{ items: Flashcard[] }>(`/meetings/${meetingId}/flashcards`),
+    queryFn: () => apiRequest<{ items: Flashcard[] }>(`/meetings/${meetingId}/flashcards`),
     enabled: !!meetingId,
   });
 }
@@ -172,8 +170,7 @@ export function useUpdateFlashcard() {
 export function useDeleteFlashcard() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      apiRequest<{ ok: true }>(`/flashcards/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => apiRequest<{ ok: true }>(`/flashcards/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["flashcards"] });
     },
@@ -265,7 +262,13 @@ export interface AdminMeetingRow {
 }
 
 export interface AdminQueueResponse {
-  counts: { waiting?: number; active?: number; completed?: number; failed?: number; delayed?: number };
+  counts: {
+    waiting?: number;
+    active?: number;
+    completed?: number;
+    failed?: number;
+    delayed?: number;
+  };
   recent_failed: Array<{
     id: string;
     name: string;
@@ -326,8 +329,13 @@ export function useAdminSystem() {
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ userId, updates }: { userId: string; updates: { name?: string; is_admin?: boolean } }) =>
-      apiRequest<{ ok: true }>(`/admin/users/${userId}`, { method: "PATCH", body: updates }),
+    mutationFn: ({
+      userId,
+      updates,
+    }: {
+      userId: string;
+      updates: { name?: string; is_admin?: boolean };
+    }) => apiRequest<{ ok: true }>(`/admin/users/${userId}`, { method: "PATCH", body: updates }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
 }
@@ -335,14 +343,20 @@ export function useUpdateUser() {
 export function useUpdateUserSubscription() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ 
-      userId, 
-      updates 
-    }: { 
-      userId: string; 
-      updates: { tier: "free" | "student" | "pro" | "team"; status?: "active" | "cancelled" | "past_due" | "trialing" } 
+    mutationFn: ({
+      userId,
+      updates,
+    }: {
+      userId: string;
+      updates: {
+        tier: "free" | "student" | "pro" | "team";
+        status?: "active" | "cancelled" | "past_due" | "trialing";
+      };
     }) =>
-      apiRequest<{ ok: true }>(`/admin/users/${userId}/subscription`, { method: "PATCH", body: updates }),
+      apiRequest<{ ok: true }>(`/admin/users/${userId}/subscription`, {
+        method: "PATCH",
+        body: updates,
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
 }
@@ -351,9 +365,12 @@ export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ userId, confirm = false }: { userId: string; confirm?: boolean }) =>
-      apiRequest<{ ok: true; deleted_email: string }>(`/admin/users/${userId}${confirm ? "?confirm=true" : ""}`, { 
-        method: "DELETE" 
-      }),
+      apiRequest<{ ok: true; deleted_email: string }>(
+        `/admin/users/${userId}${confirm ? "?confirm=true" : ""}`,
+        {
+          method: "DELETE",
+        },
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
 }
@@ -399,7 +416,10 @@ export function useDeleteAccount() {
 export function useMeetings(query: Partial<MeetingListQuery> = {}) {
   return useQuery({
     queryKey: qk.meetings(query),
-    queryFn: () => apiRequest<MeetingListResponse>("/meetings", { query: query as Record<string, string | number> }),
+    queryFn: () =>
+      apiRequest<MeetingListResponse>("/meetings", {
+        query: query as Record<string, string | number>,
+      }),
   });
 }
 
@@ -520,7 +540,12 @@ export function useShareMeeting(id: string) {
 // Action items
 // ---------------------------------------------------------------------------
 export function useActionItems(
-  filters: { completed?: boolean; meeting_id?: string; assignee?: string; due_before?: string } = {},
+  filters: {
+    completed?: boolean;
+    meeting_id?: string;
+    assignee?: string;
+    due_before?: string;
+  } = {},
 ) {
   return useQuery({
     queryKey: qk.actionItems(filters as Record<string, unknown>),
@@ -564,7 +589,8 @@ export function usePatchActionItem() {
 export function useDeleteActionItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiRequest<{ ok: true }>(`/action-items/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) =>
+      apiRequest<{ ok: true }>(`/action-items/${id}`, { method: "DELETE" }),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ["action-items"] });
       const snapshot = qc.getQueriesData<{ items: ActionItem[] }>({ queryKey: ["action-items"] });
@@ -596,7 +622,11 @@ export function useExportActionItem() {
 // ---------------------------------------------------------------------------
 // AI streaming endpoints
 // ---------------------------------------------------------------------------
-export async function streamMeetingChat(id: string, body: MeetingChatRequest, signal?: AbortSignal) {
+export async function streamMeetingChat(
+  id: string,
+  body: MeetingChatRequest,
+  signal?: AbortSignal,
+) {
   return apiStream(`/meetings/${id}/chat`, { method: "POST", body, signal });
 }
 

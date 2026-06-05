@@ -20,7 +20,7 @@ describe("formatDate", () => {
   it("formats ISO date string to short locale date", () => {
     const iso = "2024-01-15T10:30:00Z";
     const result = formatDate(iso);
-    
+
     // Should include month and day, but not year by default
     expect(result).toContain("Jan");
     expect(result).toContain("15");
@@ -30,7 +30,7 @@ describe("formatDate", () => {
   it("includes year when includeYear is true", () => {
     const iso = "2024-01-15T10:30:00Z";
     const result = formatDate(iso, true);
-    
+
     expect(result).toContain("Jan");
     expect(result).toContain("15");
     expect(result).toContain("2024");
@@ -39,7 +39,7 @@ describe("formatDate", () => {
   it("returns original string for invalid ISO date", () => {
     const invalid = "not-a-date";
     const result = formatDate(invalid);
-    
+
     expect(result).toBe(invalid);
   });
 
@@ -142,7 +142,7 @@ describe("formatDue", () => {
   it("formats due date using formatDate", () => {
     const iso = "2024-01-15T10:30:00Z";
     const result = formatDue(iso);
-    
+
     expect(result).toContain("Jan");
     expect(result).toContain("15");
   });
@@ -198,7 +198,7 @@ describe("formatDateTime", () => {
   it("formats ISO date to full date-time string", () => {
     const iso = "2024-01-15T14:30:00Z";
     const result = formatDateTime(iso);
-    
+
     // Should include month, day, year, hour, and minute
     expect(result).toContain("Jan");
     expect(result).toContain("15");
@@ -210,14 +210,14 @@ describe("formatDateTime", () => {
   it("returns original string for invalid ISO date", () => {
     const invalid = "not-a-date";
     const result = formatDateTime(invalid);
-    
+
     expect(result).toBe(invalid);
   });
 
   it("includes time component in formatted output", () => {
     const iso = "2024-01-15T14:30:00Z";
     const result = formatDateTime(iso);
-    
+
     // Should contain time separator (colon) and time digits
     expect(result).toMatch(/\d+:\d+/);
   });
@@ -236,7 +236,7 @@ describe("getTodayFormatted", () => {
 
   it("returns today's date with weekday and full month", () => {
     const result = getTodayFormatted();
-    
+
     // Should include weekday, month name, and day
     expect(result).toContain("January");
     expect(result).toContain("15");
@@ -246,11 +246,11 @@ describe("getTodayFormatted", () => {
 
   it("includes weekday in formatted output", () => {
     const result = getTodayFormatted();
-    
+
     // Should contain one of the weekdays (locale-dependent)
     const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     const hasWeekday = weekdays.some((day) => result.includes(day));
-    
+
     expect(hasWeekday).toBe(true);
   });
 });
@@ -259,7 +259,7 @@ describe("edge cases and boundary conditions", () => {
   it("handles leap year dates correctly", () => {
     const leapDay = "2024-02-29T00:00:00Z";
     const result = formatDate(leapDay);
-    
+
     expect(result).toContain("Feb");
     expect(result).toContain("29");
   });
@@ -267,7 +267,7 @@ describe("edge cases and boundary conditions", () => {
   it("handles end of year dates", () => {
     const middayNewYearsEve = "2024-12-31T12:00:00Z";
     const result = formatDate(middayNewYearsEve, true);
-    
+
     // Should contain month (Dec), day (31), and year (2024)
     // Using midday to avoid timezone conversion issues
     expect(result).toContain("31");
@@ -278,7 +278,7 @@ describe("edge cases and boundary conditions", () => {
     // formatDuration doesn't floor seconds, so decimals appear in output
     const result1 = formatDuration(90.123);
     const result2 = formatDuration(90.999);
-    
+
     expect(result1).toMatch(/1:30/);
     expect(result2).toMatch(/1:30/);
   });
