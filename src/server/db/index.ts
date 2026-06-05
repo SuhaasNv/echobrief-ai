@@ -28,7 +28,7 @@ export function getSql(): Sql {
   const maxConnections = parseInt(process.env.DB_POOL_SIZE || "100");
 
   _sql = postgres(env.DATABASE_URL, {
-    ssl: "require",
+    ssl: env.NODE_ENV === "test" ? false : "require",
     max: maxConnections, // 100 connections per instance (up from 10)
     idle_timeout: 20, // Recycle idle connections faster (down from 30)
     connect_timeout: 10,

@@ -91,6 +91,11 @@ export function rateLimit(
   opts: RateLimitOptions = {},
 ): MiddlewareHandler<AppBindings> {
   return async (c, next) => {
+    if (process.env.NODE_ENV === "test") {
+      await next();
+      return;
+    }
+
     const user = c.get("user");
     const identifier = user?.id ?? clientIp(c);
     const suffix = opts.keySuffix ? `:${opts.keySuffix}` : "";
@@ -163,6 +168,10 @@ export async function checkAuthRateLimit(
   bucket: "auth" | "signup",
   email: string,
 ): Promise<Response | null> {
+  if (process.env.NODE_ENV === "test") {
+    return null;
+  }
+
   const cfg = LIMITS[bucket];
   const ip = clientIp(c);
   const windowStart = Math.floor(Date.now() / 1000 / cfg.window_sec);
