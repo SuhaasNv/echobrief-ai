@@ -63,9 +63,19 @@ export function useSubscription() {
 }
 
 /**
+ * Feature flags only — excludes `history_retention_days`, which is a number,
+ * not an on/off capability.
+ */
+type BooleanFeature = {
+  [K in keyof SubscriptionData["features"]]: SubscriptionData["features"][K] extends boolean
+    ? K
+    : never;
+}[keyof SubscriptionData["features"]];
+
+/**
  * Check if user has a specific feature based on their tier.
  */
-export function useHasFeature(feature: keyof SubscriptionData["features"]): boolean {
+export function useHasFeature(feature: BooleanFeature): boolean {
   const { data } = useSubscription();
   return data?.features[feature] ?? false;
 }

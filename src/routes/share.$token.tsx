@@ -12,6 +12,7 @@ import {
   Lock,
 } from "lucide-react";
 import { formatDate, formatDuration } from "@/lib/date-utils";
+import { apiRequest } from "@/lib/api/client";
 
 export const Route = createFileRoute("/share/$token")({
   head: () => ({
@@ -54,17 +55,7 @@ function SharePage() {
   const query = useQuery<SharedMeeting>({
     queryKey: ["shared-meeting", token],
     queryFn: async () => {
-      console.log("[share] Fetching shared meeting with token:", token);
-      const res = await fetch(`/api/v1/share/${token}`);
-      console.log("[share] Response status:", res.status);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Failed to load meeting" }));
-        console.error("[share] Error loading meeting:", err);
-        throw new Error(err.message || "Failed to load meeting");
-      }
-      const data = await res.json();
-      console.log("[share] Successfully loaded meeting:", data.title);
-      return data;
+      return apiRequest<SharedMeeting>(`/share/${token}`);
     },
     retry: false,
   });

@@ -60,6 +60,8 @@ function Dashboard() {
 
   const weekHours = chartData.reduce((s, b) => s + b.h, 0);
 
+  const summaryCount = allMeetingsQuery.data?.items.filter((m) => m.summary_excerpt).length ?? null;
+
   const stats = [
     {
       label: `${labels.meeting.plural} indexed`,
@@ -79,7 +81,12 @@ function Dashboard() {
       delta: null,
       icon: Clock,
     },
-    { label: "AI summaries", value: "—", delta: null, icon: Sparkles },
+    {
+      label: "AI summaries",
+      value: summaryCount !== null ? String(summaryCount) : "—",
+      delta: null,
+      icon: Sparkles,
+    },
   ];
 
   const recentMeetings = meetingsQuery.data?.items.slice(0, 4) ?? [];

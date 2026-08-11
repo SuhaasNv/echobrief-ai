@@ -26,8 +26,17 @@ dist-ssr
 .env.*.local
 dist-api/
 
+# Test coverage reports — regenerable with `npm run test:coverage`
+coverage/
+
 # Database backups — contain PII (emails, password hashes). Never commit.
 backups/
+
+# AI Agent Skills — locally installed, regenerable with `npx skills add`
+.agents/
+.claude/skills/
+.cortex/skills/
+skills-lock.json
 
 # Editor directories and files
 .vscode/*

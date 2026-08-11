@@ -5,11 +5,27 @@
  * shapes. All paths are relative to /api/v1.
  */
 
-const API_BASE_URL =
+/** Every API route lives under this prefix (see src/api.ts: app.route("/api/v1", api)). */
+const API_PATH_PREFIX = "/api/v1";
+
+/**
+ * Accepts an origin with or without the /api/v1 suffix and always returns one
+ * that has it. VITE_API_URL is baked into the client bundle at image build
+ * time, so a bare origin there would otherwise 404 outside the mount — which
+ * the browser reports as a CORS failure, not a 404.
+ */
+function normalizeApiBaseUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (!trimmed) return API_PATH_PREFIX;
+  return trimmed.endsWith(API_PATH_PREFIX) ? trimmed : `${trimmed}${API_PATH_PREFIX}`;
+}
+
+const API_BASE_URL = normalizeApiBaseUrl(
   (typeof window !== "undefined" &&
     (window as { __ECHOBRIEF_API_URL__?: string }).__ECHOBRIEF_API_URL__) ||
-  (import.meta.env?.VITE_API_URL as string | undefined) ||
-  "/api/v1";
+    (import.meta.env?.VITE_API_URL as string | undefined) ||
+    API_PATH_PREFIX,
+);
 
 const TOKEN_STORAGE_KEY = "echobrief-auth-token";
 const WORKSPACE_STORAGE_KEY = "echobrief-active-workspace";

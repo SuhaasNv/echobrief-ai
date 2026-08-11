@@ -112,7 +112,10 @@ function WorkspacesSection() {
 
   // Check if user can create more workspaces
   const workspaceCount = workspaces.length;
-  const workspaceLimit = subscription?.limits.workspaces;
+  // `null` means unlimited. Treat "subscription not loaded yet" as unlimited too,
+  // otherwise the first render gates creation behind the upgrade dialog; the
+  // server enforces the real quota regardless.
+  const workspaceLimit = subscription?.limits.workspaces ?? null;
   const canCreateWorkspace = workspaceLimit === null || workspaceCount < workspaceLimit;
 
   function handleNewWorkspaceClick() {

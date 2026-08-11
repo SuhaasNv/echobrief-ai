@@ -39,7 +39,9 @@ function ChatPage() {
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const items = meetings.data?.items ?? [];
+  // Memoized so the `[]` fallback doesn't produce a new array identity on every
+  // render — that would re-run the auto-select effect and the scroll effect below.
+  const items = useMemo(() => meetings.data?.items ?? [], [meetings.data]);
   const filtered = useMemo(
     () =>
       filter.trim()
@@ -49,7 +51,10 @@ function ChatPage() {
   );
 
   const selected = items.find((m) => m.id === selectedId) ?? null;
-  const messages: Msg[] = selectedId ? (threads[selectedId] ?? []) : [];
+  const messages: Msg[] = useMemo(
+    () => (selectedId ? (threads[selectedId] ?? []) : []),
+    [selectedId, threads],
+  );
 
   // Auto-select the first complete meeting once data lands.
   useEffect(() => {
