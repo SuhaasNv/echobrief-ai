@@ -7,6 +7,24 @@ import { useMeetings, useDeleteMeeting } from "@/lib/api/hooks";
 import { useLabels } from "@/lib/workspace-store";
 import { formatDate, formatDuration } from "@/lib/date-utils";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { MeetingStatus } from "@/lib/schemas";
+
+const STATUS_FILTERS: Array<{ value: MeetingStatus | "all"; label: string }> = [
+  { value: "all", label: "All statuses" },
+  { value: "complete", label: "Ready" },
+  { value: "queued", label: "Queued" },
+  { value: "transcribing", label: "Transcribing" },
+  { value: "analyzing", label: "Analyzing" },
+  { value: "indexing", label: "Indexing" },
+  { value: "failed", label: "Failed" },
+];
 
 // Map server status string → progress percent for the inline bar.
 const STATUS_PERCENT: Record<string, number> = {
@@ -32,7 +50,12 @@ export const Route = createFileRoute("/app/meetings")({
 
 function MeetingsPage() {
   const [q, setQ] = useState("");
-  const { data, isLoading, isError, refetch } = useMeetings({ q: q || undefined, limit: 50 });
+  const [status, setStatus] = useState<MeetingStatus | "all">("all");
+  const { data, isLoading, isError, refetch } = useMeetings({
+    q: q || undefined,
+    status: status === "all" ? undefined : status,
+    limit: 50,
+  });
   const del = useDeleteMeeting();
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
   const labels = useLabels();
@@ -75,9 +98,19 @@ function MeetingsPage() {
             className="w-full bg-transparent focus:outline-none"
           />
         </div>
-        <button className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-surface/60 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">
-          <Filter className="h-3.5 w-3.5" /> Filter
-        </button>
+        <Select value={status} onValueChange={(v) => setStatus(v as MeetingStatus | "all")}>
+          <SelectTrigger className="w-[160px] gap-2 border-border/60 bg-surface/60 text-sm text-muted-foreground hover:text-foreground">
+            <Filter className="h-3.5 w-3.5" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_FILTERS.map((f) => (
+              <SelectItem key={f.value} value={f.value}>
+                {f.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -97,18 +130,39 @@ function MeetingsPage() {
           </button>
         </div>
       ) : data && data.items.length === 0 ? (
-        <div className="mt-12 rounded-xl border border-dashed border-border/70 bg-surface/40 py-16 text-center">
-          <p className="text-sm font-medium">No {labels.meeting.plural.toLowerCase()} yet.</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Upload your first recording to get started.
-          </p>
-          <Link
-            to="/app/upload"
-            className="mt-4 inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background"
-          >
-            <Plus className="h-3.5 w-3.5" /> {labels.meeting.upload_cta}
-          </Link>
-        </div>
+        q || status !== "all" ? (
+          <div className="mt-6 flex min-h-[50vh] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-surface/40 px-6 text-center">
+            <p className="text-sm font-medium">
+              No {labels.meeting.plural.toLowerCase()} match your filters.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Try a different search term or status.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setQ("");
+                setStatus("all");
+              }}
+              className="mt-4 text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          <div className="mt-6 flex min-h-[50vh] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-surface/40 px-6 text-center">
+            <p className="text-sm font-medium">No {labels.meeting.plural.toLowerCase()} yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Upload your first recording to get started.
+            </p>
+            <Link
+              to="/app/upload"
+              className="mt-4 inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background"
+            >
+              <Plus className="h-3.5 w-3.5" /> {labels.meeting.upload_cta}
+            </Link>
+          </div>
+        )
       ) : (
         <div className="mt-6 grid gap-3">
           {data?.items.map((m) => (
