@@ -57,16 +57,22 @@ export async function enqueueProcessingJob(job: ProcessingJob): Promise<void> {
  * add against that surviving key and returns the old job WITHOUT queueing
  * anything — so a plain re-add on retry is a silent no-op. Drop the old record
  * first so the new job actually runs.
+ *
+ * Returns false when the existing job is locked (currently being processed) —
+ * removal fails there, and re-queueing would duplicate the transcription spend.
  */
-export async function reenqueueProcessingJob(job: ProcessingJob): Promise<void> {
+export async function reenqueueProcessingJob(job: ProcessingJob): Promise<boolean> {
   const queue = getProcessingQueue();
   const existing = await queue.getJob(job.meeting_id);
   if (existing) {
-    // Throws if the job is currently active/locked; in that case it's already
-    // running and re-queueing would duplicate the work.
-    await existing.remove();
+    try {
+      await existing.remove();
+    } catch {
+      return false;
+    }
   }
   await queue.add(`meeting:${job.meeting_id}`, job, { jobId: job.meeting_id });
+  return true;
 }
 
 export async function enqueueWithDelay(job: ProcessingJob, delaySeconds: number): Promise<void> {

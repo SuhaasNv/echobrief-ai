@@ -625,13 +625,19 @@ app.post("/:id/retry", async (c) => {
   await sql`UPDATE meetings SET status = 'queued', failure_reason = NULL WHERE id = ${id}`;
 
   // Must clear the retained failed job first — see reenqueueProcessingJob.
-  await reenqueueProcessingJob({
+  const queued = await reenqueueProcessingJob({
     meeting_id: meeting.id,
     user_id: meeting.user_id,
     audio_key: meeting.audio_key,
     language: meeting.language,
     retry_count: meeting.retry_count + 1,
   });
+
+  if (!queued) {
+    // A worker holds the lock — this meeting is already being reprocessed.
+    await sql`UPDATE meetings SET status = 'processing' WHERE id = ${id}`;
+    throw new HTTPException(409, { message: "This meeting is already being processed" });
+  }
 
   return c.json({ ok: true });
 });
