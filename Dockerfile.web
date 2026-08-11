@@ -1,0 +1,46 @@
+# Frontend SSR (Node) — Railway deployment.
+# The default vite.config.ts targets Cloudflare Workers; this image builds with
+# vite.config.railway.ts (cloudflare plugin disabled) and serves via
+# scripts/serve-web.mjs (@hono/node-server: static assets + SSR fetch handler).
+
+# ===== Stage 1: Builder =====
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci --no-audit --no-fund
+
+COPY tsconfig.json vite.config.railway.ts components.json ./
+COPY src ./src
+
+# VITE_* vars are inlined into the client bundle at build time.
+# Railway passes service variables as build args when declared here.
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
+RUN npx vite build --config vite.config.railway.ts
+
+# ===== Stage 2: Production =====
+FROM node:20-slim AS production
+
+WORKDIR /app
+
+RUN groupadd -r echobrief && useradd -r -g echobrief echobrief
+
+COPY package.json package-lock.json* ./
+RUN npm ci --only=production --no-audit --no-fund
+
+COPY --from=builder /app/dist ./dist
+COPY scripts/serve-web.mjs ./scripts/serve-web.mjs
+
+RUN chown -R echobrief:echobrief /app
+USER echobrief
+
+ENV NODE_ENV=production
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/', (r) => { process.exit(r.statusCode < 500 ? 0 : 1); }).on('error', () => process.exit(1));"
+
+CMD ["node", "scripts/serve-web.mjs"]
