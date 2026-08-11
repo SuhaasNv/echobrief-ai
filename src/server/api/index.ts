@@ -55,6 +55,18 @@ api.use(
     credentials: true,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["content-type", "authorization", "x-request-id", "x-workspace-id"],
+    // Without this the browser strips these from cross-origin responses — and
+    // the frontend is ALWAYS cross-origin (:8080 vs :4000 in dev, separate
+    // Railway services in prod). x-citations silently read as null, so every
+    // search answer rendered with zero sources.
+    exposeHeaders: [
+      "x-citations",
+      "x-request-id",
+      "retry-after",
+      "x-ratelimit-limit",
+      "x-ratelimit-remaining",
+      "x-ratelimit-reset",
+    ],
   }),
 );
 

@@ -35,7 +35,9 @@ import {
   useFlashcards,
   useGenerateFlashcards,
   useDeleteFlashcard,
+  qk,
 } from "@/lib/api/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import type { MeetingDetail, MeetingStatusResponse } from "@/lib/schemas";
 import { useActiveWorkspaceKind, useLabels } from "@/lib/workspace-store";
 import { Brain, Sparkle, GraduationCap } from "lucide-react";
@@ -55,6 +57,19 @@ function MeetingDetailPage() {
   const retry = useRetryMeeting(id);
   const del = useDeleteMeeting();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const qc = useQueryClient();
+
+  // Only the status endpoint polls. The detail query is fetched once, so when
+  // the worker finishes, `meeting.status` is still "processing" and the page
+  // renders the skeleton forever. Pull the detail (and the action items the
+  // worker just wrote) whenever the polled status diverges from it.
+  const polledStatus = statusQuery.data?.status;
+  const detailStatus = meetingQuery.data?.status;
+  useEffect(() => {
+    if (!polledStatus || !detailStatus || polledStatus === detailStatus) return;
+    qc.invalidateQueries({ queryKey: qk.meeting(id), exact: true });
+    qc.invalidateQueries({ queryKey: qk.actionItems({ meeting_id: id }) });
+  }, [polledStatus, detailStatus, id, qc]);
 
   const handleDelete = async () => {
     try {
@@ -859,8 +874,10 @@ function MeetingScorePanel({ score }: { score: { total: number; explanation?: st
         {labels.meeting.score}
       </p>
       <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-2xl font-semibold tracking-tight">{score.total.toFixed(0)}</span>
-        <span className="text-xs text-muted-foreground">/ 100</span>
+        {/* SCORE_SYSTEM scores each dimension 0–10 and totals a weighted
+            average, so "/ 100" made every meeting look catastrophic. */}
+        <span className="text-2xl font-semibold tracking-tight">{score.total.toFixed(1)}</span>
+        <span className="text-xs text-muted-foreground">/ 10</span>
       </div>
       {score.explanation && (
         <p className="mt-2 text-xs text-muted-foreground">{score.explanation}</p>

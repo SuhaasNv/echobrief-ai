@@ -18,13 +18,49 @@ import type { AppBindings } from "../types";
 
 const app = new Hono<AppBindings>();
 
+/**
+ * Resolve the caller's active workspace without requireWorkspace: trust the
+ * header only if the user is actually a member, else fall back to their oldest
+ * workspace. Returns null when the user has none yet.
+ */
+async function resolveActiveWorkspaceId(
+  userId: string,
+  headerId: string | undefined,
+): Promise<string | null> {
+  const sql = getSql();
+  if (headerId) {
+    const rows = await sql<{ workspace_id: string }[]>`
+      SELECT workspace_id FROM workspace_members
+      WHERE workspace_id = ${headerId} AND user_id = ${userId}
+      LIMIT 1
+    `;
+    if (rows.length > 0) return rows[0].workspace_id;
+  }
+  const rows = await sql<{ id: string }[]>`
+    SELECT w.id FROM workspaces w
+    JOIN workspace_members m ON m.workspace_id = w.id AND m.user_id = ${userId}
+    ORDER BY w.created_at ASC
+    LIMIT 1
+  `;
+  return rows[0]?.id ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // GET /subscription — current tier, status, usage, and limits
 // ---------------------------------------------------------------------------
 app.get("/", async (c) => {
   const user = c.get("user");
-  const workspaceId = c.get("workspaceId");
   const sql = getSql();
+
+  // This route is mounted OUTSIDE requireWorkspace (you can read your plan
+  // without an active workspace), so c.get("workspaceId") is undefined here.
+  // Passing undefined to getCurrentUsage hit its `= null` default parameter and
+  // silently took the account-wide branch, making workspace_usage a duplicate
+  // of usage. Resolve the active workspace the same way requireWorkspace does.
+  const workspaceId = await resolveActiveWorkspaceId(
+    user.id,
+    c.req.header("x-workspace-id")?.trim(),
+  );
 
   // Get subscription details
   const subscriptionRows = await sql<

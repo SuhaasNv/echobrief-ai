@@ -54,12 +54,17 @@ function ActionItemsPage() {
 
   const bulkComplete = async (completed: boolean) => {
     const ids = [...selected];
-    await Promise.all(
-      ids.map((id) => patch.mutateAsync({ id, patch: { completed } }).catch(() => {})),
+    // Swallowing rejections and always toasting success meant a fully failed
+    // batch reported "N items completed" while the optimistic updates rolled
+    // the rows straight back. Count what actually landed.
+    const results = await Promise.allSettled(
+      ids.map((id) => patch.mutateAsync({ id, patch: { completed } })),
     );
-    toast.success(
-      `${ids.length} item${ids.length === 1 ? "" : "s"} ${completed ? "completed" : "reopened"}`,
-    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = ids.length - failed;
+    const verb = completed ? "completed" : "reopened";
+    if (ok > 0) toast.success(`${ok} item${ok === 1 ? "" : "s"} ${verb}`);
+    if (failed > 0) toast.error(`${failed} item${failed === 1 ? "" : "s"} couldn't be updated`);
     setSelected(new Set());
   };
 
@@ -71,8 +76,11 @@ function ActionItemsPage() {
       )
     )
       return;
-    await Promise.all(ids.map((id) => del.mutateAsync(id).catch(() => {})));
-    toast.success(`Deleted ${ids.length}`);
+    const results = await Promise.allSettled(ids.map((id) => del.mutateAsync(id)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = ids.length - failed;
+    if (ok > 0) toast.success(`Deleted ${ok}`);
+    if (failed > 0) toast.error(`${failed} item${failed === 1 ? "" : "s"} couldn't be deleted`);
     setSelected(new Set());
   };
 

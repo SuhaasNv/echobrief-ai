@@ -107,12 +107,14 @@ async function apiRequestInternal<T>(
     signal: opts.signal,
   });
 
-  if (opts.raw) return response as unknown as T;
-
   if (!response.ok) {
+    // Read the error payload off a clone so a `raw` caller (apiStream) still
+    // gets an unconsumed body to parse. This block runs BEFORE the raw
+    // early-return so streaming endpoints get the same self-heal and
+    // session-expiry handling as everything else.
     let payload: { error?: string; message?: string; details?: unknown } = {};
     try {
-      payload = await response.json();
+      payload = await (opts.raw ? response.clone() : response).json();
     } catch {
       /* response not JSON */
     }
@@ -128,13 +130,28 @@ async function apiRequestInternal<T>(
       typeof payload.message === "string" &&
       /not a member of this workspace/i.test(payload.message)
     ) {
-      setAuthToken(getAuthToken()); // no-op, kept for clarity
       setActiveWorkspaceId(null);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("echobrief:workspace-changed", { detail: null }));
       }
       return apiRequestInternal<T>(path, opts, true);
     }
+
+    // The token is present but the server rejected it — expired, revoked, or
+    // signed with a rotated secret. Without this the app keeps a dead token in
+    // localStorage forever: the /app guard sees a non-empty string and lets the
+    // shell mount, every query 401s, and there is no route back to /login.
+    // /auth/* is exempt — a 401 there is just wrong credentials.
+    if (response.status === 401 && !path.startsWith("/auth/")) {
+      setAuthToken(null);
+      setActiveWorkspaceId(null);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("echobrief:unauthorized"));
+      }
+    }
+
+    // Raw callers parse and throw their own error from the untouched body.
+    if (opts.raw) return response as unknown as T;
 
     throw new ApiError(
       response.status,
@@ -143,6 +160,8 @@ async function apiRequestInternal<T>(
       payload.details,
     );
   }
+
+  if (opts.raw) return response as unknown as T;
 
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;

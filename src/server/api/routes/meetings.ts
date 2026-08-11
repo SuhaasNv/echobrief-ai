@@ -26,7 +26,7 @@ import {
   createSignedReadUrl,
   deleteAudioObject,
 } from "../../services/r2";
-import { enqueueProcessingJob } from "../../services/queue";
+import { enqueueProcessingJob, reenqueueProcessingJob } from "../../services/queue";
 import { getSql } from "../../db";
 import type { MeetingRow } from "../../db/types";
 
@@ -253,6 +253,7 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       processed_at: string | null;
       summary_excerpt: string | null;
       action_item_count: number;
+      participant_count: number;
     }>
   >`
     SELECT
@@ -264,7 +265,12 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       m.created_at,
       m.processed_at,
       s.executive AS summary_excerpt,
-      (SELECT COUNT(*)::int FROM action_items ai WHERE ai.meeting_id = m.id) AS action_item_count
+      (SELECT COUNT(*)::int FROM action_items ai WHERE ai.meeting_id = m.id) AS action_item_count,
+      COALESCE((
+        SELECT jsonb_array_length(t.speakers)
+        FROM transcripts t
+        WHERE t.meeting_id = m.id AND jsonb_typeof(t.speakers) = 'array'
+      ), 0)::int AS participant_count
     FROM meetings m
     LEFT JOIN summaries s ON s.meeting_id = m.id
     WHERE ${whereClause}
@@ -286,7 +292,7 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       created_at: r.created_at,
       processed_at: r.processed_at,
       action_item_count: r.action_item_count,
-      participant_count: 0,
+      participant_count: r.participant_count,
       summary_excerpt: r.summary_excerpt,
     })),
     total,
@@ -618,7 +624,8 @@ app.post("/:id/retry", async (c) => {
 
   await sql`UPDATE meetings SET status = 'queued', failure_reason = NULL WHERE id = ${id}`;
 
-  await enqueueProcessingJob({
+  // Must clear the retained failed job first — see reenqueueProcessingJob.
+  await reenqueueProcessingJob({
     meeting_id: meeting.id,
     user_id: meeting.user_id,
     audio_key: meeting.audio_key,

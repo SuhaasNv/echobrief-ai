@@ -10,6 +10,10 @@ import type { AppBindings } from "../types";
 
 export const errorHandler: ErrorHandler<AppBindings> = (err, c) => {
   if (err instanceof HTTPException) {
+    // Honor a custom response when the thrower attached one. The quota
+    // middleware encodes error/tier/current/limit that way; flattening it to
+    // {error:"http_error"} threw away everything the upgrade CTA needs.
+    if (err.res) return err.res;
     return c.json(
       {
         error: "http_error",

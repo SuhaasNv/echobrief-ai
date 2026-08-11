@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, GraduationCap, Check, RotateCcw, ArrowRight, Sparkle } from "lucide-react";
-import { useReviewQueue, useUpdateFlashcard } from "@/lib/api/hooks";
+import { useReviewQueue, useUpdateFlashcard, type FlashcardWithMeeting } from "@/lib/api/hooks";
 import { useActiveWorkspaceKind } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/study")({
@@ -29,7 +29,17 @@ function StudyPage() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [sessionStats, setSessionStats] = useState({ reviewed: 0, gotIt: 0 });
 
-  const cards = useMemo(() => data?.items ?? [], [data]);
+  // Snapshot the queue once per session. `gotIt` marks a card reviewed, which
+  // invalidates the flashcards query; the server re-sorts by
+  // last_reviewed_at ASC NULLS FIRST, so the card just answered jumps to the
+  // end and every other card shifts down one — while `index` has already moved
+  // forward. On a live list that silently skips every second card.
+  const [deck, setDeck] = useState<FlashcardWithMeeting[] | null>(null);
+  useEffect(() => {
+    if (deck === null && data?.items) setDeck(data.items);
+  }, [deck, data]);
+
+  const cards = deck ?? [];
   const card = cards[index];
 
   // Keyboard nav: Space = flip, J = review again, K = got it.
@@ -121,6 +131,9 @@ function StudyPage() {
           onClick={() => {
             setIndex(0);
             setSessionStats({ reviewed: 0, gotIt: 0 });
+            // Drop the snapshot so the next session picks up the re-sorted
+            // queue rather than replaying this one.
+            setDeck(null);
           }}
           className="mt-6 inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-surface px-3 py-1.5 text-sm transition-colors hover:bg-accent"
         >

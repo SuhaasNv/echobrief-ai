@@ -24,6 +24,18 @@ function AuthedAppShell() {
     }
   }, [navigate]);
 
+  // A stored token only proves a string exists, not that the server still
+  // accepts it. apiRequest clears the session and fires this on any 401, which
+  // is the only thing that gets an expired session out of the app shell.
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setAuthed(false);
+      navigate({ to: "/login", replace: true });
+    };
+    window.addEventListener("echobrief:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("echobrief:unauthorized", onUnauthorized);
+  }, [navigate]);
+
   if (authed !== true) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
