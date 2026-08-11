@@ -15,7 +15,8 @@ import { checkQuota } from "../../services/usage-tracker";
 import type { AppBindings } from "../types";
 
 interface QuotaRequestBody {
-  durationSec?: number;
+  /** Wire format is snake_case — see UploadUrlRequest in src/lib/schemas.ts. */
+  duration_sec?: number;
 }
 
 /**
@@ -49,7 +50,10 @@ export const requireTranscriptionQuota = createMiddleware<AppBindings>(async (c,
     }
   }
 
-  const durationSec = body?.durationSec ?? 0;
+  // Was reading `durationSec`, which the client never sends — so this always
+  // resolved to 0 minutes and the check only tripped for users ALREADY over
+  // their limit. The schema field is `duration_sec`.
+  const durationSec = body?.duration_sec ?? 0;
 
   // SECURITY: Strict validation to prevent quota bypass attacks
   if (typeof durationSec !== "number") {

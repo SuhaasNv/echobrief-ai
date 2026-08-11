@@ -1,14 +1,23 @@
 /**
  * R2 Cleanup Worker - Deletes audio files older than 7 days.
  *
- * Runs daily to save storage costs on R2. Files are scanned by their
- * LastModified timestamp and deleted if they're older than the retention
- * period.
+ * Driven by the database, NOT by sweeping the bucket. Audio keys are
+ * `${userId}/${meetingId}/original.${ext}` (see buildAudioKey) — there is no
+ * shared prefix to filter a ListObjectsV2 on, so the previous prefix-less scan
+ * matched EVERY object in the bucket, including the account-export ZIPs under
+ * `exports/${user_id}/` that the GDPR flow writes. It also never cleared
+ * `meetings.audio_key`, leaving rows claiming audio that no longer existed:
+ * `has_audio` stayed true, /audio-url happily signed URLs for deleted objects,
+ * and retry passed its audio_key check before failing in the worker.
+ *
+ * Selecting the exact keys from Postgres fixes all of that: only audio is
+ * eligible, and the row is updated in the same pass.
  *
  * This runs as a scheduled job in the worker process.
  */
 
-import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectsCommand } from "@aws-sdk/client-s3";
+import { getSql } from "../db";
 import { getEnv } from "../env";
 
 const RETENTION_DAYS = 7;
@@ -33,9 +42,12 @@ function getClient(): S3Client {
   return _client;
 }
 
+/** DeleteObjects accepts at most 1000 keys per request. */
+const DELETE_BATCH_SIZE = 1000;
+
 /**
- * Clean up old R2 audio files.
- * Returns the count of files deleted.
+ * Clean up expired R2 audio files and clear the corresponding audio_key.
+ * Returns the count of objects deleted.
  */
 export async function cleanupOldAudioFiles(): Promise<number> {
   const env = getEnv();
@@ -50,58 +62,71 @@ export async function cleanupOldAudioFiles(): Promise<number> {
 
   const cutoffDate = new Date(Date.now() - RETENTION_MS);
   const client = getClient();
+  const sql = getSql();
   let deletedCount = 0;
-  let continuationToken: string | undefined;
 
   try {
-    do {
-      // List objects in the bucket (paginated)
-      const listResponse = await client.send(
-        new ListObjectsV2Command({
-          Bucket: bucket,
-          ContinuationToken: continuationToken,
-          MaxKeys: 1000, // Process in batches of 1000
-        }),
-      );
+    for (;;) {
+      // Only meetings still holding an audio key past the retention window.
+      // The '' sentinel marks transcript-only meetings that never had audio.
+      const rows = await sql<Array<{ id: string; audio_key: string }>>`
+        SELECT id, audio_key
+        FROM meetings
+        WHERE audio_key IS NOT NULL
+          AND audio_key <> ''
+          AND created_at < ${cutoffDate}
+        ORDER BY created_at ASC
+        LIMIT ${DELETE_BATCH_SIZE}
+      `;
 
-      const objects = listResponse.Contents ?? [];
-      if (objects.length === 0) break;
+      if (rows.length === 0) break;
 
-      // Filter objects older than retention period
-      const oldObjects = objects.filter((obj) => {
-        if (!obj.LastModified) return false;
-        return obj.LastModified < cutoffDate;
-      });
-
-      if (oldObjects.length > 0) {
-        // Delete old objects in batch
-        const deleteResponse = await client.send(
-          new DeleteObjectsCommand({
-            Bucket: bucket,
-            Delete: {
-              Objects: oldObjects.map((obj) => ({ Key: obj.Key })),
-              Quiet: true, // Don't return successful deletions in response
-            },
-          }),
-        );
-
-        const deleted = oldObjects.length - (deleteResponse.Errors?.length ?? 0);
-        deletedCount += deleted;
-
-        if (deleteResponse.Errors && deleteResponse.Errors.length > 0) {
-          console.error(
-            `[r2-cleanup] ${deleteResponse.Errors.length} deletion errors:`,
-            deleteResponse.Errors.slice(0, 5), // Log first 5 errors
-          );
-        }
-
-        console.log(
-          `[r2-cleanup] batch: deleted ${deleted} files (${oldObjects.length} eligible, ${deleteResponse.Errors?.length ?? 0} errors)`,
+      // Belt and braces: never let a malformed key reach into the export
+      // namespace, whatever ends up in the column.
+      const eligible = rows.filter((r) => !r.audio_key.startsWith("exports/"));
+      if (eligible.length !== rows.length) {
+        console.error(
+          `[r2-cleanup] skipped ${rows.length - eligible.length} row(s) whose audio_key pointed at exports/`,
         );
       }
 
-      continuationToken = listResponse.NextContinuationToken;
-    } while (continuationToken);
+      const deleteResponse = await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: {
+            Objects: eligible.map((r) => ({ Key: r.audio_key })),
+            Quiet: true, // successes are omitted; Errors still returned
+          },
+        }),
+      );
+
+      const failedKeys = new Set((deleteResponse.Errors ?? []).map((e) => e.Key));
+      if (failedKeys.size > 0) {
+        console.error(
+          `[r2-cleanup] ${failedKeys.size} deletion errors:`,
+          (deleteResponse.Errors ?? []).slice(0, 5),
+        );
+      }
+
+      // Clear audio_key ONLY for objects that actually went away, so a failed
+      // delete is retried on the next run instead of being orphaned.
+      const clearedIds = eligible.filter((r) => !failedKeys.has(r.audio_key)).map((r) => r.id);
+
+      if (clearedIds.length > 0) {
+        await sql`
+          UPDATE meetings SET audio_key = NULL WHERE id = ANY(${sql.array(clearedIds)}::uuid[])
+        `;
+        deletedCount += clearedIds.length;
+      }
+
+      console.log(
+        `[r2-cleanup] batch: deleted ${clearedIds.length} files (${eligible.length} eligible, ${failedKeys.size} errors)`,
+      );
+
+      // Everything failed or was skipped — another pass would loop forever on
+      // the same rows, since nothing was cleared.
+      if (clearedIds.length === 0) break;
+    }
 
     console.log(`[r2-cleanup] completed: ${deletedCount} files deleted`);
     return deletedCount;

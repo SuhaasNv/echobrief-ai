@@ -12,6 +12,11 @@ import { errorHandler } from "./middleware/error";
 import { requireAuth } from "./middleware/auth";
 import { requireWorkspace, requireProfessionalWorkspace } from "./middleware/workspace";
 import { rateLimit } from "./middleware/rate-limit";
+import {
+  requireTranscriptionQuota,
+  requireAIQueryQuota,
+  requireFlashcardQuota,
+} from "./middleware/quota";
 import { securityHeaders } from "./middleware/security-headers";
 import { requestLimits } from "./middleware/request-limits";
 import { sentryMiddleware } from "./middleware/monitoring";
@@ -123,6 +128,17 @@ protectedApi.use("/analytics/*", requireWorkspace);
 protectedApi.use("/integrations/*", requireProfessionalWorkspace());
 protectedApi.use("/generate/email", requireProfessionalWorkspace());
 protectedApi.use("/action-items/:id/export", requireProfessionalWorkspace());
+
+// Plan quotas. These were written, unit-tested, and then never mounted — the
+// tier limits in TIER_LIMITS only ever rendered in the UI while every endpoint
+// answered without checking them. Rate limits bound requests per minute; these
+// bound usage per billing period, so both are needed.
+protectedApi.use("/meetings/upload-url", requireTranscriptionQuota);
+protectedApi.use("/streaming/*", requireTranscriptionQuota);
+protectedApi.use("/meetings/:id/chat", requireAIQueryQuota);
+protectedApi.use("/search", requireAIQueryQuota);
+protectedApi.use("/generate/*", requireAIQueryQuota);
+protectedApi.use("/meetings/:id/flashcards/generate", requireFlashcardQuota);
 
 protectedApi.route("/meetings", meetingsRoutes);
 protectedApi.route("/meetings", chatRoutes);
