@@ -11,7 +11,7 @@
 
 @theme inline {
   --font-sans: "Inter", "SF Pro Display", system-ui, sans-serif;
-  --font-display: "Inter", "SF Pro Display", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --radius-sm: calc(var(--radius) - 4px);

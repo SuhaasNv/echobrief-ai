@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 
@@ -43,9 +42,6 @@ export function SiteHeader() {
         }`}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-3.5">
-          {/* Logo (already includes the wordmark) */}
-          <Logo />
-
           {/* Center nav with animated underlines */}
           <nav className="hidden flex-1 items-center justify-center gap-0.5 md:flex">
             {NAV.map((n) => (

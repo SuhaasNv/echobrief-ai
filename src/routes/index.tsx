@@ -69,7 +69,7 @@ function Landing() {
               ...fadeUp,
               show: { ...fadeUp.show, transition: { duration: 0.9, ease, delay: 0.05 } },
             }}
-            className="text-balance text-4xl font-semibold leading-[1.04] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
+            className="font-display text-balance text-4xl font-semibold leading-[1.04] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
           >
             <span className="text-gradient">Your meetings finally become</span>
             <br />
