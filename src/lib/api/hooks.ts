@@ -517,6 +517,27 @@ export function usePatchMeeting(id: string) {
   });
 }
 
+/**
+ * Put human names on diarized voices for one meeting.
+ *
+ * Invalidates the meeting detail so every transcript segment re-renders with
+ * the new name — the server resolves labels on read, so nothing is rewritten
+ * in the stored transcript.
+ */
+export function useRenameSpeakers(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (names: Record<string, string>) =>
+      apiRequest<{ ok: true; names: Record<string, string> }>(`/meetings/${id}/speakers`, {
+        method: "PATCH",
+        body: { names },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.meeting(id) });
+    },
+  });
+}
+
 export function useDeleteMeeting() {
   const qc = useQueryClient();
   return useMutation({

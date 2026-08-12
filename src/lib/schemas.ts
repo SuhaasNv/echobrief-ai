@@ -183,6 +183,15 @@ export const TranscriptSegment = z.object({
   text: z.string(),
 });
 
+/**
+ * Rename diarized voices: `{ "A": "Maya", "B": "David" }`.
+ * Keys are the raw AssemblyAI labels. An empty value clears the name.
+ */
+export const SpeakerNamesRequest = z.object({
+  names: z.record(z.string().min(1).max(8), z.string().trim().max(80)),
+});
+export type SpeakerNamesRequest = z.infer<typeof SpeakerNamesRequest>;
+
 export const MeetingDetail = z.object({
   id: uuidSchema,
   title: z.string(),

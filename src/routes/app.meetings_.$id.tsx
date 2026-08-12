@@ -43,6 +43,7 @@ import { useActiveWorkspaceKind, useLabels } from "@/lib/workspace-store";
 import { Brain, Sparkle, GraduationCap } from "lucide-react";
 import { formatTimestamp, formatDuration, formatDate } from "@/lib/date-utils";
 import { ProcessingTrack } from "@/components/app/processing-progress";
+import { SpeakerNames } from "@/components/app/speaker-names";
 import { percentForStatus, EASE } from "@/lib/processing-status";
 
 export const Route = createFileRoute("/app/meetings_/$id")({
@@ -859,6 +860,9 @@ function CompleteBody({
 
         {/* Transcript */}
         <div className="min-w-0">
+          {meeting.transcript && (
+            <SpeakerNames meetingId={meeting.id} speakers={meeting.transcript.speakers} />
+          )}
           <div className="mb-4 flex items-center gap-2 rounded-md border border-border/60 bg-surface/60 px-2.5 py-1.5 text-sm text-muted-foreground">
             <Search className="h-3.5 w-3.5" />
             <input

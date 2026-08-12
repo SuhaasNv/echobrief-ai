@@ -17,6 +17,7 @@ import {
   LiveUploadRequest,
   MeetingListQuery,
   MeetingPatchRequest,
+  SpeakerNamesRequest,
   MeetingStatusResponse,
 } from "../../../lib/schemas";
 import {
@@ -329,8 +330,9 @@ app.get("/:id", async (c) => {
       raw_text: string;
       content: unknown;
       speakers: Array<{ id: string; label: string; talk_time_sec: number; word_count: number }>;
+      speaker_names: unknown;
     }>
-  >`SELECT raw_text, content, speakers FROM transcripts WHERE meeting_id = ${id}`;
+  >`SELECT raw_text, content, speakers, speaker_names FROM transcripts WHERE meeting_id = ${id}`;
 
   const [summaryRow] = await sql<
     Array<{
@@ -426,10 +428,41 @@ interface SegmentOut {
   text: string;
 }
 
+/**
+ * Resolve a raw diarization label ("A") to what the user should read.
+ *
+ * Falls back to "Speaker A" when nobody has named that voice yet — never the
+ * bare letter, which is what the transcript used to render.
+ */
+function displaySpeaker(raw: string | null, names: Record<string, string>): string | null {
+  if (!raw) return null;
+  const named = names[raw];
+  return named && named.trim() ? named : `Speaker ${raw}`;
+}
+
+/** `speaker_names` is JSONB and, like the other JSONB columns here, may arrive double-encoded. */
+function parseSpeakerNames(value: unknown): Record<string, string> {
+  let parsed: unknown = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof v === "string" && v.trim()) out[k] = v.trim();
+  }
+  return out;
+}
+
 function buildTranscriptResponse(row: {
   raw_text: string;
   content: unknown;
   speakers: Array<{ id: string; label: string; talk_time_sec: number; word_count: number }>;
+  speaker_names?: unknown;
 }): { raw_text: string; segments: SegmentOut[]; speakers: typeof row.speakers } {
   // `content` may be a real JSONB object OR a JSON-encoded string (older
   // meetings inserted before the sql.json fix). Normalize both forms.
@@ -488,6 +521,17 @@ function buildTranscriptResponse(row: {
   }
   if (!Array.isArray(speakers)) speakers = [];
 
+  // Apply human names over the raw diarization labels. `id` is normalised to
+  // the RAW label ("A") because that's what segments carry and what the rename
+  // endpoint addresses — the stored form was "speaker_A", which matched
+  // neither.
+  const names = parseSpeakerNames(row.speaker_names);
+  speakers = speakers.map((s) => {
+    const raw = s.id?.startsWith("speaker_") ? s.id.slice("speaker_".length) : s.id;
+    return { ...s, id: raw, label: displaySpeaker(raw, names) ?? s.label };
+  });
+  for (const seg of segments) seg.speaker = displaySpeaker(seg.speaker, names);
+
   return { raw_text: row.raw_text, segments, speakers };
 }
 
@@ -521,6 +565,45 @@ app.patch("/:id", zValidator("json", MeetingPatchRequest), async (c) => {
 
   await sql`UPDATE meetings SET ${setClause} WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}`;
   return c.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /:id/speakers — put human names on diarized voices
+// ---------------------------------------------------------------------------
+app.patch("/:id/speakers", zValidator("json", SpeakerNamesRequest), async (c) => {
+  const id = c.req.param("id");
+  const { names } = c.req.valid("json");
+  const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
+  const sql = getSql();
+
+  // Scope the write through meetings so a user can't rename speakers on a
+  // transcript in someone else's workspace — transcripts has no user_id.
+  const owned = await sql<Array<{ id: string }>>`
+    SELECT id FROM meetings
+    WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
+  `;
+  if (owned.length === 0) throw new HTTPException(404, { message: "Meeting not found" });
+
+  // Blank means "clear this name" — drop the key so the label falls back to
+  // "Speaker A" rather than persisting an empty string.
+  const cleaned: Record<string, string> = {};
+  for (const [raw, name] of Object.entries(names)) {
+    const trimmed = name.trim();
+    if (trimmed) cleaned[raw] = trimmed;
+  }
+
+  const updated = await sql<Array<{ meeting_id: string }>>`
+    UPDATE transcripts
+    SET speaker_names = ${JSON.stringify(cleaned)}::jsonb
+    WHERE meeting_id = ${id}
+    RETURNING meeting_id
+  `;
+  if (updated.length === 0) {
+    throw new HTTPException(404, { message: "This meeting has no transcript yet" });
+  }
+
+  return c.json({ ok: true, names: cleaned });
 });
 
 // ---------------------------------------------------------------------------
