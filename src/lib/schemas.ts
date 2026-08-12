@@ -187,6 +187,10 @@ export const MeetingDetail = z.object({
   id: uuidSchema,
   title: z.string(),
   status: MeetingStatus,
+  /** Why processing failed. The API has always returned these two; the schema
+   *  just never declared them, so the failure UI couldn't show the reason. */
+  failure_reason: z.string().nullable().optional(),
+  retry_count: z.number().int().optional(),
   duration_sec: z.number().int().nullable(),
   language: z.string(),
   tags: z.array(z.string()),

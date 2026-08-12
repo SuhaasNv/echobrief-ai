@@ -420,6 +420,18 @@ export function useMeetings(query: Partial<MeetingListQuery> = {}) {
       apiRequest<MeetingListResponse>("/meetings", {
         query: query as Record<string, string | number>,
       }),
+    // Poll while anything on the page is still processing. Without this the
+    // inline progress bar and shimmer animate on every processing card but
+    // never advance — the list was fetched once and nothing refetched it, so
+    // the motion was purely decorative until a window-focus refetch.
+    // Terminal-only pages don't poll at all.
+    refetchInterval: (q) => {
+      const data = q.state.data as MeetingListResponse | undefined;
+      if (!data) return false;
+      return data.items.some((m) => m.status !== "complete" && m.status !== "failed")
+        ? 5000
+        : false;
+    },
   });
 }
 

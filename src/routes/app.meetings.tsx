@@ -7,6 +7,8 @@ import { useMeetings, useDeleteMeeting } from "@/lib/api/hooks";
 import { useLabels } from "@/lib/workspace-store";
 import { formatDate, formatDuration } from "@/lib/date-utils";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { ProcessingTrack } from "@/components/app/processing-progress";
+import { percentForStatus, labelForStatus } from "@/lib/processing-status";
 import {
   Select,
   SelectContent,
@@ -25,23 +27,6 @@ const STATUS_FILTERS: Array<{ value: MeetingStatus | "all"; label: string }> = [
   { value: "indexing", label: "Indexing" },
   { value: "failed", label: "Failed" },
 ];
-
-// Map server status string → progress percent for the inline bar.
-const STATUS_PERCENT: Record<string, number> = {
-  queued: 5,
-  transcribing: 30,
-  analyzing: 60,
-  indexing: 85,
-  complete: 100,
-  failed: 0,
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  queued: "Queued · waiting for a free worker",
-  transcribing: "Transcribing audio with AssemblyAI",
-  analyzing: "Extracting summary + action items",
-  indexing: "Indexing for semantic search",
-};
 
 export const Route = createFileRoute("/app/meetings")({
   head: () => ({ meta: [{ title: "Meetings — EchoBrief" }] }),
@@ -219,25 +204,12 @@ function MeetingsPage() {
                     {/* Inline progress bar for processing meetings */}
                     {m.status !== "complete" && m.status !== "failed" && (
                       <div className="mt-3 max-w-md">
-                        <div className="relative h-1 w-full overflow-hidden rounded-full bg-muted/30">
-                          <motion.div
-                            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand to-violet"
-                            initial={false}
-                            animate={{ width: `${STATUS_PERCENT[m.status] ?? 5}%` }}
-                            transition={{
-                              duration: 0.55,
-                              ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
-                            }}
-                          />
-                          <motion.div
-                            className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-foreground/15 to-transparent"
-                            animate={{ x: ["-30%", "330%"] }}
-                            transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
-                            style={{ left: 0 }}
-                          />
-                        </div>
+                        <ProcessingTrack
+                          percent={percentForStatus(m.status)}
+                          heightClassName="h-1"
+                        />
                         <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
-                          {STATUS_LABEL[m.status] ?? m.status} · {STATUS_PERCENT[m.status] ?? 5}%
+                          {labelForStatus(m.status)} · {percentForStatus(m.status)}%
                         </p>
                       </div>
                     )}

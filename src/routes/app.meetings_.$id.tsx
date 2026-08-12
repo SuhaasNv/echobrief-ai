@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
   Search,
@@ -42,6 +42,8 @@ import type { MeetingDetail, MeetingStatusResponse } from "@/lib/schemas";
 import { useActiveWorkspaceKind, useLabels } from "@/lib/workspace-store";
 import { Brain, Sparkle, GraduationCap } from "lucide-react";
 import { formatTimestamp, formatDuration, formatDate } from "@/lib/date-utils";
+import { ProcessingTrack } from "@/components/app/processing-progress";
+import { percentForStatus, EASE } from "@/lib/processing-status";
 
 export const Route = createFileRoute("/app/meetings_/$id")({
   head: () => ({ meta: [{ title: "Meeting — EchoBrief" }] }),
@@ -69,6 +71,9 @@ function MeetingDetailPage() {
     if (!polledStatus || !detailStatus || polledStatus === detailStatus) return;
     qc.invalidateQueries({ queryKey: qk.meeting(id), exact: true });
     qc.invalidateQueries({ queryKey: qk.actionItems({ meeting_id: id }) });
+    // Completion used to be silent — the card just vanished. Announce it once,
+    // on the transition into `complete` (not on every render while complete).
+    if (polledStatus === "complete") toast.success("Meeting is ready");
   }, [polledStatus, detailStatus, id, qc]);
 
   const handleDelete = async () => {
@@ -82,9 +87,21 @@ function MeetingDetailPage() {
   };
 
   if (meetingQuery.isLoading) {
+    // A bare centred spinner blanked the whole page on every navigation from
+    // the list. Render the page's shape instead so the layout doesn't jump
+    // once data lands.
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      <div className="mx-auto max-w-4xl px-4 py-8" aria-busy="true">
+        <div className="h-4 w-28 animate-pulse rounded bg-muted/40" />
+        <div className="mt-5 h-7 w-2/3 animate-pulse rounded bg-muted/40" />
+        <div className="mt-3 h-3 w-44 animate-pulse rounded bg-muted/30" />
+        <div className="mt-8 space-y-3 rounded-xl border border-border/70 bg-surface p-8">
+          <div className="h-3 w-1/3 animate-pulse rounded bg-muted/40" />
+          <div className="h-3 w-full animate-pulse rounded bg-muted/30" />
+          <div className="h-3 w-5/6 animate-pulse rounded bg-muted/30" />
+          <div className="h-3 w-4/6 animate-pulse rounded bg-muted/30" />
+        </div>
+        <span className="sr-only">Loading meeting</span>
       </div>
     );
   }
@@ -161,18 +178,35 @@ function MeetingDetailPage() {
         </div>
       </div>
 
-      {/* Processing / failed / complete branching */}
-      {isFailed ? (
-        <FailedState meeting={meeting} onRetry={() => retry.mutate()} retrying={retry.isPending} />
-      ) : !isComplete ? (
-        <ProcessingState
-          status={status}
-          hasAudio={meeting.has_audio}
-          transcriptProvided={meeting.transcript_provided}
-        />
-      ) : (
-        <CompleteBody meeting={meeting} actionItems={actionItemsQuery.data?.items ?? []} />
-      )}
+      {/* Processing / failed / complete branching. The swap used to be a hard
+          cut — one frame the progress card, the next the whole transcript.
+          Crossfade on opacity only so nothing reflows. */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={isFailed ? "failed" : isComplete ? "complete" : "processing"}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25, ease: EASE }}
+        >
+          {isFailed ? (
+            <FailedState
+              meeting={meeting}
+              status={status}
+              onRetry={() => retry.mutate()}
+              retrying={retry.isPending}
+            />
+          ) : !isComplete ? (
+            <ProcessingState
+              status={status}
+              hasAudio={meeting.has_audio}
+              transcriptProvided={meeting.transcript_provided}
+            />
+          ) : (
+            <CompleteBody meeting={meeting} actionItems={actionItemsQuery.data?.items ?? []} />
+          )}
+        </motion.div>
+      </AnimatePresence>
 
       {confirmDelete && (
         <DeleteConfirm
@@ -522,6 +556,7 @@ function ProcessingState({
   //     to R2, but transcription already happened in the browser via
   //     AssemblyAI streaming. Skip the "Transcribed" step's description
   //     about diarization (live mode is single-speaker).
+  const reduceMotion = useReducedMotion();
   type StepKey = "uploaded" | "transcribed" | "analyzed" | "indexed";
   type Step = { key: StepKey; label: string; detail: string };
   const steps: Step[] = [];
@@ -551,12 +586,19 @@ function ProcessingState({
   });
 
   const doneCount = steps.filter((s) => status?.progress?.[s.key]).length;
-  const percent = Math.round((doneCount / steps.length) * 100);
+  // Percent comes from the shared status→percent map so this page and the
+  // meetings list can never disagree about the same meeting.
+  const percent = percentForStatus(status?.status);
   const currentStep = steps.find((s) => !status?.progress?.[s.key]) ?? steps[steps.length - 1];
+  const remaining = useCountdown(status?.estimated_seconds_remaining, status?.status);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16">
-      <div className="rounded-xl border border-border/70 bg-surface p-8">
+      <div
+        className="rounded-xl border border-border/70 bg-surface p-8"
+        role="status"
+        aria-live="polite"
+      >
         <div className="flex items-center gap-3">
           <Loader2 className="h-5 w-5 animate-spin text-brand" />
           <div className="min-w-0 flex-1">
@@ -566,27 +608,7 @@ function ProcessingState({
           <span className="font-mono text-xs text-muted-foreground">{percent}%</span>
         </div>
 
-        {/* Synced progress bar */}
-        <div className="relative mt-5 h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
-          <motion.div
-            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-brand to-violet"
-            initial={false}
-            animate={{ width: `${percent}%` }}
-            transition={{
-              duration: 0.65,
-              ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
-            }}
-          />
-          {/* shimmer effect while we're not at 100% */}
-          {percent < 100 && (
-            <motion.div
-              className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-foreground/15 to-transparent"
-              animate={{ x: ["-30%", "330%"] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
-              style={{ left: 0 }}
-            />
-          )}
-        </div>
+        <ProcessingTrack percent={percent} className="mt-5" />
 
         {/* Step list */}
         <div className="mt-6 space-y-3">
@@ -604,16 +626,33 @@ function ProcessingState({
                         : "border border-border/70 text-muted-foreground/60"
                   }`}
                 >
-                  {done ? (
-                    <CheckCircle2 className="h-3 w-3" />
-                  ) : isCurrent ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <span className="h-1 w-1 rounded-full bg-current" />
-                  )}
+                  {/* Finishing a step is the single most meaningful signal on
+                      this screen, so give the badge a beat when it flips. */}
+                  <AnimatePresence mode="wait" initial={false}>
+                    {done ? (
+                      <motion.span
+                        key="done"
+                        initial={reduceMotion ? false : { opacity: 0, scale: 0.6 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: EASE }}
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                      </motion.span>
+                    ) : isCurrent ? (
+                      <motion.span key="current" initial={false}>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      </motion.span>
+                    ) : (
+                      <motion.span key="pending" initial={false}>
+                        <span className="block h-1 w-1 rounded-full bg-current" />
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </span>
                 <div className="min-w-0">
-                  <p className={done || isCurrent ? "text-foreground" : "text-muted-foreground/70"}>
+                  <p
+                    className={`transition-colors ${done || isCurrent ? "text-foreground" : "text-muted-foreground/70"}`}
+                  >
                     {s.label}
                   </p>
                   <p className="text-[11px] text-muted-foreground/70">{s.detail}</p>
@@ -624,44 +663,108 @@ function ProcessingState({
         </div>
 
         <div className="mt-6 flex items-center justify-between border-t border-border/60 pt-4 text-xs text-muted-foreground">
-          <span>Auto-refreshes every 5 seconds.</span>
-          {status?.estimated_seconds_remaining != null &&
-            status.estimated_seconds_remaining > 0 && (
-              <span className="font-mono">
-                ~{Math.ceil(status.estimated_seconds_remaining)}s remaining
-              </span>
-            )}
+          <span>Updates automatically.</span>
+          {remaining != null && remaining > 0 && (
+            <span className="font-mono">~{remaining}s remaining</span>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
+/**
+ * A time-remaining readout that actually decreases.
+ *
+ * The server returns a constant estimate (max(30, duration/20)), so rendering
+ * it raw parked the number at e.g. "~180s" for three minutes and made the page
+ * look frozen. Seed from the server value, tick down locally, and re-seed only
+ * when the pipeline advances to a new stage — so it never jumps back up
+ * mid-stage just because another poll returned the same constant.
+ */
+function useCountdown(seconds: number | null | undefined, stage: string | undefined) {
+  const [remaining, setRemaining] = useState<number | null>(seconds ?? null);
+  const stageRef = useRef(stage);
+
+  useEffect(() => {
+    if (seconds == null) return;
+    // Re-seed on first value and whenever the stage changes.
+    if (stageRef.current !== stage || remaining == null) {
+      stageRef.current = stage;
+      setRemaining(Math.ceil(seconds));
+    }
+    // `remaining` is intentionally omitted: including it would re-seed on every
+    // tick and the countdown would never move.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seconds, stage]);
+
+  useEffect(() => {
+    if (remaining == null || remaining <= 0) return;
+    const t = setInterval(() => {
+      setRemaining((r) => (r == null ? null : Math.max(0, r - 1)));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [remaining]);
+
+  return remaining;
+}
+
+/** The server refuses a 4th attempt (meetings.ts) — mirror that here. */
+const MAX_RETRIES = 3;
+
 function FailedState({
   meeting,
+  status,
   onRetry,
   retrying,
 }: {
   meeting: MeetingDetail;
+  status: MeetingStatusResponse | undefined;
   onRetry: () => void;
   retrying: boolean;
 }) {
+  // The API already returns why it failed on both the detail and status
+  // payloads; showing "something went wrong" while holding the actual reason
+  // just makes the failure unactionable.
+  const reason = status?.failure_reason ?? meeting.failure_reason ?? null;
+  const attempts = meeting.retry_count ?? 0;
+  const exhausted = attempts >= MAX_RETRIES;
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-16">
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-8">
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 text-destructive" />
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-medium">Processing failed.</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              EchoBrief couldn't process &ldquo;{meeting.title}&rdquo;. You can retry — most
-              failures resolve on a second attempt.
+              {exhausted ? (
+                <>
+                  EchoBrief couldn&rsquo;t process &ldquo;{meeting.title}&rdquo; after {attempts}{" "}
+                  attempts. Delete it and upload again, or contact support.
+                </>
+              ) : (
+                <>
+                  EchoBrief couldn&rsquo;t process &ldquo;{meeting.title}&rdquo;. You can retry —
+                  most failures resolve on a second attempt.
+                </>
+              )}
             </p>
+            {reason && (
+              <p className="mt-3 break-words rounded-md bg-destructive/10 px-2.5 py-2 font-mono text-[11px] text-destructive">
+                {reason}
+              </p>
+            )}
+            {attempts > 0 && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {attempts} of {MAX_RETRIES} attempts used.
+              </p>
+            )}
           </div>
         </div>
         <button
           onClick={onRetry}
-          disabled={retrying}
+          disabled={retrying || exhausted}
           className="mt-5 inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-60"
         >
           {retrying ? (
@@ -669,7 +772,7 @@ function FailedState({
           ) : (
             <RotateCcw className="h-3 w-3" />
           )}
-          {retrying ? "Retrying…" : "Retry processing"}
+          {retrying ? "Retrying…" : exhausted ? "Retry limit reached" : "Retry processing"}
         </button>
       </div>
     </div>
