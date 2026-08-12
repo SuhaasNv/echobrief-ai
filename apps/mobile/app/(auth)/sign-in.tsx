@@ -13,6 +13,7 @@ import { Link, router } from "expo-router";
 
 import { authErrorMessage, useSignIn } from "@/lib/api/auth";
 import { haptics } from "@/lib/haptics";
+import { DISPLAY } from "@/lib/type";
 
 export default function SignInScreen() {
   const signIn = useSignIn();
@@ -50,7 +51,13 @@ export default function SignInScreen() {
     <View className="flex-1 bg-background">
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
+          // Deliberately NOT contentInsetAdjustmentBehavior="automatic". That
+          // asks UIKit to inject header and safe-area insets, which is right
+          // for a list under a large title and wrong for a centred form — it
+          // adds phantom height, pushing content down and making a screen that
+          // fits become scrollable.
+          contentInsetAdjustmentBehavior="never"
+          alwaysBounceVertical={false}
           contentContainerStyle={{
             flexGrow: 1,
             justifyContent: "center",
@@ -61,7 +68,8 @@ export default function SignInScreen() {
           keyboardDismissMode="interactive"
         >
           <View className="mb-10">
-            <Text className="text-[34px] font-bold tracking-tight text-label">EchoBrief</Text>
+            <Text className="text-[36px] leading-[42px] text-label"
+              style={{ fontFamily: DISPLAY.bold }}>EchoBrief</Text>
             <Text className="mt-2 text-[17px] text-label-secondary">
               Your meetings, remembered.
             </Text>

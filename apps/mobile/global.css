@@ -109,8 +109,12 @@
     --label-tertiary: #6e727a;
     --label-quaternary: #4a4e56;
 
-    --separator: #22252b;
-    --separator-opaque: #2a2d34;
+    /* Raised from #22252B, which computed to 1.31:1 against the background —
+       physically invisible on a real display. UIKit's own separator on a black
+       table sits nearer 1.9-2.2:1. Without this the list reads as one
+       undifferentiated black wall with no row boundaries. */
+    --separator: #2e3138;
+    --separator-opaque: #3a3e46;
 
     --tint: #4c99f8;
     --tint-label: #4c99f8;

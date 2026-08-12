@@ -14,6 +14,7 @@ import { router } from "expo-router";
 
 import { authErrorMessage, useSignUp } from "@/lib/api/auth";
 import { haptics } from "@/lib/haptics";
+import { DISPLAY } from "@/lib/type";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -70,7 +71,10 @@ export default function SignUpScreen() {
     <View className="flex-1 bg-background">
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
+          // See sign-in: "automatic" is for lists under a large title, not a
+          // centred form. Sign-up has a real header, so its inset comes from
+          // the stack rather than from this prop.
+          contentInsetAdjustmentBehavior="never"
           contentContainerStyle={{
             flexGrow: 1,
             justifyContent: "center",
@@ -81,7 +85,8 @@ export default function SignUpScreen() {
           keyboardDismissMode="interactive"
         >
           <View className="mb-10">
-            <Text className="text-[34px] font-bold tracking-tight text-label">
+            <Text className="text-[36px] leading-[42px] text-label"
+              style={{ fontFamily: DISPLAY.bold }}>
               Create an account
             </Text>
             <Text className="mt-2 text-[17px] text-label-secondary">

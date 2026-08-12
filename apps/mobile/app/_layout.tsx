@@ -8,6 +8,14 @@ import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 
+import { useFonts } from "expo-font";
+import {
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from "@expo-google-fonts/space-grotesk";
+
 import { createQueryClient, installQueryPlatformBindings } from "@/lib/query";
 import { hydrateSession } from "@/lib/api/token-store";
 import { subscribeToSessionEvents } from "@/lib/api/session-events";
@@ -20,10 +28,22 @@ void SplashScreen.preventAutoHideAsync();
 const queryClient = createQueryClient();
 
 export default function RootLayout() {
-  const [ready, setReady] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   // Ref, not state: this is read inside callbacks and must never trigger a
   // render or be captured stale.
   const queryClientRef = useRef(queryClient);
+
+  // Display face only — body text stays on the system font so Dynamic Type,
+  // optical sizing, and non-Latin fallback keep working. Held behind the splash
+  // so headings never render in SF and then reflow into Space Grotesk.
+  const [fontsLoaded] = useFonts({
+    SpaceGrotesk_400Regular,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
+  });
+
+  const ready = sessionReady && fontsLoaded;
 
   useEffect(() => {
     let cancelled = false;
@@ -34,7 +54,7 @@ export default function RootLayout() {
         // to the sign-in screen rather than hanging on the splash forever.
       })
       .finally(() => {
-        if (!cancelled) setReady(true);
+        if (!cancelled) setSessionReady(true);
       });
 
     return () => {

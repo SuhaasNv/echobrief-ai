@@ -28,7 +28,10 @@ export const stackScreenOptions = {
   headerLargeTitleShadowVisible: false,
   // Back chevron and header buttons.
   headerTintColor: "#4C99F8",
-  headerLargeTitleStyle: { color: "#F4F5F7" },
+  // Space Grotesk on the large title only. The collapsed inline title stays on
+  // the system face — it sits at 17pt beside system chrome, where a display
+  // face reads as inconsistent rather than characterful.
+  headerLargeTitleStyle: { color: "#F4F5F7", fontFamily: "SpaceGrotesk_700Bold" },
   headerTitleStyle: { color: "#F4F5F7" },
   headerBackButtonDisplayMode: "minimal",
 } satisfies StackScreenOptions;

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@echobrief/shared": "*",
+    "@expo-google-fonts/space-grotesk": "^0.4.1",
     "@shopify/flash-list": "2.0.2",
     "@tanstack/react-query": "^5.101.4",
     "expo": "~57.0.12",
@@ -20,6 +21,7 @@
     "expo-dev-client": "~57.0.11",
     "expo-document-picker": "~57.0.1",
     "expo-file-system": "~57.0.2",
+    "expo-font": "^57.0.1",
     "expo-glass-effect": "^57.0.1",
     "expo-haptics": "~57.0.1",
     "expo-image": "~57.0.2",

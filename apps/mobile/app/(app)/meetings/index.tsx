@@ -29,7 +29,12 @@ function MeetingRow({ meeting }: { meeting: MeetingSummary }) {
         haptics.select();
         router.push(`/(app)/meetings/${meeting.id}`);
       }}
-      className="px-4 py-3 active:bg-fill"
+      // Cards on the dark ground rather than flat rows on one surface. A plain
+      // list needs a visible separator to read as a list at all; at this
+      // palette's contrast, cards carry the structure more reliably and match
+      // the web app's language.
+      className="rounded-card bg-surface px-4 py-3.5 active:bg-elevated"
+      style={{ borderCurve: "continuous" }}
       accessibilityRole="button"
       accessibilityLabel={a11yLabel}
       accessibilityHint="Opens the summary and transcript"
@@ -186,7 +191,8 @@ export default function MeetingsScreen() {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={EmptyState}
-        ItemSeparatorComponent={() => <View className="ml-4 h-px bg-separator" />}
+        ItemSeparatorComponent={() => <View className="h-2.5" />}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
         // Required for the large title to collapse and for the iOS 26 scroll
         // edge effect to have something to blur. React Native defaults this to
         // 'never', which is NOT the UIKit default.

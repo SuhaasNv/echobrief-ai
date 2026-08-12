@@ -34,7 +34,16 @@ import { Easing, type WithSpringConfig, type WithTimingConfig } from "react-nati
  * @param duration Undamped period in seconds (SwiftUI `duration` / `response`).
  * @param zeta     Damping ratio (SwiftUI `dampingFraction`; bounce = 1 − zeta).
  */
-export function spring(duration: number, zeta: number, mass = 1): WithSpringConfig {
+// WithSpringConfig is a union, so this has to be an intersection rather than an
+// interface extension. Concrete numbers so callers that need raw values — e.g.
+// LinearTransition.springify().damping(x) — can read them without a cast.
+export type SpringConfig = WithSpringConfig & {
+  mass: number;
+  stiffness: number;
+  damping: number;
+};
+
+export function spring(duration: number, zeta: number, mass = 1): SpringConfig {
   "worklet";
   const w0 = (2 * Math.PI) / duration;
   const stiffness = w0 * w0 * mass;
