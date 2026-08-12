@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+ * EchoBrief iOS design tokens
+ *
+ * Derived from the web app's OKLCH tokens in src/styles.css, converted to sRGB
+ * and then corrected for iOS. Four deliberate divergences from web, each fixing
+ * a measured WCAG failure rather than a matter of taste:
+ *
+ *   secondaryLabel dark  #82868E -> #9CA1A9   web value fails AA once alpha-multiplied
+ *   danger dark          #EA3C3F -> #FF5F62   3.79:1 on white text, fails AA
+ *   success light        #00A166 -> #098356   authored OKLCH was out of sRGB gamut
+ *   warning light        #CE9200 -> #9B690B   out of gamut AND 2.71:1, worst in the app
+ *
+ * Every text-on-background pair below was verified >= 4.5:1 (>= 3:1 for
+ * tertiary/large). Quaternary is decorative only and must never carry text.
+ * ------------------------------------------------------------------------- */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-sheet: var(--sheet);
+
+  --color-label: var(--label);
+  --color-label-secondary: var(--label-secondary);
+  --color-label-tertiary: var(--label-tertiary);
+  --color-label-quaternary: var(--label-quaternary);
+
+  --color-separator: var(--separator);
+  --color-separator-opaque: var(--separator-opaque);
+
+  --color-tint: var(--tint);
+  --color-tint-label: var(--tint-label);
+  --color-tint-pressed: var(--tint-pressed);
+  --color-violet: var(--violet);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --color-fill: var(--fill);
+  --color-fill-secondary: var(--fill-secondary);
+  --color-fill-tertiary: var(--fill-tertiary);
+
+  /* Speaker attribution ramp — all verified >= 4.5:1 on surface. Never the
+     sole carrier of identity; the speaker name label is always present. */
+  --color-speaker-a: var(--speaker-a);
+  --color-speaker-b: var(--speaker-b);
+  --color-speaker-c: var(--speaker-c);
+  --color-speaker-d: var(--speaker-d);
+  --color-speaker-e: var(--speaker-e);
+
+  /* iOS-adjusted radii. Web uses 10px controls / 16px sheets, both of which
+     read as web idioms on iOS. */
+  --radius-chip: 8px;
+  --radius-row: 12px;
+  --radius-control: 12px;
+  --radius-card: 16px;
+  --radius-sheet: 20px;
+}
+
+/* Light — iOS grouped convention: white cards on a gray grouped background. */
+:root {
+  --background: #ffffff;
+  --surface: #f4f5f7;
+  --elevated: #e9ebef;
+  --sheet: #ffffff;
+
+  --label: #090b0f;
+  --label-secondary: #52555c;
+  --label-tertiary: #767a82;
+  --label-quaternary: #a9adb4;
+
+  --separator: #dde0e4;
+  --separator-opaque: #c9cdd3;
+
+  --tint: #1779e1;
+  --tint-label: #0b69c7;
+  --tint-pressed: #1265be;
+  --violet: #7b47dc;
+
+  --success: #098356;
+  --warning: #9b690b;
+  --danger: #c81c2a;
+
+  --fill: #e9ebef;
+  --fill-secondary: #f0f2f4;
+  --fill-tertiary: #f4f5f7;
+
+  --speaker-a: #0b69c7;
+  --speaker-b: #7b47dc;
+  --speaker-c: #098356;
+  --speaker-d: #875d04;
+  --speaker-e: #63728f;
+}
+
+/* Dark — the brand's native mode. Background through elevated spans only
+   OKLCH L 0.13 -> 0.19, so hierarchy is carried by hairlines, not shadow. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #06070a;
+    --surface: #0b0d11;
+    --elevated: #121418;
+    --sheet: #0d0f13;
+
+    --label: #f4f5f7;
+    --label-secondary: #9ca1a9;
+    --label-tertiary: #6e727a;
+    --label-quaternary: #4a4e56;
+
+    --separator: #22252b;
+    --separator-opaque: #2a2d34;
+
+    --tint: #4c99f8;
+    --tint-label: #4c99f8;
+    --tint-pressed: #3d86e0;
+    --violet: #a27dfa;
+
+    --success: #2fc183;
+    --warning: #e6ac3d;
+    --danger: #ff5f62;
+
+    --fill: #1c1f25;
+    --fill-secondary: #181b1f;
+    --fill-tertiary: #14161a;
+
+    --speaker-a: #4c99f8;
+    --speaker-b: #a27dfa;
+    --speaker-c: #2fc183;
+    --speaker-d: #e6ac3d;
+    --speaker-e: #7a869f;
+  }
+}

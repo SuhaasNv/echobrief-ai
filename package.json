@@ -9,7 +9,8 @@
   ],
   "overrides": {
     "react": "$react",
-    "react-dom": "$react-dom"
+    "react-dom": "$react-dom",
+    "react-native-reanimated": "4.5.3"
   },
   "scripts": {
     "dev": "vite dev",
