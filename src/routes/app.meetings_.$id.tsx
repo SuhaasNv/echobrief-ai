@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
@@ -796,6 +796,22 @@ function CompleteBody({
   const segments = meeting.transcript?.segments ?? [];
   const chapters = meeting.summary?.chapters ?? [];
   const audio = useMeetingAudioUrl(meeting.id);
+
+  // Distinct assignees the analysis step extracted, offered as one-tap names
+  // for the diarized voices. Deliberately suggestions, never auto-assignment:
+  // an owner named in an action item is not necessarily the person who spoke,
+  // and a wrong name on a decision is worse than an anonymous one.
+  const nameSuggestions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          actionItems
+            .map((a) => a.assignee_name?.trim())
+            .filter((n): n is string => !!n && n.length <= 80),
+        ),
+      ),
+    [actionItems],
+  );
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const seekTo = (seconds: number) => {
@@ -861,7 +877,15 @@ function CompleteBody({
         {/* Transcript */}
         <div className="min-w-0">
           {meeting.transcript && (
-            <SpeakerNames meetingId={meeting.id} speakers={meeting.transcript.speakers} />
+            <SpeakerNames
+              meetingId={meeting.id}
+              speakers={meeting.transcript.speakers}
+              // Names the model already pulled out of the conversation itself.
+              // Being named in the meeting is better evidence someone was in
+              // the room than a calendar invite they may have declined — and
+              // it costs no extra OAuth scope and stores no third-party PII.
+              suggestions={nameSuggestions}
+            />
           )}
           <div className="mb-4 flex items-center gap-2 rounded-md border border-border/60 bg-surface/60 px-2.5 py-1.5 text-sm text-muted-foreground">
             <Search className="h-3.5 w-3.5" />
@@ -966,14 +990,42 @@ function CompleteBody({
 
           <FlashcardsPanel meetingId={meeting.id} />
 
-          {meeting.meeting_score && <MeetingScorePanel score={meeting.meeting_score} />}
+          {meeting.meeting_score && (
+            <MeetingScorePanel
+              score={meeting.meeting_score}
+              speakers={meeting.transcript?.speakers ?? []}
+            />
+          )}
         </aside>
       </div>
     </>
   );
 }
 
-function MeetingScorePanel({ score }: { score: { total: number; explanation?: string } }) {
+/**
+ * Rewrite "Speaker A" to the name that voice has been given.
+ *
+ * The score explanation is prose the model wrote at analysis time, so it still
+ * says "Speaker A dominated two-thirds of talk time" after the user renames
+ * that voice to Maya. Substituting at render keeps the page consistent without
+ * re-running the analysis or rewriting stored text.
+ */
+function applySpeakerNames(text: string, speakers: Array<{ id: string; label: string }>): string {
+  let out = text;
+  for (const s of speakers) {
+    if (s.label === `Speaker ${s.id}`) continue; // unnamed — nothing to swap
+    out = out.replaceAll(`Speaker ${s.id}`, s.label);
+  }
+  return out;
+}
+
+function MeetingScorePanel({
+  score,
+  speakers,
+}: {
+  score: { total: number; explanation?: string };
+  speakers: Array<{ id: string; label: string }>;
+}) {
   const labels = useLabels();
   return (
     <div className="rounded-xl border border-border/70 bg-surface p-5">
@@ -987,7 +1039,9 @@ function MeetingScorePanel({ score }: { score: { total: number; explanation?: st
         <span className="text-xs text-muted-foreground">/ 10</span>
       </div>
       {score.explanation && (
-        <p className="mt-2 text-xs text-muted-foreground">{score.explanation}</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {applySpeakerNames(score.explanation, speakers)}
+        </p>
       )}
     </div>
   );

@@ -15,6 +15,13 @@ export interface DiarizedSpeaker {
 interface SpeakerNamesProps {
   meetingId: string;
   speakers: DiarizedSpeaker[];
+  /**
+   * Candidate names lifted from the meeting's own content (action-item
+   * assignees). Offered as one-tap fills — never applied automatically. Being
+   * named in a meeting doesn't prove which voice you are, and a confidently
+   * wrong name on a decision is worse than an anonymous one.
+   */
+  suggestions?: string[];
 }
 
 /** A speaker is "named" when its label is something other than the fallback. */
@@ -37,7 +44,7 @@ function formatTalkTime(sec: number): string {
  * assigned per recording: "A" here is not "A" in the next meeting, so carrying
  * names across would confidently mislabel people.
  */
-export function SpeakerNames({ meetingId, speakers }: SpeakerNamesProps) {
+export function SpeakerNames({ meetingId, speakers, suggestions = [] }: SpeakerNamesProps) {
   const rename = useRenameSpeakers(meetingId);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -45,23 +52,27 @@ export function SpeakerNames({ meetingId, speakers }: SpeakerNamesProps) {
   if (speakers.length === 0) return null;
 
   const totalTalk = speakers.reduce((acc, s) => acc + s.talk_time_sec, 0);
+  // Don't re-offer a name already in use on another voice.
+  const taken = new Set(speakers.map((s) => customName(s)).filter(Boolean));
+  const available = suggestions.filter((n) => !taken.has(n));
 
   function startEdit(s: DiarizedSpeaker) {
     setEditingId(s.id);
     setDraft(customName(s));
   }
 
-  async function save(s: DiarizedSpeaker) {
+  async function save(s: DiarizedSpeaker, value: string) {
+    const next = value.trim();
     // Send the whole map, not just this one: the endpoint replaces
     // speaker_names wholesale, so omitting the others would wipe them.
     const names: Record<string, string> = {};
     for (const other of speakers) {
-      names[other.id] = other.id === s.id ? draft.trim() : customName(other);
+      names[other.id] = other.id === s.id ? next : customName(other);
     }
     setEditingId(null);
     try {
       await rename.mutateAsync(names);
-      toast.success(draft.trim() ? `Renamed to ${draft.trim()}` : "Name cleared");
+      toast.success(next ? `Renamed to ${next}` : "Name cleared");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not rename speaker");
     }
@@ -91,7 +102,7 @@ export function SpeakerNames({ meetingId, speakers }: SpeakerNamesProps) {
                   className="flex items-center gap-1.5"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    void save(s);
+                    void save(s, draft);
                   }}
                 >
                   <input
@@ -140,6 +151,30 @@ export function SpeakerNames({ meetingId, speakers }: SpeakerNamesProps) {
           );
         })}
       </div>
+
+      {editingId && available.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground/70">Mentioned in this meeting:</span>
+          {available.map((name) => {
+            const speaker = speakers.find((s) => s.id === editingId);
+            return (
+              <button
+                key={name}
+                type="button"
+                // onMouseDown, not onClick: the name input is focused, and a
+                // click would blur it before the handler ran on some browsers.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  if (speaker) void save(speaker, name);
+                }}
+                className="rounded-full border border-border/60 bg-surface px-2 py-0.5 text-[11px] text-foreground transition-colors hover:border-brand hover:text-brand"
+              >
+                {name}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <p className="mt-2.5 text-[11px] text-muted-foreground/70">
         Names apply to this meeting only — voice labels are assigned per recording.

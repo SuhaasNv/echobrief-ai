@@ -220,6 +220,11 @@ function UploadPage() {
         title,
         language: "en",
         tags: [],
+        // Best-effort recording time. For most recorder exports lastModified
+        // is when the recording was written, which beats dating the meeting to
+        // whenever the user got round to uploading it. The server rejects
+        // implausible values, and 0 means the browser didn't know.
+        recorded_at: file.lastModified ? new Date(file.lastModified).toISOString() : undefined,
       });
 
       setPhase("uploading");

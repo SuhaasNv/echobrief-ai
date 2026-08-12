@@ -215,7 +215,14 @@ function MeetingsPage() {
                     )}
 
                     <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="font-mono">{formatDate(m.created_at)}</span>
+                      {/* Prefer when it was recorded; upload time is only a
+                          stand-in when the file carried no timestamp. */}
+                      <span
+                        className="font-mono"
+                        title={m.recorded_at ? "Recorded" : "Uploaded (recording time unknown)"}
+                      >
+                        {formatDate(m.recorded_at ?? m.created_at)}
+                      </span>
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" /> {formatDuration(m.duration_sec)}
                       </span>

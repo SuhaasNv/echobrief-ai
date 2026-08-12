@@ -68,6 +68,8 @@ export const MeetingSummary = z.object({
   duration_sec: z.number().int().nullable(),
   tags: z.array(z.string()),
   created_at: isoDateSchema,
+  /** When the audio was recorded. NULL when unknown — fall back to created_at. */
+  recorded_at: isoDateSchema.nullable().optional(),
   processed_at: isoDateSchema.nullable(),
   action_item_count: z.number().int().default(0),
   participant_count: z.number().int().default(0),
@@ -100,6 +102,14 @@ export const UploadUrlRequest = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   language: z.string().min(2).max(10).default("en"),
   tags: z.array(z.string().trim().max(50)).max(10).default([]),
+  /**
+   * When the audio was recorded, if the client can tell — the browser exposes
+   * File.lastModified, which for most recorder exports is the recording time.
+   * Best-effort, never trusted: copying or re-saving a file rewrites it, so a
+   * value in the future or implausibly old is rejected server-side and the
+   * meeting falls back to its upload time.
+   */
+  recorded_at: isoDateSchema.optional(),
 });
 export type UploadUrlRequest = z.infer<typeof UploadUrlRequest>;
 

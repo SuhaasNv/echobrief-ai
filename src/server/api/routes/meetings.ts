@@ -33,6 +33,28 @@ import type { MeetingRow } from "../../db/types";
 
 const app = new Hono<AppBindings>();
 
+/** Oldest recording date we'll believe. Audio predating this is a bad clock. */
+const EARLIEST_PLAUSIBLE_RECORDING = new Date("2000-01-01T00:00:00Z").getTime();
+
+/**
+ * Accept a client-supplied recording time only if it's plausible.
+ *
+ * The browser reports File.lastModified, which is usually the recording time
+ * but is trivially wrong: copying a file, restoring a backup, or a skewed
+ * device clock all rewrite it. Rather than date a meeting to 1970 or next
+ * year, reject the implausible and return null so callers fall back to the
+ * upload time.
+ */
+function sanitizeRecordedAt(value: string | undefined): string | null {
+  if (!value) return null;
+  const ts = new Date(value).getTime();
+  if (Number.isNaN(ts)) return null;
+  // A small future skew is normal (client clock ahead); a day is not.
+  if (ts > Date.now() + 24 * 60 * 60 * 1000) return null;
+  if (ts < EARLIEST_PLAUSIBLE_RECORDING) return null;
+  return new Date(ts).toISOString();
+}
+
 // ---------------------------------------------------------------------------
 // POST /upload-url
 // ---------------------------------------------------------------------------
@@ -49,7 +71,7 @@ app.post("/upload-url", zValidator("json", UploadUrlRequest), async (c) => {
   await sql`
     INSERT INTO meetings (
       id, user_id, workspace_id, title, audio_key, audio_size, audio_mime,
-      duration_sec, language, tags, status
+      duration_sec, language, tags, status, recorded_at
     ) VALUES (
       ${meetingId},
       ${user.id},
@@ -61,7 +83,8 @@ app.post("/upload-url", zValidator("json", UploadUrlRequest), async (c) => {
       ${body.duration_sec ?? null},
       ${body.language},
       ${sql.array(body.tags)},
-      'queued'
+      'queued',
+      ${sanitizeRecordedAt(body.recorded_at)}
     )
   `;
 
@@ -251,6 +274,7 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       duration_sec: number | null;
       tags: string[];
       created_at: string;
+      recorded_at: string | null;
       processed_at: string | null;
       summary_excerpt: string | null;
       action_item_count: number;
@@ -264,6 +288,7 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       m.duration_sec,
       m.tags,
       m.created_at,
+      m.recorded_at,
       m.processed_at,
       s.executive AS summary_excerpt,
       (SELECT COUNT(*)::int FROM action_items ai WHERE ai.meeting_id = m.id) AS action_item_count,
@@ -299,6 +324,7 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       duration_sec: r.duration_sec,
       tags: r.tags ?? [],
       created_at: r.created_at,
+      recorded_at: r.recorded_at ?? null,
       processed_at: r.processed_at,
       action_item_count: r.action_item_count,
       participant_count: r.participant_count,
