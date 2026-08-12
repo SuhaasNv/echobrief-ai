@@ -53,11 +53,20 @@ app.get("/summary", async (c) => {
         WHEN m.created_at > NOW() - INTERVAL '30 days' 
         THEN m.id 
       END)::TEXT AS recent_meetings,
+      -- Three separate reasons this always returned NULL:
+      --   1. the worker writes the score under 'total', not 'overall';
+      --   2. the old guard required ^[0-9]+$, rejecting any decimal (8.2);
+      --   3. meeting_score is stored double-encoded — a JSONB *string* holding
+      --      the object — so ->>'total' misses regardless of the key name.
+      -- Unwrap the string form with #>>'{}' before reading the key.
       AVG(
-        CASE 
-          WHEN m.meeting_score IS NOT NULL 
-            AND (m.meeting_score->>'overall')::TEXT ~ '^[0-9]+$'
-          THEN (m.meeting_score->>'overall')::INT 
+        CASE
+          WHEN jsonb_typeof(m.meeting_score) = 'object'
+            AND (m.meeting_score->>'total') ~ '^[0-9]+(\.[0-9]+)?$'
+          THEN (m.meeting_score->>'total')::NUMERIC
+          WHEN jsonb_typeof(m.meeting_score) = 'string'
+            AND ((m.meeting_score #>> '{}')::jsonb ->> 'total') ~ '^[0-9]+(\.[0-9]+)?$'
+          THEN ((m.meeting_score #>> '{}')::jsonb ->> 'total')::NUMERIC
         END
       )::TEXT AS avg_score
     FROM meetings m

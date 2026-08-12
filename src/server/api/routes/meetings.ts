@@ -266,10 +266,18 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       m.processed_at,
       s.executive AS summary_excerpt,
       (SELECT COUNT(*)::int FROM action_items ai WHERE ai.meeting_id = m.id) AS action_item_count,
+      -- speakers is stored double-encoded (a JSONB *string* holding an array)
+      -- for every row the worker has ever written, so an 'array' check alone
+      -- always reported 0 participants. Handle both shapes.
       COALESCE((
-        SELECT jsonb_array_length(t.speakers)
+        SELECT CASE
+          WHEN jsonb_typeof(t.speakers) = 'array' THEN jsonb_array_length(t.speakers)
+          WHEN jsonb_typeof(t.speakers) = 'string' THEN
+            jsonb_array_length((t.speakers #>> '{}')::jsonb)
+          ELSE 0
+        END
         FROM transcripts t
-        WHERE t.meeting_id = m.id AND jsonb_typeof(t.speakers) = 'array'
+        WHERE t.meeting_id = m.id
       ), 0)::int AS participant_count
     FROM meetings m
     LEFT JOIN summaries s ON s.meeting_id = m.id
@@ -467,7 +475,20 @@ function buildTranscriptResponse(row: {
     segments.push({ speaker: null, start_sec: 0, end_sec: 0, text: row.raw_text });
   }
 
-  return { raw_text: row.raw_text, segments, speakers: row.speakers ?? [] };
+  // `speakers` has the same double-encoding problem as `content` above and was
+  // NOT being normalized — it went out as a JSON string, so the UI rendered
+  // `speakers.length` as the string's character count (149 instead of 2) and
+  // the response violated its own Zod contract (schemas.ts declares an array).
+  let speakers: typeof row.speakers = [];
+  try {
+    if (typeof row.speakers === "string") speakers = JSON.parse(row.speakers) as typeof speakers;
+    else if (Array.isArray(row.speakers)) speakers = row.speakers;
+  } catch {
+    /* malformed — fall back to no speakers rather than failing the request */
+  }
+  if (!Array.isArray(speakers)) speakers = [];
+
+  return { raw_text: row.raw_text, segments, speakers };
 }
 
 function toSegment(group: { speaker: string | null; words: WordEntry[] }): SegmentOut {
