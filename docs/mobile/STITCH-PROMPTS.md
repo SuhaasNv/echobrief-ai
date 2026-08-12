@@ -206,6 +206,171 @@ at reduced opacity, fading out.
 
 ---
 
+## 6. Sign in
+
+```
+Design the sign-in screen for EchoBrief using the established design system.
+
+The screen splits in half horizontally.
+
+TOP HALF: a full-bleed abstract visual — an iridescent soap-bubble-like orb
+floating in pure black, with rainbow refraction across its surface. It fades into
+the black background at its lower edge via a soft vertical gradient, with no hard
+line where it ends.
+
+BOTTOM HALF, on solid #06070A:
+- "EchoBrief" in Space Grotesk Bold, 40px, white, left-aligned
+- "Your meetings, remembered." below it in 17px grey
+- An email field: 52px tall, #0B0D11 background, 12px radius, 17px placeholder
+- A password field, same styling, with a blue "Show" text button on its right
+- A primary button: full width, 52px tall, fully rounded pill, near-white #F4F5F7
+  background with dark #06070A text reading "Sign in"
+- Centered below: "New to EchoBrief? Create an account", where the second part is
+  blue
+
+No social login buttons. No "or continue with" divider.
+```
+
+---
+
+## 7. Sign up
+
+```
+Design the account creation screen for EchoBrief using the established design
+system. Same structure as sign-in but no video — solid #06070A throughout.
+
+A back chevron in the top left.
+
+"Create an account" in Space Grotesk Bold 40px.
+"Start turning meetings into summaries you can search." in 17px grey.
+
+Three stacked fields, each 52px tall with #0B0D11 background and 12px radius:
+Name (optional), Email, Password.
+
+Below the password field, a small 13px line reading "At least 8 characters" in
+green with a checkmark, indicating the requirement is satisfied.
+
+A near-white pill button reading "Create account".
+```
+
+---
+
+## 8. Meeting chat
+
+```
+Design a chat screen for asking questions about ONE specific meeting, using the
+established design system.
+
+Navigation bar shows the meeting name with a smaller grey subtitle underneath
+reading "Grounded on this transcript".
+
+Empty state: an uppercase monospace label "TRY ASKING", then four suggestion cards
+stacked vertically, each a rounded #0B0D11 container with 15px white text:
+"Give me a 3-bullet summary"
+"What decisions were made, and by whom?"
+"List the action items with owners"
+"What was left open for next time?"
+
+Conversation state:
+- User messages right-aligned in rounded grey #121418 bubbles, max 85% width
+- AI responses NOT in bubbles — full-width flowing text at 17px, with a small
+  violet dot marker at the start of each response
+- A thin violet vertical caret at the end of the most recent response, suggesting
+  live typing
+
+Bottom: a rounded text input with placeholder "Ask about this meeting" and a
+circular violet send button with an up arrow.
+```
+
+---
+
+## 9. Account
+
+```
+Design the account screen for EchoBrief using the established design system.
+
+iOS large title "Account".
+
+At the top, a profile row: a 56px circle showing the initials "MN" in Space Grotesk
+on a #121418 background, with the name "Maya Nakamura" in 17px semibold and
+"maya@acme.com" in 15px grey beside it.
+
+Then a section labeled "WORKSPACE" in uppercase monospace 11px grey, containing one
+grouped card row: a small colored dot, "Personal", and a chevron.
+
+Then a section labeled "CONTINUE ON THE WEB" containing a grouped card with several
+rows, each with a label on the left and a small diagonal arrow icon on the right
+indicating it opens externally:
+Settings and profile / Analytics / Plan and billing / Shared links / Integrations
+
+Rows are separated by hairline dividers inset 16px from the left edge.
+
+At the bottom, separated by空 space, a final grouped card with a single row reading
+"Sign out" in red, and below it "Delete account" also in red.
+
+Version text "1.0 (build 42)" in 13px tertiary grey, centered at the very bottom.
+```
+
+---
+
+## 10. Processing state
+
+```
+Design the meeting detail screen for EchoBrief in its PROCESSING state, using the
+established design system. This is what a user sees while the AI is still working.
+
+Navigation bar with the meeting title.
+
+Below it: date and duration in monospace 13px grey.
+
+Then a flat dark grey horizontal bar with rounded ends, 28px tall, full width — a
+placeholder where the colored speaker timeline will appear once processing
+completes.
+
+Center of the screen:
+- A circular progress ring, roughly 120px diameter, thin stroke, mostly complete in
+  blue with the remainder dark grey, and "60%" in large monospace in its center
+- Below it, "Extracting summary and action items" in 17px semibold white
+- Below that, a vertical checklist with four rows, left-aligned:
+  ✓ Uploaded to storage        (green check, white text)
+  ✓ Transcribed                (green check, white text)
+  ◌ Analyzed                   (spinner, white text)
+  · Indexed                    (grey dot, grey text)
+- Below that, "about 2 min left" in monospace 15px grey
+
+At the bottom, a subtle line in 15px grey: "You can close the app — we'll keep
+working."
+```
+
+---
+
+## 11. Empty states
+
+```
+Design three empty state screens for EchoBrief using the established design system.
+Each is vertically centered with generous space, max 280px content width.
+
+SCREEN 1 — No meetings yet:
+A dimmed multi-colored horizontal segmented bar at 20% opacity as a background
+decoration, with the text over it. "Record your first meeting" in 20px semibold
+white. "EchoBrief turns it into a summary, action items, and a searchable
+transcript in a couple of minutes." in 15px grey. A near-white pill button reading
+"Start recording".
+
+SCREEN 2 — No action items:
+"You're all clear." in 20px semibold white, "Nothing open across 12 meetings." in
+15px grey. No button.
+
+SCREEN 3 — No search results:
+"No meeting mentions that." in 20px semibold. "Try different words, or search
+titles in Meetings." in 15px grey. A text button in blue reading "Ask something
+else".
+
+All three: no illustrations, no icons larger than 44px, no gradients.
+```
+
+---
+
 ## Notes on iterating
 
 - If output looks generic, the usual cause is adjectives. Replace "modern card" with
