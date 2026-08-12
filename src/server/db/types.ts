@@ -22,6 +22,8 @@ export interface UserRow {
   name: string | null;
   avatar_url: string | null;
   password_hash: string | null;
+  /** Google's `sub` claim. NULL for users who only ever used email/password. */
+  google_id: string | null;
   is_admin: boolean;
   default_account_type: AccountType | null;
   created_at: string;

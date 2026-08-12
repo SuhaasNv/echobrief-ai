@@ -20,6 +20,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as ShareTokenRouteImport } from './routes/share.$token'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AppUploadRouteImport } from './routes/app.upload'
 import { Route as AppStudyRouteImport } from './routes/app.study'
 import { Route as AppSharedRouteImport } from './routes/app.shared'
@@ -83,6 +84,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const ShareTokenRoute = ShareTokenRouteImport.update({
   id: '/share/$token',
   path: '/share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppUploadRoute = AppUploadRouteImport.update({
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/app/shared': typeof AppSharedRoute
   '/app/study': typeof AppStudyRoute
   '/app/upload': typeof AppUploadRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/share/$token': typeof ShareTokenRoute
   '/app/': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByTo {
   '/app/shared': typeof AppSharedRoute
   '/app/study': typeof AppStudyRoute
   '/app/upload': typeof AppUploadRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/share/$token': typeof ShareTokenRoute
   '/app': typeof AppIndexRoute
   '/app/meetings/$id': typeof AppMeetingsIdRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/app/shared': typeof AppSharedRoute
   '/app/study': typeof AppStudyRoute
   '/app/upload': typeof AppUploadRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/share/$token': typeof ShareTokenRoute
   '/app/': typeof AppIndexRoute
   '/app/meetings_/$id': typeof AppMeetingsIdRoute
@@ -217,6 +226,7 @@ export interface FileRouteTypes {
     | '/app/shared'
     | '/app/study'
     | '/app/upload'
+    | '/auth/callback'
     | '/share/$token'
     | '/app/'
     | '/app/meetings/$id'
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
     | '/app/shared'
     | '/app/study'
     | '/app/upload'
+    | '/auth/callback'
     | '/share/$token'
     | '/app'
     | '/app/meetings/$id'
@@ -260,6 +271,7 @@ export interface FileRouteTypes {
     | '/app/shared'
     | '/app/study'
     | '/app/upload'
+    | '/auth/callback'
     | '/share/$token'
     | '/app/'
     | '/app/meetings_/$id'
@@ -275,6 +287,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   SignupRoute: typeof SignupRoute
   TermsRoute: typeof TermsRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   ShareTokenRoute: typeof ShareTokenRoute
 }
 
@@ -355,6 +368,13 @@ declare module '@tanstack/react-router' {
       path: '/share/$token'
       fullPath: '/share/$token'
       preLoaderRoute: typeof ShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/upload': {
@@ -461,6 +481,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   SignupRoute: SignupRoute,
   TermsRoute: TermsRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   ShareTokenRoute: ShareTokenRoute,
 }
 export const routeTree = rootRouteImport

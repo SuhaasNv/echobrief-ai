@@ -27,6 +27,17 @@ const API_BASE_URL = normalizeApiBaseUrl(
     API_PATH_PREFIX,
 );
 
+/**
+ * The resolved API base (origin + /api/v1).
+ *
+ * Needed for flows the fetch wrapper can't perform — OAuth sign-in is a
+ * full-page browser navigation to the API, not an XHR, so it needs the
+ * absolute URL rather than a relative path.
+ */
+export function getApiBaseUrl(): string {
+  return API_BASE_URL;
+}
+
 const TOKEN_STORAGE_KEY = "echobrief-auth-token";
 const WORKSPACE_STORAGE_KEY = "echobrief-active-workspace";
 

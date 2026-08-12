@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, ArrowRight, Check, GraduationCap, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { GoogleButton, AuthDivider } from "@/components/auth/google-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -165,6 +166,22 @@ function SignupPage() {
             />
           </div>
         </div>
+
+        <AnimatePresence initial={false}>
+          {accountType && (
+            <motion.div
+              key="google-signup"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-4"
+            >
+              <GoogleButton label="Sign up" accountType={accountType} disabled={submitting} />
+              <AuthDivider />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence initial={false}>
           {accountType && (

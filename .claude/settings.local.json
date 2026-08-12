@@ -118,7 +118,8 @@
       "Bash(npm ls *)",
       "Bash(/opt/anaconda3/bin/python3 -c \"import playwright; print\\('python playwright available'\\)\")",
       "Bash(/opt/anaconda3/bin/python3 -m playwright install chromium)",
-      "Bash(lsof -i :8080 -i :4000 -sTCP:LISTEN)"
+      "Bash(lsof -i :8080 -i :4000 -sTCP:LISTEN)",
+      "Bash(cd *)"
     ]
   }
 }

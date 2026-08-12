@@ -5,6 +5,7 @@ import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { GoogleButton, AuthDivider } from "@/components/auth/google-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -100,7 +101,12 @@ function LoginPage() {
         </>
       }
     >
-      <form className="space-y-4" onSubmit={handleSubmit}>
+      <div className="space-y-4">
+        <GoogleButton label="Sign in" disabled={submitting} />
+        <AuthDivider />
+      </div>
+
+      <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1.5">
           <Label htmlFor="email">Work email</Label>
           <Input

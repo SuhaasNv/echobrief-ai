@@ -24,6 +24,7 @@ import { getEnv } from "../env";
 
 import adminRoutes from "./routes/admin";
 import authRoutes from "./routes/auth";
+import googleAuthRoutes from "./routes/auth-google";
 import healthRoutes from "./routes/health";
 import docsRoutes from "./routes/docs";
 import meetingsRoutes from "./routes/meetings";
@@ -85,6 +86,7 @@ api.route("/docs", docsRoutes);
 
 // Public routes (no auth)
 api.route("/auth", authRoutes);
+api.route("/auth", googleAuthRoutes);
 api.route("/share", shareRoutes);
 
 // Protected routes
