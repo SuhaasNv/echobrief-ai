@@ -8,16 +8,19 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { Link, router } from "expo-router";
 
 import { authErrorMessage, useSignIn } from "@/lib/api/auth";
 import { haptics } from "@/lib/haptics";
 import { DISPLAY } from "@/lib/type";
+import { AUTH_HERO_RATIO, AuthBackdrop } from "@/components/auth-backdrop";
 
 export default function SignInScreen() {
   const signIn = useSignIn();
   const passwordRef = useRef<TextInput>(null);
+  const { height } = useWindowDimensions();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,6 +52,7 @@ export default function SignInScreen() {
 
   return (
     <View className="flex-1 bg-background">
+      <AuthBackdrop />
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
           // Deliberately NOT contentInsetAdjustmentBehavior="automatic". That
@@ -58,19 +62,19 @@ export default function SignInScreen() {
           // fits become scrollable.
           contentInsetAdjustmentBehavior="never"
           alwaysBounceVertical={false}
-          contentContainerStyle={{
-            flexGrow: 1,
-            justifyContent: "center",
-            paddingHorizontal: 20,
-            paddingVertical: 24,
-          }}
+          contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
         >
-          <View className="mb-10">
-            <Text className="text-[36px] leading-[42px] text-label"
+          {/* Reserves the hero. The video is absolutely positioned behind this,
+              so it is a spacer rather than a container. */}
+          <View style={{ height: height * AUTH_HERO_RATIO }} pointerEvents="none" />
+
+          <View className="flex-1 justify-center px-5 pb-10">
+          <View className="mb-8">
+            <Text className="text-[40px] leading-[46px] text-label"
               style={{ fontFamily: DISPLAY.bold }}>EchoBrief</Text>
-            <Text className="mt-2 text-[17px] text-label-secondary">
+            <Text className="mt-1.5 text-[17px] text-label-secondary">
               Your meetings, remembered.
             </Text>
           </View>
@@ -183,6 +187,7 @@ export default function SignInScreen() {
                 </Text>
               </Pressable>
             </Link>
+          </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

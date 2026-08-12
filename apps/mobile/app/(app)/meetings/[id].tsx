@@ -8,10 +8,20 @@ import { isProcessing } from "@/lib/api/meetings";
 import { formatDuration, formatListDate } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { SPRING, TIMING } from "@/lib/motion";
+import { Ribbon } from "@/components/ribbon";
 import { SummaryView } from "@/components/meeting/summary-view";
 import { TranscriptView } from "@/components/meeting/transcript-view";
 
 type Tab = "summary" | "transcript";
+
+/** Legend swatches — mirrors SPEAKER_HEX in components/ribbon. */
+const SPEAKER_DOT = [
+  "bg-speaker-a",
+  "bg-speaker-b",
+  "bg-speaker-c",
+  "bg-speaker-d",
+  "bg-speaker-e",
+] as const;
 
 /**
  * Segmented control.
@@ -130,10 +140,40 @@ export default function MeetingDetailScreen() {
       <Stack.Screen options={{ title: meeting.title }} />
 
       <ScrollView contentInsetAdjustmentBehavior="automatic">
-        <View className="px-4 pb-4 pt-1">
-          <Text className="text-[13px] text-label-secondary" style={{ fontVariant: ["tabular-nums"] }}>
+        <View className="gap-3 px-4 pb-4 pt-1">
+          <Text
+            className="text-[13px] text-label-secondary"
+            style={{ fontVariant: ["tabular-nums"] }}
+          >
             {meta}
           </Text>
+
+          {/* The signature, at hero size. Only meaningful once diarization has
+              produced segments, so it holds a placeholder bar while processing
+              rather than disappearing and shifting the layout. */}
+          {meeting.transcript?.segments.length || processing ? (
+            <View className="gap-2">
+              <Ribbon
+                segments={meeting.transcript?.segments ?? []}
+                speakers={meeting.transcript?.speakers ?? []}
+                height={28}
+                radius={6}
+                placeholder={processing}
+              />
+              {meeting.transcript?.speakers.length ? (
+                <View className="flex-row flex-wrap gap-x-4 gap-y-1">
+                  {meeting.transcript.speakers.map((s, i) => (
+                    <View key={s.id} className="flex-row items-center gap-1.5">
+                      <View
+                        className={`h-2 w-2 rounded-full ${SPEAKER_DOT[i % SPEAKER_DOT.length]}`}
+                      />
+                      <Text className="text-[11px] text-label-secondary">{s.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         {processing ? (
