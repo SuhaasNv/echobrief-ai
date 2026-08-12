@@ -16,7 +16,12 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Copy package files
+# packages/ must land before `npm ci` — the root package.json declares npm
+# workspaces, and src/lib/schemas.ts re-exports @echobrief/shared, which 8
+# server files import. The `apps/*` workspace glob matches nothing here; that
+# is intentional, so the mobile app never enters the API image.
 COPY package.json package-lock.json* ./
+COPY packages ./packages
 
 # Install ALL dependencies (including devDependencies for type checking)
 RUN npm ci --no-audit --no-fund
@@ -38,8 +43,9 @@ WORKDIR /app
 # Create non-root user for security
 RUN groupadd -r echobrief && useradd -r -g echobrief echobrief
 
-# Copy package files
+# Copy package files (see builder stage for why packages/ is needed)
 COPY package.json package-lock.json* ./
+COPY packages ./packages
 
 # Install ONLY production dependencies (no devDependencies)
 # tsx is a production dependency in package.json

@@ -8,7 +8,11 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
+# packages/ must land before `npm ci` — the root package.json declares npm
+# workspaces and src/lib/schemas.ts re-exports @echobrief/shared. The `apps/*`
+# workspace glob matches nothing here, keeping the mobile app out of this image.
 COPY package.json package-lock.json* ./
+COPY packages ./packages
 RUN npm ci --no-audit --no-fund
 
 COPY tsconfig.json vite.config.railway.ts components.json ./
@@ -29,6 +33,7 @@ WORKDIR /app
 RUN groupadd -r echobrief && useradd -r -g echobrief echobrief
 
 COPY package.json package-lock.json* ./
+COPY packages ./packages
 RUN npm ci --only=production --no-audit --no-fund
 
 COPY --from=builder /app/dist ./dist

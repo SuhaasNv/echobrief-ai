@@ -3,6 +3,14 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "overrides": {
+    "react": "$react",
+    "react-dom": "$react-dom"
+  },
   "scripts": {
     "dev": "vite dev",
     "dev:api": "tsx watch src/api.ts",
@@ -28,6 +36,7 @@
     "@aws-sdk/client-s3": "^3.1046.0",
     "@aws-sdk/s3-request-presigner": "^3.1046.0",
     "@cloudflare/vite-plugin": "^1.25.5",
+    "@echobrief/shared": "*",
     "@hono/node-server": "^2.0.2",
     "@hono/zod-validator": "^0.4.3",
     "@hookform/resolvers": "^5.2.2",
