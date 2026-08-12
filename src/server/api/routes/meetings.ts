@@ -765,7 +765,11 @@ app.post("/:id/retry", async (c) => {
 
   if (!queued) {
     // A worker holds the lock — this meeting is already being reprocessed.
-    await sql`UPDATE meetings SET status = 'processing' WHERE id = ${id}`;
+    // Leave the status as 'queued' (set above); the worker owning the lock
+    // advances it. Do NOT write 'processing' here — it is absent from the
+    // meetings.status CHECK constraint, so the write throws before the 409
+    // below is constructed, surfacing a 500 and stranding the meeting in
+    // 'queued' with no job and no path back to 'failed' to retry from.
     throw new HTTPException(409, { message: "This meeting is already being processed" });
   }
 
