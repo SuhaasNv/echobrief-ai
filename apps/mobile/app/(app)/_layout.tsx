@@ -21,7 +21,7 @@ export default function AppLayout() {
       // to the content layer. Free legibility win on the transcript screen.
       minimizeBehavior="onScrollDown"
     >
-      <NativeTabs.Trigger name="index">
+      <NativeTabs.Trigger name="meetings">
         <NativeTabs.Trigger.Label>Meetings</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf={{ default: "list.bullet.rectangle", selected: "list.bullet.rectangle.fill" }}

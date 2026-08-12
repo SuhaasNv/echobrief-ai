@@ -8,8 +8,9 @@
     "scheme": "echobrief",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.suhaasnv.echobrief"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.suhaasnv.echobrief",
+      "appleTeamId": "8Q79YMZRDR"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,6 +27,16 @@
     "plugins": [
       "expo-secure-store",
       "expo-image",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#06070A",
+          "dark": { "backgroundColor": "#06070A" }
+        }
+      ],
       [
         "expo-audio",
         {

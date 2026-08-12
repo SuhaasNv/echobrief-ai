@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -10,13 +10,13 @@ import {
   View,
 } from "react-native";
 import { Link, router } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { authErrorMessage, useSignIn } from "@/lib/api/auth";
+import { haptics } from "@/lib/haptics";
 
 export default function SignInScreen() {
-  const insets = useSafeAreaInsets();
   const signIn = useSignIn();
+  const passwordRef = useRef<TextInput>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,27 +24,38 @@ export default function SignInScreen() {
 
   const canSubmit = /.+@.+\..+/.test(email) && password.length > 0 && !signIn.isPending;
 
+  // VoiceOver focus stays on the button after a failed submit, so a silently
+  // rendered error below the fields is never announced.
+  useEffect(() => {
+    if (signIn.isError) {
+      AccessibilityInfo.announceForAccessibility(authErrorMessage(signIn.error));
+    }
+  }, [signIn.isError, signIn.error]);
+
   const onSubmit = () => {
     if (!canSubmit) return;
     signIn.mutate(
       { email: email.trim(), password },
-      { onSuccess: () => router.replace("/(app)") },
+      {
+        onSuccess: () => {
+          haptics.success();
+          router.replace("/(app)/meetings");
+        },
+        onError: () => haptics.error(),
+      },
     );
   };
 
   return (
     <View className="flex-1 bg-background">
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={{
             flexGrow: 1,
             justifyContent: "center",
-            paddingHorizontal: 24,
-            paddingTop: insets.top + 24,
-            paddingBottom: insets.bottom + 24,
+            paddingHorizontal: 20,
+            paddingVertical: 24,
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
@@ -58,25 +69,37 @@ export default function SignInScreen() {
 
           <View className="gap-3">
             <TextInput
-              className="h-[52px] rounded-control bg-surface px-4 text-[17px] text-label"
+              // min-h, not a fixed height: Text auto-scales with Dynamic Type,
+              // so a fixed 52px box clips its own label from AX1 upward.
+              className="min-h-[52px] rounded-control bg-surface px-4 py-3.5 text-[17px] text-label"
+              style={{ borderCurve: "continuous" }}
               placeholder="Email"
-              placeholderTextColor="#6E727A"
+              placeholderTextColor="#767A82"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
+              // username + password (not emailAddress) is what makes iOS offer
+              // the saved-credential QuickType bar.
               textContentType="username"
               autoComplete="email"
               returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              enablesReturnKeyAutomatically
               editable={!signIn.isPending}
             />
 
-            <View className="flex-row items-center rounded-control bg-surface pr-2">
+            <View
+              className="flex-row items-center rounded-control bg-surface pr-2"
+              style={{ borderCurve: "continuous" }}
+            >
               <TextInput
-                className="h-[52px] flex-1 px-4 text-[17px] text-label"
+                ref={passwordRef}
+                className="min-h-[52px] flex-1 px-4 py-3.5 text-[17px] text-label"
                 placeholder="Password"
-                placeholderTextColor="#6E727A"
+                placeholderTextColor="#767A82"
                 value={password}
                 onChangeText={setPassword}
                 autoCapitalize="none"
@@ -91,7 +114,7 @@ export default function SignInScreen() {
               <Pressable
                 onPress={() => setRevealPassword((v) => !v)}
                 hitSlop={12}
-                className="px-3 py-2"
+                className="px-3 py-2 active:opacity-40"
                 accessibilityRole="button"
                 accessibilityLabel={revealPassword ? "Hide password" : "Show password"}
               >
@@ -102,7 +125,11 @@ export default function SignInScreen() {
             </View>
 
             {signIn.isError ? (
-              <Text className="px-1 text-[15px] text-danger">
+              <Text
+                className="px-1 text-[15px] text-danger"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+              >
                 {authErrorMessage(signIn.error)}
               </Text>
             ) : null}
@@ -111,11 +138,14 @@ export default function SignInScreen() {
               onPress={onSubmit}
               disabled={!canSubmit}
               accessibilityRole="button"
+              accessibilityLabel="Sign in"
+              accessibilityState={{ disabled: !canSubmit, busy: signIn.isPending }}
               // Primary CTA is neutral near-white, not brand blue. On a
               // near-black ground that is the highest-contrast element
-              // available, and it is the web app's established identity.
-              className={`mt-2 h-[52px] items-center justify-center rounded-full ${
-                canSubmit ? "bg-label" : "bg-fill"
+              // available, and it matches the web app's identity.
+              // Pressable gives NO feedback by default — active: is required.
+              className={`mt-2 min-h-[52px] items-center justify-center rounded-full px-6 ${
+                canSubmit ? "bg-label active:opacity-80" : "bg-fill"
               }`}
             >
               {signIn.isPending ? (
@@ -135,8 +165,14 @@ export default function SignInScreen() {
           <View className="mt-8 flex-row justify-center gap-1">
             <Text className="text-[15px] text-label-secondary">New to EchoBrief?</Text>
             <Link href="/(auth)/sign-up" asChild>
-              <Pressable accessibilityRole="link" hitSlop={8}>
-                <Text className="text-[15px] font-medium text-tint-label">Create an account</Text>
+              <Pressable
+                accessibilityRole="link"
+                hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
+                className="active:opacity-40"
+              >
+                <Text className="text-[15px] font-medium text-tint-label">
+                  Create an account
+                </Text>
               </Pressable>
             </Link>
           </View>

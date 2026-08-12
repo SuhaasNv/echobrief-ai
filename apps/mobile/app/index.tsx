@@ -11,5 +11,5 @@ import { tokenStore } from "@/lib/api/token-store";
  * first API call will 401 and the session listener routes back to sign-in.
  */
 export default function Index() {
-  return <Redirect href={tokenStore.getToken() ? "/(app)" : "/(auth)/sign-in"} />;
+  return <Redirect href={tokenStore.getToken() ? "/(app)/meetings" : "/(auth)/sign-in"} />;
 }

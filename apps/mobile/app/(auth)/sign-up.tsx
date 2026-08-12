@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -11,15 +11,16 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { authErrorMessage, useSignUp } from "@/lib/api/auth";
+import { haptics } from "@/lib/haptics";
 
 const MIN_PASSWORD_LENGTH = 8;
 
 export default function SignUpScreen() {
-  const insets = useSafeAreaInsets();
   const signUp = useSignUp();
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,6 +28,12 @@ export default function SignUpScreen() {
 
   const passwordLongEnough = password.length >= MIN_PASSWORD_LENGTH;
   const canSubmit = /.+@.+\..+/.test(email) && passwordLongEnough && !signUp.isPending;
+
+  useEffect(() => {
+    if (signUp.isError) {
+      AccessibilityInfo.announceForAccessibility(authErrorMessage(signUp.error));
+    }
+  }, [signUp.isError, signUp.error]);
 
   const onSubmit = () => {
     if (!canSubmit) return;
@@ -43,31 +50,32 @@ export default function SignUpScreen() {
             // 200 with no token means the email already exists. The server
             // deliberately does not say so outright; surface its wording rather
             // than inventing more specific copy.
+            haptics.warning();
             Alert.alert("Check your email", result.message, [
-              { text: "Sign in", onPress: () => router.replace("/(auth)/sign-in") },
+              // Cancel first — iOS renders the leading button on the left.
               { text: "OK", style: "cancel" },
+              { text: "Sign in", onPress: () => router.replace("/(auth)/sign-in") },
             ]);
             return;
           }
-          router.replace("/(app)");
+          haptics.success();
+          router.replace("/(app)/meetings");
         },
+        onError: () => haptics.error(),
       },
     );
   };
 
   return (
     <View className="flex-1 bg-background">
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={{
             flexGrow: 1,
             justifyContent: "center",
-            paddingHorizontal: 24,
-            paddingTop: insets.top + 24,
-            paddingBottom: insets.bottom + 24,
+            paddingHorizontal: 20,
+            paddingVertical: 24,
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
@@ -83,21 +91,27 @@ export default function SignUpScreen() {
 
           <View className="gap-3">
             <TextInput
-              className="h-[52px] rounded-control bg-surface px-4 text-[17px] text-label"
+              className="min-h-[52px] rounded-control bg-surface px-4 py-3.5 text-[17px] text-label"
+              style={{ borderCurve: "continuous" }}
               placeholder="Name (optional)"
-              placeholderTextColor="#6E727A"
+              placeholderTextColor="#767A82"
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
               textContentType="name"
               autoComplete="name"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => emailRef.current?.focus()}
               editable={!signUp.isPending}
             />
 
             <TextInput
-              className="h-[52px] rounded-control bg-surface px-4 text-[17px] text-label"
+              ref={emailRef}
+              className="min-h-[52px] rounded-control bg-surface px-4 py-3.5 text-[17px] text-label"
+              style={{ borderCurve: "continuous" }}
               placeholder="Email"
-              placeholderTextColor="#6E727A"
+              placeholderTextColor="#767A82"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -105,13 +119,19 @@ export default function SignUpScreen() {
               keyboardType="email-address"
               textContentType="username"
               autoComplete="email"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              enablesReturnKeyAutomatically
               editable={!signUp.isPending}
             />
 
             <TextInput
-              className="h-[52px] rounded-control bg-surface px-4 text-[17px] text-label"
+              ref={passwordRef}
+              className="min-h-[52px] rounded-control bg-surface px-4 py-3.5 text-[17px] text-label"
+              style={{ borderCurve: "continuous" }}
               placeholder="Password"
-              placeholderTextColor="#6E727A"
+              placeholderTextColor="#767A82"
               value={password}
               onChangeText={setPassword}
               autoCapitalize="none"
@@ -136,7 +156,11 @@ export default function SignUpScreen() {
             </Text>
 
             {signUp.isError ? (
-              <Text className="px-1 text-[15px] text-danger">
+              <Text
+                className="px-1 text-[15px] text-danger"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+              >
                 {authErrorMessage(signUp.error)}
               </Text>
             ) : null}
@@ -145,8 +169,10 @@ export default function SignUpScreen() {
               onPress={onSubmit}
               disabled={!canSubmit}
               accessibilityRole="button"
-              className={`mt-2 h-[52px] items-center justify-center rounded-full ${
-                canSubmit ? "bg-label" : "bg-fill"
+              accessibilityLabel="Create account"
+              accessibilityState={{ disabled: !canSubmit, busy: signUp.isPending }}
+              className={`mt-2 min-h-[52px] items-center justify-center rounded-full px-6 ${
+                canSubmit ? "bg-label active:opacity-80" : "bg-fill"
               }`}
             >
               {signUp.isPending ? (

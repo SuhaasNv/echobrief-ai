@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 import { api } from "./client";
 
@@ -23,8 +23,10 @@ export interface MeetingListResponse {
   limit: number;
 }
 
+const PAGE_SIZE = 20;
+
 export const qk = {
-  meetings: (page: number) => ["meetings", { page }] as const,
+  meetings: (search: string) => ["meetings", { search }] as const,
 };
 
 /** A meeting is still moving through the pipeline. */
@@ -32,17 +34,26 @@ export function isProcessing(status: MeetingSummary["status"]): boolean {
   return status !== "complete" && status !== "failed";
 }
 
-export function useMeetings(page = 1) {
-  return useQuery({
-    queryKey: qk.meetings(page),
-    queryFn: () =>
+export function useMeetings(search = "") {
+  return useInfiniteQuery({
+    queryKey: qk.meetings(search),
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
       api.apiRequest<MeetingListResponse>("/meetings", {
-        query: { page, limit: 20 },
+        query: {
+          page: pageParam,
+          limit: PAGE_SIZE,
+          ...(search ? { q: search } : {}),
+        },
       }),
+    getNextPageParam: (last) =>
+      last.page * last.limit < last.total ? last.page + 1 : undefined,
     // Poll only while something is actually processing. The web app polls every
     // 5s; on cellular that is four times the battery for a list-level view, so
     // the list uses 15s and the detail screen keeps the tighter loop.
     refetchInterval: (query) =>
-      query.state.data?.items.some((m) => isProcessing(m.status)) ? 15_000 : false,
+      query.state.data?.pages.some((p) => p.items.some((m) => isProcessing(m.status)))
+        ? 15_000
+        : false,
   });
 }
