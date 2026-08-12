@@ -111,7 +111,14 @@
       "WebFetch(domain:www.assemblyai.com)",
       "WebFetch(domain:assemblyai.com)",
       "Bash(pkill -f \"concurrently.*npm:dev\")",
-      "Bash(kill 10820 10839 10841 10842 10904 10906 10920 13549)"
+      "Bash(kill 10820 10839 10841 10842 10904 10906 10920 13549)",
+      "WebFetch(domain:github.com)",
+      "Bash(npx skills *)",
+      "Bash(npx --yes playwright --version)",
+      "Bash(npm ls *)",
+      "Bash(/opt/anaconda3/bin/python3 -c \"import playwright; print\\('python playwright available'\\)\")",
+      "Bash(/opt/anaconda3/bin/python3 -m playwright install chromium)",
+      "Bash(lsof -i :8080 -i :4000 -sTCP:LISTEN)"
     ]
   }
 }
