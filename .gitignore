@@ -48,3 +48,6 @@ skills-lock.json
 *.njsproj
 *.sln
 *.sw?
+
+# Local Claude Code settings. Has held a live API key; never commit.
+.claude/settings.local.json
