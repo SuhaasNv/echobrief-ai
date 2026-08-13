@@ -44,6 +44,17 @@ export interface MeetingDetail {
   duration_sec: number | null;
   language: string;
   tags: string[];
+  /**
+   * The live public share token, or null when nothing is shared.
+   *
+   * GET /meetings/:id selects the whole row, so this has always been on the
+   * wire; the mobile type simply never declared it. It is what lets the share
+   * menu know a link already exists WITHOUT asking the server, which matters
+   * because POST /meetings/:id/share mints a brand new token every time it is
+   * called with `enabled: true` — using that endpoint to find out would revoke
+   * the link the user had already sent someone.
+   */
+  share_token: string | null;
   has_audio: boolean;
   transcript_provided: boolean;
   meeting_score: MeetingScore | null;

@@ -1,13 +1,25 @@
-import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
-import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  LinearTransition,
+  useReducedMotion,
+} from "react-native-reanimated";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 
 import { useMeetingDetail, type TranscriptSegment } from "@/lib/api/meeting-detail";
 import { isProcessing } from "@/lib/api/meetings";
 import { useMeetingPlayback } from "@/lib/audio/playback";
-import { formatDuration, formatListDate } from "@/lib/format";
-import { displayTitle } from "@/components/meetings/meeting-row";
+import { displayTitle, formatDuration, formatListDate } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { SPRING, TIMING } from "@/lib/motion";
 import { ribbonSpan } from "@/components/ribbon";
@@ -15,6 +27,7 @@ import { useFollowScroll } from "@/components/player/follow-scroll";
 import { PlayerBar } from "@/components/player/player-bar";
 import { RibbonScrubber } from "@/components/player/ribbon-scrubber";
 import { MeetingMenuButton } from "@/components/meeting/meeting-menu";
+import { dismissShareToast, useShareToastNote } from "@/components/meeting/share-toast";
 import { ProcessingView } from "@/components/meeting/processing-view";
 import { SummaryView } from "@/components/meeting/summary-view";
 import { TranscriptView } from "@/components/meeting/transcript-view";
@@ -91,6 +104,87 @@ function Segmented({ value, onChange }: { value: Tab; onChange: (t: Tab) => void
         );
       })}
     </View>
+  );
+}
+
+/**
+ * How long a confirmation stays up.
+ *
+ * Long enough to read three words after the action sheet's own dismissal
+ * animation has finished, short enough that it is gone before the user's next
+ * tap lands anywhere near it.
+ */
+const TOAST_MS = 2200;
+
+/**
+ * "Summary copied" / "Sharing turned off".
+ *
+ * Drawn here rather than by the menu because the menu button lives inside the
+ * native navigation bar, which would clip it. It reads its message from an
+ * external store (components/meeting/share-toast) so showing one does not
+ * re-render this screen — and this screen's render is the whole transcript.
+ *
+ * Local to the route for the same reason Segmented is: it has one caller, one
+ * screen, and no life outside it.
+ */
+function ShareToast({ bottomInset }: { bottomInset: number }) {
+  const note = useShareToastNote();
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!note) return;
+
+    // Announced as well as drawn. The action sheet has just dismissed, which
+    // puts VoiceOver focus back on the header button, and a view that merely
+    // appears near the bottom of the screen is never read — the same pairing,
+    // and the same reason, as AuthFormError.
+    AccessibilityInfo.announceForAccessibility(note.message);
+
+    const timer = setTimeout(dismissShareToast, TOAST_MS);
+    // Keyed on the note's id, so a second confirmation gets a full window
+    // rather than inheriting what was left of the first one's.
+    return () => clearTimeout(timer);
+  }, [note]);
+
+  // The store is module scope, so a note still standing when this screen goes
+  // away outlives the meeting it was about — leaving the next meeting opened to
+  // flash "Summary copied" for a summary nobody copied. Clearing the timer
+  // above is not enough; the note itself has to go.
+  useEffect(() => {
+    return () => dismissShareToast();
+  }, []);
+
+  if (!note) return null;
+
+  return (
+    <Animated.View
+      key={note.id}
+      // FadeInDown starts 25pt BELOW its resting place and rises into it, which
+      // is the right direction for something entering from the bottom edge.
+      // Opacity and translate only; nothing here animates layout.
+      entering={reduceMotion ? undefined : FadeInDown.duration(220)}
+      exiting={reduceMotion ? undefined : FadeOut.duration(160)}
+      className="absolute inset-x-4 items-center"
+      style={{ bottom: bottomInset }}
+      // Never eats a tap. It sits over the transcript and the player, and a
+      // confirmation that swallows the play button for two seconds is worse
+      // than no confirmation at all.
+      pointerEvents="none"
+    >
+      <View
+        className="rounded-control border border-edge bg-elevated px-4 py-2.5"
+        style={{ borderCurve: "continuous" }}
+      >
+        <Text
+          className="text-[14px] font-medium text-label"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          maxFontSizeMultiplier={1.4}
+        >
+          {note.message}
+        </Text>
+      </View>
+    </Animated.View>
   );
 }
 
@@ -181,7 +275,7 @@ export default function MeetingDetailScreen() {
           title,
           headerRight: () => (
             <MeetingMenuButton
-              id={meeting.id}
+              meeting={meeting}
               title={title}
               onDeleteScheduled={leaveAfterDelete}
             />
@@ -240,7 +334,10 @@ export default function MeetingDetailScreen() {
         {processing ? (
           <ProcessingView meeting={meeting} />
         ) : meeting.status === "failed" ? (
-          <View className="mx-4 gap-2 rounded-card bg-surface p-5" style={{ borderCurve: "continuous" }}>
+          <View
+            className="mx-4 gap-2 rounded-card bg-surface p-5"
+            style={{ borderCurve: "continuous" }}
+          >
             <Text className="text-[17px] font-semibold text-danger">Processing failed</Text>
             {meeting.failure_reason ? (
               <Text className="text-[14px] leading-[20px] text-label-secondary" selectable>
@@ -271,6 +368,10 @@ export default function MeetingDetailScreen() {
       {/* Renders nothing for a transcript-only meeting. A play button that
           cannot play is worse than no player at all. */}
       {processing ? null : <PlayerBar meeting={meeting} playback={playback} follow={follow} />}
+
+      {/* Above the transport and the tab bar, on the same measured inset the
+          content already clears, so it can never land under either. */}
+      <ShareToast bottomInset={follow.bottomInset} />
     </View>
   );
 }
