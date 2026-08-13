@@ -13,7 +13,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { haptics } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
-import { TAB_BAR_HEIGHT, TAB_BAR_SIDE_INSET, TAB_BAR_BOTTOM_GAP } from "@/lib/layout";
+import {
+  TAB_BAR_HEIGHT,
+  TAB_BAR_SIDE_INSET,
+  TAB_BAR_BOTTOM_GAP,
+  TAB_BAR_ORB_LIFT,
+} from "@/lib/layout";
 import { useColorTokens } from "@/lib/tokens";
 
 /**
@@ -171,6 +176,7 @@ export function CustomTabBar({ state, navigation }: TabBarProps) {
                 onLongPress={onLongPress}
                 danger={danger}
                 background={background}
+                labelTertiary={labelTertiary}
               />
             );
           }
@@ -310,6 +316,7 @@ function CenterButton({
   onLongPress,
   danger,
   background,
+  labelTertiary,
 }: {
   meta: TabMeta;
   focused: boolean;
@@ -317,6 +324,7 @@ function CenterButton({
   onLongPress: () => void;
   danger?: string;
   background?: string;
+  labelTertiary?: string;
 }) {
   const pressed = useSharedValue(0);
 
@@ -345,11 +353,12 @@ function CenterButton({
             {
               // Lifted so it breaks the top edge of the bar — the elevation is
               // the whole point, and it is what marks this as the primary action
-              // rather than a fifth peer.
-              marginTop: -26,
-              width: 60,
-              height: 60,
-              borderRadius: 30,
+              // rather than a fifth peer. The lift is a shared constant because
+              // every scroll surface has to reserve clearance for it.
+              marginTop: -TAB_BAR_ORB_LIFT,
+              width: 58,
+              height: 58,
+              borderRadius: 29,
               alignItems: "center",
               justifyContent: "center",
               backgroundColor: danger,
@@ -357,10 +366,14 @@ function CenterButton({
               // sitting through the bar rather than pasted on top of it.
               borderWidth: 4,
               borderColor: background,
+              // A confident seat, not an alarm. A design review read the old
+              // 0.55/12 halo as "hot" — the lift and the red fill already carry
+              // all the prominence the primary verb needs, so the glow only has
+              // to ground the circle, not announce it.
               shadowColor: danger,
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: focused ? 0.55 : 0.4,
-              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: focused ? 0.3 : 0.2,
+              shadowRadius: 7,
             },
             style,
           ]}
@@ -368,18 +381,24 @@ function CenterButton({
           <Image
             source={`sf:${meta.icon}`}
             tintColor="#FFFFFF"
-            style={{ width: 26, height: 26 }}
+            style={{ width: 25, height: 25 }}
             contentFit="contain"
           />
         </Animated.View>
+        {/* The one always-on label in the bar, so the tab with no room for an
+            inline pill never loses its name. Its colour was `undefined` when
+            unfocused, which fell back to near-black on the dark bar — legible
+            only on the Record screen itself, where it turned red. Now it matches
+            the inactive icons (tertiary grey) off-screen and turns red when
+            active, exactly like every other tab's icon. */}
         <Animated.Text
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
           style={{
-            marginTop: 3,
+            marginTop: 2,
             fontSize: 11,
-            fontWeight: focused ? "700" : "500",
-            color: focused ? danger : undefined,
+            fontWeight: focused ? "700" : "600",
+            color: focused ? danger : labelTertiary,
             textAlign: "center",
           }}
         >

@@ -385,9 +385,15 @@ export function SummaryView({ meeting, onNameSpeaker }: SummaryViewProps) {
             the colour was correct, it just never occupied any area. The wash is
             6% so the body text keeps its contrast against --surface. */}
         <View className="-mx-4 -mt-4 mb-1 border-b border-violet/20 bg-violet/[0.06] px-4 pb-3 pt-4">
+          {/* "Summary", not "AI summary". Naming the mechanism is the tell a
+              summariser is trying to be trusted for being a robot; Granola's
+              posture is that the summary simply IS the notes. The violet dot and
+              wash still mark it as model-produced — that meaning is carried by
+              colour, which is the app's system, without the heading having to
+              say "AI" out loud. */}
           <View className="flex-row items-center gap-2">
             <View className="h-1.5 w-1.5 rounded-full bg-violet" />
-            <Eyebrow>AI summary</Eyebrow>
+            <Eyebrow>Summary</Eyebrow>
           </View>
         </View>
         <Text className="text-[17px] leading-[25px] text-label" selectable>

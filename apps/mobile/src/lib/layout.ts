@@ -18,7 +18,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export const TAB_BAR_HEIGHT = 60;
 export const TAB_BAR_BOTTOM_GAP = 10;
 export const TAB_BAR_SIDE_INSET = 16;
-export const TAB_BAR_RESERVE = TAB_BAR_HEIGHT + TAB_BAR_BOTTOM_GAP;
+/**
+ * How far the Record orb pokes ABOVE the pill's top edge.
+ *
+ * Part of the reserve because content is full-width and the orb is centred: a
+ * line of text whose middle sits under the lifted orb is covered even though its
+ * ends are clear. A design review caught exactly this — the orb bisecting a
+ * "Decisions" line on the meeting screen. Clearing the pill alone is not enough;
+ * everything must clear the orb too.
+ */
+export const TAB_BAR_ORB_LIFT = 24;
+export const TAB_BAR_RESERVE = TAB_BAR_HEIGHT + TAB_BAR_BOTTOM_GAP + TAB_BAR_ORB_LIFT;
 
 /**
  * Bottom padding a tab screen needs so its content clears the tab bar.
