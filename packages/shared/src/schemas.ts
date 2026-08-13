@@ -298,9 +298,17 @@ export const ActionItem = z.object({
   assignee_id: uuidSchema.nullable(),
   due_date: z.string().nullable(),
   completed: z.boolean(),
+  /**
+   * When it was completed. NULL means "completed, date unknown" — rows finished
+   * before the API recorded this were deliberately not backfilled (see
+   * migration 0013), so clients must not present a date for them.
+   */
+  completed_at: isoDateSchema.nullable().optional(),
   timestamp_sec: z.number().int().nullable(),
   export_refs: z.record(z.string()).default({}),
   created_at: isoDateSchema,
+  /** When the source meeting happened: COALESCE(recorded_at, created_at). */
+  meeting_date: isoDateSchema.nullable().optional(),
 });
 export type ActionItem = z.infer<typeof ActionItem>;
 
