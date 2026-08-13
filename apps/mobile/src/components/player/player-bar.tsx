@@ -280,7 +280,11 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
             // band unmounts and a fading copy of the skip buttons would be
             // dragged down on top of the transport row. The rule that exits are
             // faster than entrances, taken to its limit.
-            className="flex-row items-center justify-between px-6"
+            // Centred pair, not spread to the edges. The total duration used to
+            // sit between these two and justify the spread; with it moved down
+            // to the transport row, `justify-between` would have pushed the two
+            // glyphs into opposite corners with a void between them.
+            className="flex-row items-center justify-center gap-14 px-6"
             style={{ height: PLAYER_SKIP_ROW_HEIGHT }}
           >
             <TransportButton
@@ -290,22 +294,6 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
             >
               <SkipBackGlyph seconds={SKIP_BACK_SEC} color={total > 0 ? GLYPH : GLYPH_DIM} />
             </TransportButton>
-
-            {/* Total duration lives here rather than in the resting row: it is
-                a fact that never changes during playback, the header already
-                states it, and the resting row's width is better spent on the
-                ribbon. */}
-            {/* label-secondary: this sits on --elevated (#121418), where
-                --label-tertiary measures 4.41:1 and misses AA. --elevated was
-                never certified in global.css alongside background/surface/fill,
-                so the app-wide contrast sweep did not catch it. */}
-            <Text
-              className="text-[12px] text-label-secondary"
-              style={{ fontVariant: ["tabular-nums"] }}
-              maxFontSizeMultiplier={1.3}
-            >
-              {formatClock(total)}
-            </Text>
 
             <TransportButton
               onPress={() => playback.skip(SKIP_FORWARD_SEC)}
@@ -317,10 +305,7 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
           </Animated.View>
         ) : null}
 
-        <View
-          className="flex-row items-center gap-3 px-3"
-          style={{ height: PLAYER_BAR_HEIGHT }}
-        >
+        <View className="flex-row items-center gap-3 px-3" style={{ height: PLAYER_BAR_HEIGHT }}>
           <Pressable
             onPress={() => {
               haptics.tap();
@@ -375,9 +360,25 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
                   playback={playback}
                   segments={segments}
                   speakers={speakers}
-                  height={4}
+                  height={6}
                 />
               </View>
+
+              {/* Total length, on the same line as the position.
+                  It used to live only inside the skip band, so how long a
+                  recording ran was invisible until you opened a disclosure —
+                  and once open, an unlabelled 0:16 sat centred in one row above
+                  an unlabelled 0:06 in another, which reads as two clocks
+                  rather than as position and length. Flanking the ribbon, the
+                  pair reads as one fact with the progress between them, which
+                  is the arrangement every audio player has settled on. */}
+              <Text
+                className="text-[12px] text-label-secondary"
+                style={{ fontVariant: ["tabular-nums"] }}
+                maxFontSizeMultiplier={1.3}
+              >
+                {formatClock(total)}
+              </Text>
             </>
           )}
 

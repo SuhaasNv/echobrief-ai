@@ -73,14 +73,20 @@ export function useMeetings(search = "") {
   return useInfiniteQuery({
     queryKey: qk.meetings(search),
     initialPageParam: 1,
-    queryFn: ({ pageParam }) =>
-      api.apiRequest<MeetingListResponse>("/meetings", {
-        query: {
-          page: pageParam,
-          limit: PAGE_SIZE,
-          ...(search ? { q: search } : {}),
-        },
-      }),
+    // Filtered on the way in rather than repaired afterwards: a page fetched
+    // while a DELETE is still on the wire carries the meeting the server has
+    // not been told about yet, and writing that page to the cache is what puts
+    // a deleted row back. See `committingDeletes` in the delete section below.
+    queryFn: async ({ pageParam }) =>
+      withoutCommittingDeletes(
+        await api.apiRequest<MeetingListResponse>("/meetings", {
+          query: {
+            page: pageParam,
+            limit: PAGE_SIZE,
+            ...(search ? { q: search } : {}),
+          },
+        }),
+      ),
     getNextPageParam: (last) =>
       last.page * last.limit < last.total ? last.page + 1 : undefined,
     // Poll only while something is actually processing. The web app polls every
@@ -226,6 +232,43 @@ export function undoMeetingDelete(id: string): void {
   notifyPendingChanged();
 }
 
+/**
+ * Ids whose DELETE is on the wire right now.
+ *
+ * The request is not instant: the server destroys the R2 audio object before it
+ * touches the row, so for as long as it is in flight `/meetings` still answers
+ * WITH the meeting. Any list fetch that starts in that window — the 15s poll,
+ * a pull to refresh, a return to the foreground — lands on top of the
+ * optimistic write below and puts the row, and the `total` the stat header
+ * reads, straight back. The `cancelQueries` at the top of the commit guards the
+ * optimistic write; nothing guarded the window around the request itself, and
+ * the invalidation at the end only repairs it a round trip later.
+ *
+ * Deliberately NOT the same thing as `pendingDeletes`. During the undo window
+ * nothing has been sent, the meeting is still real, and a refetch that carries
+ * it is telling the truth — the row is hidden by the veil, not by the cache.
+ */
+const committingDeletes = new Set<string>();
+
+/** Drops meetings whose DELETE is in flight from a list page as it lands. */
+function withoutCommittingDeletes(page: MeetingListResponse): MeetingListResponse {
+  if (committingDeletes.size === 0) return page;
+
+  const items = page.items.filter((m) => !committingDeletes.has(m.id));
+  // Returning the original object keeps its reference stable for the common
+  // case where nothing on this page is being deleted.
+  if (items.length === page.items.length) return page;
+
+  // `total` is a count of the whole collection repeated on every page, so it
+  // comes down by the same number the page lost — same reason the optimistic
+  // write below decrements every page rather than just the one that held the row.
+  return {
+    ...page,
+    items,
+    total: Math.max(0, page.total - (page.items.length - items.length)),
+  };
+}
+
 async function commitMeetingDelete(id: string, queryClient: QueryClient): Promise<void> {
   const entry = pendingDeletes.get(id);
   // Undone in the gap between the timer firing and this running.
@@ -273,6 +316,8 @@ async function commitMeetingDelete(id: string, queryClient: QueryClient): Promis
     },
   );
 
+  committingDeletes.add(id);
+
   try {
     await api.apiRequest(`/meetings/${id}`, { method: "DELETE" });
   } catch (error) {
@@ -303,6 +348,13 @@ async function commitMeetingDelete(id: string, queryClient: QueryClient): Promis
       );
       return;
     }
+  } finally {
+    // In a finally so no path can leave an id on the list: one stuck there
+    // would hide a real meeting from every subsequent list fetch for the life
+    // of the process. It runs after the catch body, so the reconciling
+    // invalidation above still refetches unfiltered — that response lands long
+    // after this line.
+    committingDeletes.delete(id);
   }
 
   // The detail query is removed rather than invalidated: invalidating refetches

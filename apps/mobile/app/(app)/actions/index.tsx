@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
-import Animated, {
-  FadeIn,
-  LinearTransition,
-  useReducedMotion,
-} from "react-native-reanimated";
+import Animated, { FadeIn, LinearTransition, useReducedMotion } from "react-native-reanimated";
 
 import {
   groupByCompleted,
   groupByDue,
   useActionItems,
+  useDeleteActionItem,
   useToggleActionItem,
   type ActionItem,
 } from "@/lib/api/action-items";
@@ -19,6 +16,7 @@ import { useTabBarInset } from "@/lib/layout";
 import { SPRING } from "@/lib/motion";
 import { ErrorState, StaleNotice } from "@/components/error-state";
 import { ActionRow } from "@/components/actions/action-row";
+import { SwipeToDelete } from "@/components/meeting/swipe-to-delete";
 import { ActionsEmptyState, type EmptyKind } from "@/components/actions/empty";
 import { ActionsSkeleton } from "@/components/actions/skeleton";
 
@@ -159,6 +157,7 @@ export default function ActionsScreen() {
   const online = useOnline();
   const { data, isLoading, isError, isPaused, isFetching, error, refetch } = useActionItems();
   const toggle = useToggleActionItem();
+  const remove = useDeleteActionItem();
 
   const [tab, setTab] = useState<Tab>("open");
   const [manualRefresh, setManualRefresh] = useState(false);
@@ -252,9 +251,7 @@ export default function ActionsScreen() {
       const result = await refetch();
       if (result.isError) {
         haptics.error();
-        setRefreshError(
-          describeError(result.error, { online, subject: "your action items" }).body,
-        );
+        setRefreshError(describeError(result.error, { online, subject: "your action items" }).body);
       } else {
         setRefreshError(null);
       }
@@ -344,7 +341,15 @@ export default function ActionsScreen() {
         <Eyebrow label={group} count={items.length} danger={group === "Overdue"} />
 
         {items.map((item, index) => (
-          <ActionRow key={item.id} item={item} index={index} onToggle={onToggle} />
+          // Wrapped here rather than inside ActionRow: the screen already
+          // owns the mutations, and the row stays a pure presentation component.
+          <SwipeToDelete
+            key={item.id}
+            title={item.description}
+            onDelete={() => remove.mutate({ id: item.id, title: item.description })}
+          >
+            <ActionRow item={item} index={index} onToggle={onToggle} />
+          </SwipeToDelete>
         ))}
       </Animated.View>
     ))

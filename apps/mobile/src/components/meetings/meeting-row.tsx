@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated, {
   FadeInDown,
@@ -12,24 +12,13 @@ import { router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { percentForStatus } from "@/lib/api/meeting-status";
-import { isProcessing, type MeetingSummary } from "@/lib/api/meetings";
-import { formatDuration, pluralize } from "@/lib/format";
+import { isProcessing, useMeetingDeletePending, type MeetingSummary } from "@/lib/api/meetings";
+import { displayTitle, formatDuration, pluralize } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { SPRING, TIMING } from "@/lib/motion";
 import { confirmDeleteMeeting } from "@/components/meeting/delete-meeting";
-import { SwipeToDelete } from "@/components/meeting/swipe-to-delete";
+import { MeetingUndoVeil, SwipeToDelete } from "@/components/meeting/swipe-to-delete";
 import { StatusBadge, statusLabel } from "@/components/status-badge";
-
-/**
- * A recording with no name is titled with its own timestamp, which then sits
- * beside the date column repeating the same information. "Untitled recording"
- * is more honest and stops the row leading with a string of digits.
- */
-const TIMESTAMP_TITLE = /^\w{3},?\s+\w{3}\s+\d{1,2}(\s+at)?\s+\d{1,2}:\d{2}/i;
-
-export function displayTitle(title: string): string {
-  return TIMESTAMP_TITLE.test(title.trim()) ? "Untitled recording" : title;
-}
 
 /** Rows past the first screenful appear rather than animate, as cells do. */
 const STAGGER_LIMIT = 8;
@@ -180,7 +169,17 @@ function TagChip({ tags }: { tags: string[] }) {
   );
 }
 
-export function MeetingRow({
+/**
+ * Memoised, like SegmentRow above it in the transcript.
+ *
+ * These rows live in a SectionList inside a screen that re-renders on every
+ * poll, every search keystroke and every focus change. `meeting` keeps its
+ * identity across a refetch that returns structurally identical data, so
+ * without this a list of fifty rows re-rendered fifty swipe gestures, fifty
+ * animated styles and fifty date formats to draw exactly what was already
+ * there.
+ */
+export const MeetingRow = memo(function MeetingRow({
   meeting,
   time,
   index = 0,
@@ -193,6 +192,8 @@ export function MeetingRow({
 }) {
   const reduceMotion = useReducedMotion();
   const queryClient = useQueryClient();
+  // Lifted out of SwipeToDelete when that component stopped being meetings-only.
+  const deletePending = useMeetingDeletePending(meeting.id);
 
   // Cards scale on press; full-width list ROWS would not, but these are cards
   // sitting on a canvas, which is the case where scale reads correctly. The
@@ -217,7 +218,12 @@ export function MeetingRow({
   const a11yLabel = [title, time, ...meta, status].filter(Boolean).join(", ");
 
   return (
-    <SwipeToDelete id={meeting.id} title={title}>
+    <SwipeToDelete
+      title={title}
+      pending={deletePending}
+      undoOverlay={<MeetingUndoVeil id={meeting.id} title={title} />}
+      onDelete={() => confirmDeleteMeeting({ id: meeting.id, title, queryClient })}
+    >
       <Animated.View
         // Entrance only on first paint, never on scroll, and only for the rows
         // that are on screen when the list arrives — a page that loads at index 40
@@ -256,10 +262,7 @@ export function MeetingRow({
           style={{ borderCurve: "continuous" }}
         >
           {/* Light from above — turns the border into a bevel. */}
-          <View
-            className="absolute inset-x-0 top-0 z-10 h-px bg-highlight"
-            pointerEvents="none"
-          />
+          <View className="absolute inset-x-0 top-0 z-10 h-px bg-highlight" pointerEvents="none" />
 
           <View className="gap-2 px-4 pb-3.5 pt-3.5">
             <View className="flex-row items-start gap-3">
@@ -333,4 +336,4 @@ export function MeetingRow({
       </Animated.View>
     </SwipeToDelete>
   );
-}
+});

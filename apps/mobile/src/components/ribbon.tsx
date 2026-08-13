@@ -90,9 +90,24 @@ export function buildBands(
 
   // One pass to build the lookup instead of a findIndex per segment: at 800+
   // segments the linear scan is the most expensive thing in this function.
+  //
+  // Indexed by BOTH id and label, because the two sides of this disagree.
+  // `speakers[].id` is the bare diarization tag ("A"), while a segment's
+  // `speaker` carries the display label ("Speaker A") — so a lookup by id alone
+  // missed on every segment of every meeting, every band fell through to
+  // UNKNOWN_HEX, and the ribbon rendered as one flat grey slab. It looked like
+  // a component that had failed to load rather than a lookup that never hit,
+  // which is why it survived: the playhead still drew, so nothing was obviously
+  // broken.
+  //
+  // Both keys rather than normalising one into the other: the label is
+  // user-editable (speaker names), so today's "Speaker A" can become "Priya"
+  // while the id stays "A", and only a map that answers to both survives that.
   const colors = new Map<string, string>();
   speakers.forEach((speaker, i) => {
-    colors.set(speaker.id, SPEAKER_HEX[i % SPEAKER_HEX.length] ?? UNKNOWN_HEX);
+    const hex = SPEAKER_HEX[i % SPEAKER_HEX.length] ?? UNKNOWN_HEX;
+    colors.set(speaker.id, hex);
+    if (speaker.label) colors.set(speaker.label, hex);
   });
   const colorFor = (speakerId: string | null): string =>
     (speakerId ? colors.get(speakerId) : undefined) ?? UNKNOWN_HEX;

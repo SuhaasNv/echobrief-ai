@@ -19,8 +19,6 @@ import { DELETE_UNDO_MS, undoMeetingDelete, useMeetingDeletePending } from "@/li
 import { haptics } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
 
-import { confirmDeleteMeeting } from "./delete-meeting";
-
 /**
  * Swipe-to-delete, built on Gesture.Pan rather than on a Swipeable component.
  *
@@ -101,7 +99,14 @@ function TrashGlyph({ color }: { color: string }) {
  * resolved instantly it would read as an empty bar and tell the user the window
  * had already closed.
  */
-function UndoVeil({ id, title }: { id: string; title: string }) {
+/**
+ * The undo window, meetings-only.
+ *
+ * Exported because SwipeToDelete no longer knows what it is deleting: the row
+ * renders whatever overlay its caller hands it while `pending`. Action items
+ * have no undo window, so they hand it nothing.
+ */
+export function MeetingUndoVeil({ id, title }: { id: string; title: string }) {
   const reduceMotion = useReducedMotion();
   const drain = useSharedValue(1);
 
@@ -162,18 +167,29 @@ function UndoVeil({ id, title }: { id: string; title: string }) {
 }
 
 export function SwipeToDelete({
-  id,
   title,
   children,
+  onDelete,
+  pending = false,
+  undoOverlay = null,
 }: {
-  id: string;
-  /** Display title, already run through displayTitle. */
+  /** Display title, already run through displayTitle. Used for the a11y label. */
   title: string;
   children: React.ReactNode;
+  /**
+   * Runs when the destructive action is tapped. The row closes itself first.
+   *
+   * Passed in rather than hardcoded so this gesture is not owned by meetings.
+   * Everything above this line — the latch, the rubber band, the single-open-row
+   * registry, the haptics — is list-agnostic, and duplicating 300 lines of it to
+   * put a swipe on action items would be the wrong kind of reuse.
+   */
+  onDelete: () => void;
+  /** True while this row is inside an undo window; suppresses the gesture. */
+  pending?: boolean;
+  /** Rendered over the row while `pending`. Lists without undo pass nothing. */
+  undoOverlay?: React.ReactNode;
 }) {
-  const queryClient = useQueryClient();
-  const pending = useMeetingDeletePending(id);
-
   const translateX = useSharedValue(0);
   const startX = useSharedValue(0);
   /**
@@ -191,11 +207,14 @@ export function SwipeToDelete({
   // A named function expression so it can compare the registry against its own
   // identity. useCallback hands back this exact object, so `close` inside the
   // body and the value stored in `openRowCloser` are the same reference.
-  const closeSelf = useCallback(function close() {
-    translateX.value = withSpring(0, { ...SPRING.snappy, reduceMotion: ReduceMotion.Never });
-    setOpen(false);
-    if (openRowCloser === close) openRowCloser = null;
-  }, [translateX]);
+  const closeSelf = useCallback(
+    function close() {
+      translateX.value = withSpring(0, { ...SPRING.snappy, reduceMotion: ReduceMotion.Never });
+      setOpen(false);
+      if (openRowCloser === close) openRowCloser = null;
+    },
+    [translateX],
+  );
 
   /**
    * Touching any row dismisses whichever other row is open, but does NOT make
@@ -307,6 +326,34 @@ export function SwipeToDelete({
 
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
 
+  /**
+   * The track is parked one full width past the trailing edge and rides in with
+   * the row, so it fills exactly the strip the row has vacated and is never
+   * underneath the row itself.
+   *
+   * It used to be a static full-bleed fill, which is invisible only while the
+   * row above it stays opaque and exactly its size. Action items break that
+   * assumption: ActionRow exits with a FadeOut (components/actions/action-row.tsx),
+   * and Reanimated defers removal of a whole subtree until a descendant's
+   * exiting animation finishes — so this container, and the red under it,
+   * outlived the row it was hidden behind and every completion and delete
+   * washed the row red on its way out.
+   */
+  const trackStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: "100%" }, { translateX: translateX.value }],
+  }));
+
+  /**
+   * The action itself holds still in the container's coordinates, so it is
+   * uncovered by the row moving off it rather than sliding in behind it, and it
+   * stays put at the trailing edge through the rubber-band instead of drifting
+   * with the finger. Cancelling both the parking offset and the drag is what
+   * keeps the reveal identical to the static track it replaces.
+   */
+  const actionStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -(ACTION_WIDTH + translateX.value) }],
+  }));
+
   return (
     <GestureDetector gesture={pan}>
       {/* Clipped and rounded to the card's own geometry, so the action track
@@ -314,44 +361,52 @@ export function SwipeToDelete({
       <View className="overflow-hidden rounded-card" style={{ borderCurve: "continuous" }}>
         {/* Full-bleed rather than ACTION_WIDTH wide: during the rubber-band the
             row travels past the resting width, and a track sized to the resting
-            width would expose the canvas behind it. */}
-        <View className="absolute inset-0 flex-row justify-end bg-danger">
-          <Pressable
-            onPress={() =>
-              confirmDeleteMeeting({ id, title, queryClient, onConfirmed: closeSelf })
-            }
-            style={{ width: ACTION_WIDTH }}
-            className="items-center justify-center gap-1"
-            accessibilityRole="button"
-            accessibilityLabel={`Delete ${title}`}
-            // Hidden from VoiceOver while closed: it is under the card and
-            // unreachable by touch, and an invisible Delete button in the rotor
-            // is worse than none. The row exposes a proper custom action for
-            // that path instead (see components/meetings/meeting-row.tsx).
-            accessibilityElementsHidden={!open}
-            importantForAccessibility={open ? "yes" : "no-hide-descendants"}
-          >
-            {/* text-background on bg-danger, not white. This palette's dark red
-                is #FF5F62, where near-white measures 2.97:1 and fails AA, while
-                the canvas colour over it clears 6.7:1. The token pairing also
-                holds in a light theme, where both flip together and it becomes
-                white on #C81C2A at 5.8:1.
-
-                The glyph takes the hex directly because react-native-svg strokes
-                are not styled by className. Safe only because app.json pins
-                userInterfaceStyle to "dark" — the same reason lib/screen-options
-                hardcodes its palette. If that ever becomes "automatic", this and
-                that file both need a resolved variable. */}
-            <TrashGlyph color="#06070A" />
-            <Text
-              className="text-[12px] font-semibold text-background"
-              maxFontSizeMultiplier={1.3}
-              numberOfLines={1}
+            width would expose the canvas behind it. Clipped, because the action
+            counter-translates out of the track's own box and would otherwise
+            paint across the row. */}
+        <Animated.View
+          className="absolute inset-0 flex-row overflow-hidden bg-danger"
+          style={trackStyle}
+        >
+          <Animated.View style={actionStyle}>
+            <Pressable
+              onPress={() => {
+                closeSelf();
+                onDelete();
+              }}
+              style={{ width: ACTION_WIDTH }}
+              className="h-full items-center justify-center gap-1"
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${title}`}
+              // Hidden from VoiceOver while closed: it is under the card and
+              // unreachable by touch, and an invisible Delete button in the rotor
+              // is worse than none. The row exposes a proper custom action for
+              // that path instead (see components/meetings/meeting-row.tsx).
+              accessibilityElementsHidden={!open}
+              importantForAccessibility={open ? "yes" : "no-hide-descendants"}
             >
-              Delete
-            </Text>
-          </Pressable>
-        </View>
+              {/* text-background on bg-danger, not white. This palette's dark red
+                  is #FF5F62, where near-white measures 2.97:1 and fails AA, while
+                  the canvas colour over it clears 6.7:1. The token pairing also
+                  holds in a light theme, where both flip together and it becomes
+                  white on #C81C2A at 5.8:1.
+
+                  The glyph takes the hex directly because react-native-svg strokes
+                  are not styled by className. Safe only because app.json pins
+                  userInterfaceStyle to "dark" — the same reason lib/screen-options
+                  hardcodes its palette. If that ever becomes "automatic", this and
+                  that file both need a resolved variable. */}
+              <TrashGlyph color="#06070A" />
+              <Text
+                className="text-[12px] font-semibold text-background"
+                maxFontSizeMultiplier={1.3}
+                numberOfLines={1}
+              >
+                Delete
+              </Text>
+            </Pressable>
+          </Animated.View>
+        </Animated.View>
 
         <Animated.View style={rowStyle}>
           {children}
@@ -373,7 +428,7 @@ export function SwipeToDelete({
           ) : null}
         </Animated.View>
 
-        {pending ? <UndoVeil id={id} title={title} /> : null}
+        {pending ? undoOverlay : null}
       </View>
     </GestureDetector>
   );

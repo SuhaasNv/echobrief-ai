@@ -309,10 +309,7 @@ export function useMeetingPlayback({
     [configureSession, meetingId, player, publishState],
   );
 
-  const isStale = useCallback(
-    () => deadlineRef.current - Date.now() < EXPIRY_MARGIN_MS,
-    [],
-  );
+  const isStale = useCallback(() => deadlineRef.current - Date.now() < EXPIRY_MARGIN_MS, []);
 
   // The meeting row's duration arrives one render after mount, and the player's
   // own duration not until a source is attached. Without this the bar would
@@ -325,84 +322,81 @@ export function useMeetingPlayback({
 
   // Status stream. This is the only writer of position and transport state.
   useEffect(() => {
-    const subscription = player.addListener(
-      "playbackStatusUpdate",
-      (status: AudioStatus) => {
-        if (status.error) {
-          // Almost always the signature aging out mid-stream: AVPlayer holds
-          // its connection open, so an expired URL usually only bites on the
-          // next range request. Re-sign and resume rather than surfacing it.
-          if (recoveryRef.current < MAX_RECOVERY_ATTEMPTS) {
-            recoveryRef.current += 1;
-            attachedRef.current = false;
-            void attachSource({ seconds: positionRef.current, play: true });
-          } else {
-            publishState({
-              phase: "error",
-              error: "Playback stopped. Check your connection and try again.",
-              playing: false,
-              buffering: false,
-            });
-          }
+    const subscription = player.addListener("playbackStatusUpdate", (status: AudioStatus) => {
+      if (status.error) {
+        // Almost always the signature aging out mid-stream: AVPlayer holds
+        // its connection open, so an expired URL usually only bites on the
+        // next range request. Re-sign and resume rather than surfacing it.
+        if (recoveryRef.current < MAX_RECOVERY_ATTEMPTS) {
+          recoveryRef.current += 1;
+          attachedRef.current = false;
+          void attachSource({ seconds: positionRef.current, play: true });
+        } else {
+          publishState({
+            phase: "error",
+            error: "Playback stopped. Check your connection and try again.",
+            playing: false,
+            buffering: false,
+          });
+        }
+        return;
+      }
+
+      if (status.duration > 0) publishState({ duration: status.duration });
+
+      const resume = pendingRef.current;
+      if (resume && status.isLoaded) {
+        pendingRef.current = null;
+        if (resume.seconds > 0) {
+          armSeekGuard(resume.seconds);
+          player.seekTo(resume.seconds).catch(() => undefined);
+        }
+        if (resume.play) {
+          player.play();
+          publishState({ playing: true });
+        }
+        publishPosition(resume.seconds, false);
+        // The player's clock is still at zero here. Falling through would
+        // publish that and snap the playhead back to the start of a recording
+        // the user is being resumed into.
+        return;
+      }
+
+      publishState({ playing: status.playing, buffering: status.isBuffering });
+
+      if (status.didJustFinish) {
+        publishState({ playing: false });
+        publishPosition(stateRef.current.duration, false);
+        return;
+      }
+
+      // A finger owns the playhead; the player's own clock is behind it and
+      // would fight the drag.
+      if (scrubbing.value) return;
+
+      // A seek is asynchronous, and the ticks that arrive before it lands
+      // still report the old position. Publishing them would drag the
+      // playhead back to where the user just left, for a beat, on every
+      // scrub - the single most common way a scrubber feels broken.
+      const guard = seekGuardRef.current;
+      if (guard) {
+        if (Math.abs(status.currentTime - guard.target) <= SEEK_TOLERANCE_SEC) {
+          seekGuardRef.current = null;
+        } else if (Date.now() - guard.at < SEEK_SETTLE_MS) {
           return;
+        } else {
+          // The seek never landed near its target. Stop suppressing, so the
+          // playhead tracks reality rather than freezing forever.
+          seekGuardRef.current = null;
         }
+      }
 
-        if (status.duration > 0) publishState({ duration: status.duration });
-
-        const resume = pendingRef.current;
-        if (resume && status.isLoaded) {
-          pendingRef.current = null;
-          if (resume.seconds > 0) {
-            armSeekGuard(resume.seconds);
-            player.seekTo(resume.seconds).catch(() => undefined);
-          }
-          if (resume.play) {
-            player.play();
-            publishState({ playing: true });
-          }
-          publishPosition(resume.seconds, false);
-          // The player's clock is still at zero here. Falling through would
-          // publish that and snap the playhead back to the start of a recording
-          // the user is being resumed into.
-          return;
-        }
-
-        publishState({ playing: status.playing, buffering: status.isBuffering });
-
-        if (status.didJustFinish) {
-          publishState({ playing: false });
-          publishPosition(stateRef.current.duration, false);
-          return;
-        }
-
-        // A finger owns the playhead; the player's own clock is behind it and
-        // would fight the drag.
-        if (scrubbing.value) return;
-
-        // A seek is asynchronous, and the ticks that arrive before it lands
-        // still report the old position. Publishing them would drag the
-        // playhead back to where the user just left, for a beat, on every
-        // scrub - the single most common way a scrubber feels broken.
-        const guard = seekGuardRef.current;
-        if (guard) {
-          if (Math.abs(status.currentTime - guard.target) <= SEEK_TOLERANCE_SEC) {
-            seekGuardRef.current = null;
-          } else if (Date.now() - guard.at < SEEK_SETTLE_MS) {
-            return;
-          } else {
-            // The seek never landed near its target. Stop suppressing, so the
-            // playhead tracks reality rather than freezing forever.
-            seekGuardRef.current = null;
-          }
-        }
-
-        if (status.playing && status.currentTime > positionRef.current) {
-          // Real forward progress means the source is healthy again.
-          recoveryRef.current = 0;
-        }
-        publishPosition(status.currentTime, status.playing);
-      },
-    );
+      if (status.playing && status.currentTime > positionRef.current) {
+        // Real forward progress means the source is healthy again.
+        recoveryRef.current = 0;
+      }
+      publishPosition(status.currentTime, status.playing);
+    });
 
     return () => subscription.remove();
   }, [armSeekGuard, attachSource, player, publishPosition, publishState, scrubbing]);
@@ -421,7 +415,24 @@ export function useMeetingPlayback({
     useCallback(
       () => () => {
         if (!touchedSessionRef.current) return;
-        player.pause();
+        try {
+          player.pause();
+        } catch {
+          // The native player may already be gone. This cleanup runs during
+          // React's passive unmount pass, and when the whole screen is being
+          // torn down expo-audio can release the shared object first — calling
+          // into it then throws NotFoundException, which surfaces as a full
+          // render error over a screen the user has already left.
+          //
+          // Swallowed rather than guarded on a liveness flag because there is
+          // no such flag to read: expo-audio exposes no "is released" property,
+          // so the call itself is the only test. A released player is also
+          // already stopped, which is the entire point of this line.
+          //
+          // Only the native call is inside the try. The session teardown below
+          // must run either way, otherwise the audio session stays active and
+          // the next screen inherits a route it never asked for.
+        }
         publishState({ playing: false, buffering: false });
         sessionRef.current = false;
         void setIsAudioActiveAsync(false).catch(() => undefined);

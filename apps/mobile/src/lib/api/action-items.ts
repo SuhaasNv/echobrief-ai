@@ -35,6 +35,18 @@ export interface ActionItem {
 
 export const actionKeys = {
   all: ["action-items"] as const,
+  /**
+   * Scoped list. Nested under `all` so an optimistic write or an invalidation
+   * against the root key still reaches every scope — the mutations all target
+   * `actionKeys.all`, and a sibling key would silently stop receiving them.
+   */
+  scoped: (mine: boolean) => ["action-items", { mine }] as const,
+  /**
+   * One meeting's items. Nested under `all` for the same reason as `scoped` —
+   * ticking an item off from the Actions tab writes through to this entry too,
+   * so a share taken afterwards cannot paste a stale copy of the list.
+   */
+  forMeeting: (meetingId: string) => ["action-items", { meetingId }] as const,
 };
 
 /**
@@ -49,10 +61,45 @@ interface ActionItemListResponse {
   items: ActionItem[];
 }
 
-export function useActionItems() {
+/**
+ * @param mine Narrow to commitments the signed-in user plausibly owns.
+ *
+ * Defaults to false, which is the whole meeting's list — "Priya will send the
+ * deck" belongs on screen, because extracting every commitment from the room is
+ * the product. Mine is a filter the user reaches for, not the default reading.
+ */
+export function useActionItems(mine = false) {
   return useQuery({
-    queryKey: actionKeys.all,
-    queryFn: () => api.apiRequest<ActionItemListResponse>("/action-items"),
+    queryKey: actionKeys.scoped(mine),
+    queryFn: () =>
+      api.apiRequest<ActionItemListResponse>("/action-items", {
+        query: mine ? { mine: "true" } : undefined,
+      }),
+    select: (data): ActionItem[] => (Array.isArray(data?.items) ? data.items : []),
+  });
+}
+
+/**
+ * The commitments made in ONE meeting.
+ *
+ * Nothing on the meeting screen renders these — it has no action items pane.
+ * They are fetched so the share menu can put them in the plain text it hands to
+ * the clipboard and the share sheet, which is the thing the meetings empty
+ * state promises ("the decisions, in a paragraph you can send") and which is
+ * useless without the follow-ups.
+ *
+ * They live on a different endpoint from the meeting, so this is a second
+ * request per meeting opened. It is a small one, it is cached for the session,
+ * and the alternative — fetching at the moment Copy is tapped — would make the
+ * offline path fail exactly where it is meant to work.
+ */
+export function useMeetingActionItems(meetingId: string) {
+  return useQuery({
+    queryKey: actionKeys.forMeeting(meetingId),
+    queryFn: () =>
+      api.apiRequest<ActionItemListResponse>("/action-items", {
+        query: { meeting_id: meetingId },
+      }),
     select: (data): ActionItem[] => (Array.isArray(data?.items) ? data.items : []),
   });
 }
@@ -87,10 +134,14 @@ export function useToggleActionItem() {
 
     onMutate: async ({ id, completed }) => {
       await queryClient.cancelQueries({ queryKey: actionKeys.all });
-      const previous = queryClient.getQueryData<ActionItemListResponse>(actionKeys.all);
+      // Every scope, because `mine` gives the list more than one cache entry
+      // and an exact-key read would snapshot a key nothing is stored under.
+      const previous = queryClient.getQueriesData<ActionItemListResponse>({
+        queryKey: actionKeys.all,
+      });
 
       // The cache holds the raw response, not the selected array.
-      queryClient.setQueryData<ActionItemListResponse>(actionKeys.all, (old) =>
+      queryClient.setQueriesData<ActionItemListResponse>({ queryKey: actionKeys.all }, (old) =>
         old
           ? {
               ...old,
@@ -122,13 +173,70 @@ export function useToggleActionItem() {
 
     onError: (error, variables, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(actionKeys.all, context.previous);
+        for (const [key, data] of context.previous) queryClient.setQueryData(key, data);
       }
 
       haptics.error();
       Alert.alert(
         variables.completed ? "That item is not checked off" : "That item is still checked off",
         `${describeActionFailure(error, { online: onlineManager.isOnline() })} EchoBrief put it back the way it was. Tapping it again retries.`,
+      );
+    },
+
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: actionKeys.all });
+    },
+  });
+}
+
+/**
+ * Delete one action item.
+ *
+ * Optimistic, and deliberately WITHOUT an undo window, unlike meetings. A
+ * meeting is minutes of irreplaceable audio; an action item is a line of text
+ * the pipeline can regenerate from the transcript it came from. Matching the
+ * meeting flow here would spend a persistent veil and a timer on a row whose
+ * loss costs a re-read, and it would leave a dead row occupying the list for
+ * five seconds in a surface people use to clear things.
+ *
+ * The swipe itself is the confirmation. It is deliberate, it is reversible by
+ * rolling back on failure, and it already takes a full gesture past a latch.
+ */
+export function useDeleteActionItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // Same reasoning as the toggle above: offline this must FAIL rather than
+    // park, or the row vanishes against a request that never left the device.
+    networkMode: "always",
+
+    mutationFn: ({ id }: { id: string; title: string }) =>
+      api.apiRequest(`/action-items/${id}`, { method: "DELETE" }),
+
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: actionKeys.all });
+      // Every scope, because `mine` gives the list more than one cache entry
+      // and an exact-key read would snapshot a key nothing is stored under.
+      const previous = queryClient.getQueriesData<ActionItemListResponse>({
+        queryKey: actionKeys.all,
+      });
+
+      queryClient.setQueriesData<ActionItemListResponse>({ queryKey: actionKeys.all }, (old) =>
+        old ? { ...old, items: old.items.filter((item) => item.id !== id) } : old,
+      );
+
+      return { previous };
+    },
+
+    onError: (error, variables, context) => {
+      if (context?.previous) {
+        for (const [key, data] of context.previous) queryClient.setQueryData(key, data);
+      }
+
+      haptics.error();
+      Alert.alert(
+        "That item is still here",
+        `${describeActionFailure(error, { online: onlineManager.isOnline() })} EchoBrief put it back. Swiping again retries.`,
       );
     },
 
@@ -249,11 +357,7 @@ export function groupByCompleted(
       continue;
     }
 
-    const day = new Date(
-      completedAt.getFullYear(),
-      completedAt.getMonth(),
-      completedAt.getDate(),
-    );
+    const day = new Date(completedAt.getFullYear(), completedAt.getMonth(), completedAt.getDate());
     const days = Math.round((startOfToday.getTime() - day.getTime()) / 86_400_000);
 
     // A future timestamp (clock skew between device and server) is treated as

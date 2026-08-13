@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated, {
   FadeInDown,
@@ -42,7 +43,15 @@ function Chevron() {
   );
 }
 
-export function ActionRow({
+/**
+ * Memoised for the same reason as MeetingRow.
+ *
+ * `onToggle` is a useCallback in the screen and `item` comes straight from the
+ * query cache, so both hold their identity between renders — which is the
+ * precondition that makes this worth anything. Ticking one item off used to
+ * re-render every other row on the screen.
+ */
+export const ActionRow = memo(function ActionRow({
   item,
   onToggle,
   index = 0,
@@ -79,7 +88,9 @@ export function ActionRow({
     <Animated.View
       // Entrance on first paint only. Exit is what makes checking something off
       // feel finished: the row fades as its neighbours spring up into the gap.
-      entering={reduceMotion ? undefined : FadeInDown.duration(260).delay(Math.min(index * 40, 200))}
+      entering={
+        reduceMotion ? undefined : FadeInDown.duration(260).delay(Math.min(index * 40, 200))
+      }
       exiting={reduceMotion ? undefined : FadeOut.duration(160)}
       layout={
         reduceMotion
@@ -178,9 +189,7 @@ export function ActionRow({
           router.push(`/(app)/meetings/${item.meeting_id}`);
         }}
         accessibilityRole="button"
-        accessibilityLabel={
-          [sourceTitle, clock ? `at ${clock}` : null].filter(Boolean).join(", ")
-        }
+        accessibilityLabel={[sourceTitle, clock ? `at ${clock}` : null].filter(Boolean).join(", ")}
         accessibilityHint="Opens the meeting this came from"
         className="flex-row items-center gap-2 border-t border-edge bg-inset px-4 py-2.5 active:bg-elevated"
       >
@@ -205,4 +214,4 @@ export function ActionRow({
       </Pressable>
     </Animated.View>
   );
-}
+});
