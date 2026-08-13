@@ -113,6 +113,33 @@ private struct AudioIndicator: View {
   }
 }
 
+/**
+ * The waveform, at the size it deserves.
+ *
+ * This is the only element on the card that says "sound is arriving right now",
+ * and it was previously a 17pt glyph parked in a corner at body-text size, which
+ * reads as an icon rather than as a signal. Voice Memos gives the waveform the
+ * whole width because it is the one thing a recording card is actually about.
+ *
+ * Scaled with `font(size:)` rather than `.resizable()` on purpose: a resizable
+ * SF Symbol is no longer treated as a symbol, and `symbolEffect` — the only
+ * motion WidgetKit will run for us — stops applying. Growing the point size
+ * keeps the effect and the glyph's own proportions intact.
+ */
+private struct WideAudioIndicator: View {
+  let isPaused: Bool
+  let size: CGFloat
+
+  var body: some View {
+    Image(systemName: isPaused ? "waveform.slash" : "waveform")
+      .font(.system(size: size, weight: .regular))
+      .foregroundStyle(isPaused ? Palette.paused.opacity(0.7) : Palette.live)
+      .modifier(VaryingSymbol(isActive: !isPaused))
+      .frame(maxWidth: .infinity)
+      .animation(.easeInOut(duration: 0.25), value: isPaused)
+  }
+}
+
 /// Elapsed time, ticked by the system rather than by us.
 ///
 /// The range's upper bound is a 24 hour ceiling, not a duration: `timerInterval`
@@ -217,26 +244,34 @@ private struct RecordingLockScreenView: View {
   let context: ActivityViewContext<RecordingActivityAttributes>
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      HStack(spacing: 8) {
-        RecordIndicator(isPaused: context.state.isPaused, size: 16)
+    VStack(alignment: .leading, spacing: 9) {
+      // The clock is the hero. It was 20pt and losing the row to a red status
+      // label; at 30pt it is unambiguously the thing being reported, and the
+      // label beside it drops to a caption where it belongs.
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        RecordIndicator(isPaused: context.state.isPaused, size: 15)
         StatusLabel(isPaused: context.state.isPaused)
         Spacer(minLength: 8)
-        ElapsedTime(state: context.state, size: 20, weight: .semibold)
+        ElapsedTime(state: context.state, size: 30, weight: .semibold)
       }
 
-      HStack(spacing: 10) {
+      // Only when the user actually named this. The recorder pre-fills the
+      // title field with a timestamp, and rendering that here put a date
+      // directly beneath the Lock Screen's own clock — see the JS side, which
+      // now sends an empty string rather than the placeholder.
+      if !context.attributes.title.isEmpty {
         Text(context.attributes.title)
-          .font(.system(size: 15, weight: .medium))
+          .font(.system(size: 14, weight: .medium))
           .foregroundStyle(Palette.secondary)
           .lineLimit(1)
-        Spacer(minLength: 8)
-        AudioIndicator(isPaused: context.state.isPaused, size: 17)
       }
+
+      WideAudioIndicator(isPaused: context.state.isPaused, size: 46)
 
       ControlRow(isPaused: context.state.isPaused)
     }
-    .padding(16)
+    .padding(.horizontal, 16)
+    .padding(.vertical, 14)
   }
 }
 
@@ -272,21 +307,29 @@ struct RecordingLiveActivity: Widget {
         }
 
         DynamicIslandExpandedRegion(.bottom) {
-          VStack(spacing: 10) {
-            HStack(spacing: 10) {
-              Text(context.attributes.title)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Palette.secondary)
-                .lineLimit(1)
-              Spacer(minLength: 8)
-              AudioIndicator(isPaused: paused, size: 16)
+          VStack(spacing: 8) {
+            if !context.attributes.title.isEmpty {
+              HStack(spacing: 0) {
+                Text(context.attributes.title)
+                  .font(.system(size: 14, weight: .medium))
+                  .foregroundStyle(Palette.secondary)
+                  .lineLimit(1)
+                Spacer(minLength: 0)
+              }
             }
+            WideAudioIndicator(isPaused: paused, size: 42)
             ControlRow(isPaused: paused)
           }
-          .padding(.top, 2)
+          .padding(.top, 0)
         }
       } compactLeading: {
-        RecordIndicator(isPaused: paused, size: 15)
+        // Waveform, not the record dot. A red dot in the compact pill is the
+        // single most generic thing the island renders — timers, calls, screen
+        // recording and every other live session use one, so ours was
+        // indistinguishable at a glance. The waveform says "audio", the red
+        // says "recording", and unlike the dot's pulse it animates through the
+        // bars, which reads as sound arriving rather than a blinking light.
+        AudioIndicator(isPaused: paused, size: 15)
       } compactTrailing: {
         ElapsedTime(state: context.state, size: 13, weight: .medium)
       } minimal: {
