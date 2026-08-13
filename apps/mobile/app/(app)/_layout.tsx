@@ -1,20 +1,22 @@
-import { NativeTabs } from "expo-router/unstable-native-tabs";
+import { Tabs } from "expo-router";
 
+import { CustomTabBar, type TabBarProps } from "@/components/tab-bar/custom-tab-bar";
 import { useRecordingRecovery } from "@/lib/audio/recovery";
 import { useNotificationLifecycle } from "@/lib/notifications";
-import { useColorToken } from "@/lib/tokens";
 
 /**
- * Native tab bar — a real UITabBar via react-native-screens.
+ * The app's own bottom navigation, drawn in JS.
  *
- * This is deliberately NOT expo-router's JS <Tabs>. Because the app is built
- * against the iOS 26 SDK, a real UITabBar adopts Liquid Glass, the scroll edge
- * effect, and correct Reduce Transparency / Increase Contrast behaviour for
- * free. The JS tab bar is a plain View and gets none of it.
+ * This replaced `expo-router/unstable-native-tabs`. A real UITabBar gave Liquid
+ * Glass for free, but the design calls for two things a UITabBar cannot draw:
+ * an elevated centre Record action lifted into a circle above the bar, and a
+ * selected tab that expands to reveal its label while the rest collapse to
+ * icons. Both are custom by definition. See components/tab-bar/custom-tab-bar.
  *
- * Consequence: tabBarBackgroundColor and blurEffect are inert on iOS 26 — the
- * system derives the background from the content scrolling underneath. Do not
- * try to paint it.
+ * The trade has a cost that is paid in lib/layout.ts: with no UITabBar, UIKit
+ * stops reporting the bar in the bottom safe area, so every scroll surface's
+ * clearance is recomputed there around the bar's known height. That is the one
+ * place a change here can hide content, so the geometry lives as constants.
  */
 export default function AppLayout() {
   // Notification plumbing for the whole signed-in app: routes a tap to its
@@ -45,58 +47,30 @@ export default function AppLayout() {
    */
   useRecordingRecovery();
 
-  // UITabBar is native chrome, so this is one of the few colours that has to
-  // reach JS resolved rather than through a className.
-  const tint = useColorToken("--tint");
-
   return (
-    <NativeTabs
-      // Drives the Liquid Glass selection glow on iOS 26.
-      tintColor={tint}
-      // The tab bar collapses as content scrolls down, handing the screen back
-      // to the content layer. Free legibility win on the transcript screen.
-      minimizeBehavior="onScrollDown"
+    <Tabs
+      // The custom bar floats over content, so screens draw full-height and the
+      // bar overlays them. `tabBar` returns our component; `sceneStyle` keeps
+      // the canvas colour behind it during the fade between tabs.
+      // Cast because React Navigation's BottomTabBarProps is not importable from
+      // a stable path (expo-router bundles its own copy under a deep build dir).
+      // CustomTabBar reads only the four fields TabBarProps declares, all of
+      // which the real props satisfy structurally.
+      tabBar={(props) => <CustomTabBar {...(props as unknown as TabBarProps)} />}
+      screenOptions={{
+        headerShown: false,
+        sceneStyle: { backgroundColor: "transparent" },
+      }}
     >
-      {/* One glyph per tab, all of them the outline (non-.fill) member of the
-          SF Symbols family, and no per-state swap. Mixing filled and stroked
-          glyphs across a five-tab bar is what makes an icon set look sourced
-          from two places; on iOS 26 the tint and the Liquid Glass selection
-          indicator already carry the selected state, so switching glyph weight
-          on top of that is emphasis nobody asked for and it costs the row its
-          optical consistency. */}
-      <NativeTabs.Trigger name="meetings">
-        <NativeTabs.Trigger.Label>Meetings</NativeTabs.Trigger.Label>
-        {/* Not list.bullet.rectangle: its enclosing rounded rect is a frame the
-            other four glyphs do not have, so it read as a badge rather than a
-            peer. */}
-        <NativeTabs.Trigger.Icon sf="list.bullet" />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="ask">
-        <NativeTabs.Trigger.Label>Ask</NativeTabs.Trigger.Label>
-        {/* Not a magnifier of any kind. The meetings list has a real search
-            field with its own magnifier, so one here collides with a live
-            affordance — and text.magnifyingglass reads as the zoom control it
-            resembles, not as a question. A question mark inside a speech bubble
-            is the one shape that says "ask", and the bubble carries the fact
-            that this tab is a conversation rather than a single query. */}
-        <NativeTabs.Trigger.Icon sf="questionmark.bubble" />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="record">
-        <NativeTabs.Trigger.Label>Record</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="mic" />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="actions">
-        <NativeTabs.Trigger.Label>Actions</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="checkmark.circle" />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="account">
-        <NativeTabs.Trigger.Label>Account</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="person.crop.circle" />
-      </NativeTabs.Trigger>
-    </NativeTabs>
+      {/* Order here is the on-screen order, and it is load-bearing: Record must
+          be the third of five so it lands in the centre where the elevated
+          action belongs. The glyphs and labels themselves live in the tab bar's
+          own TABS map. */}
+      <Tabs.Screen name="meetings" />
+      <Tabs.Screen name="ask" />
+      <Tabs.Screen name="record" />
+      <Tabs.Screen name="actions" />
+      <Tabs.Screen name="account" />
+    </Tabs>
   );
 }

@@ -1,6 +1,26 @@
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /**
+ * The custom tab bar's geometry, in ONE place.
+ *
+ * The bar is now a JS overlay (components/tab-bar/custom-tab-bar.tsx), not a
+ * UITabBar, so UIKit no longer reports it in `insets.bottom` — that value is
+ * back down to just the home indicator (~34). Every clearance below is measured
+ * against these constants instead of a magic number, so re-tuning the bar's
+ * height is one edit here and nothing hides behind it.
+ *
+ *   HEIGHT      the pill's own height
+ *   BOTTOM_GAP  the float above the home indicator
+ *   SIDE_INSET  the float in from each screen edge
+ *   RESERVE     HEIGHT + BOTTOM_GAP — the total the bar occupies above the
+ *               bottom safe-area edge, which is what content must clear.
+ */
+export const TAB_BAR_HEIGHT = 60;
+export const TAB_BAR_BOTTOM_GAP = 10;
+export const TAB_BAR_SIDE_INSET = 16;
+export const TAB_BAR_RESERVE = TAB_BAR_HEIGHT + TAB_BAR_BOTTOM_GAP;
+
+/**
  * Bottom padding a tab screen needs so its content clears the tab bar.
  *
  * Exists because this was got wrong on four separate screens: the pattern is
@@ -40,41 +60,42 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export function useTabBarInset(extra = 16): number {
   const insets = useSafeAreaInsets();
 
-  // Floor guards the case where the safe area has not resolved yet and reports
-  // 0: better a slightly large gap for one frame than controls under the bar.
-  const bottom = insets.bottom > 0 ? insets.bottom : 83;
+  // Home indicator only now (~34 with one, 0 without). The bar's own height is
+  // added explicitly rather than read out of `insets.bottom`, because a custom
+  // overlay is not part of the safe area the way a UITabBar was.
+  //
+  // Floor guards the not-yet-resolved frame where insets read 0 on a device
+  // that does have a home indicator: a slightly large gap for one frame beats
+  // controls under the bar.
+  const bottom = insets.bottom > 0 ? insets.bottom : 34;
 
-  return bottom + extra;
+  return bottom + TAB_BAR_RESERVE + extra;
 }
 
 /**
  * Bottom padding for the contentContainer of a scroll surface that runs
  * `contentInsetAdjustmentBehavior="automatic"`.
  *
- * Air only — no bar height — and that is the whole point.
+ * `automatic` asks UIKit to inset the content by the scroll view's SAFE AREA at
+ * BOTH ends. The top inset parks content below the large title; the bottom
+ * inset is now just the HOME INDICATOR (~34), because the UITabBar that used to
+ * live in the safe area is gone — the bar is a JS overlay.
  *
- * `automatic` asks UIKit to inset the content by the scroll view's SAFE AREA,
- * and it does that at BOTH ends, not only the top. Every screen here relies on
- * that already: the top inset is what parks content below the large title, and
- * the bottom inset is 83pt of tab-bar clearance the screen never asked for in
- * a style prop. Paying `useTabBarInset()` on top of it counted the 83 twice.
+ * So this adds the bar itself on top: TAB_BAR_RESERVE (its height + float) plus
+ * 16pt of air. Total bottom clearance = automatic's home-indicator inset +
+ * TAB_BAR_RESERVE + 16, which lands content exactly 16pt above the floating
+ * bar's top edge.
  *
- * That is the second half of the same arithmetic bug documented above, and it
- * failed in the opposite, quieter direction. Where the old `+ 49` lifted
- * ANCHORED chrome off the bar and left a visible sliver, this doubled the
- * padding at the END of scrolling content, where the only symptom is that
- * every screen keeps scrolling for one tab bar past its own last line.
- * Nothing looks wrong in a screenshot — the extra is empty canvas — which is
- * why it survived on four surfaces at once: settings, Actions, the meetings
- * list, and the transcript.
- *
- * The Ask screen was the one that had it right, and its contentContainer note
- * says why in the same terms: under `automatic`, Yoga measures against the
- * FRAME while UIKit's inset defines the visible window, so anything the
- * container adds at the bottom lands on top of the inset rather than inside it.
+ * History worth keeping, because it is the trap to avoid: under the native
+ * UITabBar this value was 16, because `automatic` already supplied the 83pt bar
+ * inset and adding the bar again double-counted it — every screen scrolled one
+ * bar-height past its own last line. That failure was silent (extra empty
+ * canvas, invisible in a screenshot) and shipped on four surfaces at once. The
+ * custom bar inverts it: automatic no longer supplies the bar, so the bar must
+ * be added back here — but exactly once, and only here.
  *
  * Screens whose content owes clearance to something MORE than the tab bar — the
  * transcript, which also sits under the floating player — add that extra height
  * to this, never the bar again. See FollowScroll.contentPadding.
  */
-export const SCROLL_TAB_BAR_AIR = 16;
+export const SCROLL_TAB_BAR_AIR = TAB_BAR_RESERVE + 16;

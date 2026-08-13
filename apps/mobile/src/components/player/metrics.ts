@@ -1,5 +1,7 @@
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { TAB_BAR_RESERVE } from "@/lib/layout";
+
 /**
  * Shared player geometry.
  *
@@ -56,7 +58,11 @@ export const PLAYER_TAB_BAR_GAP = 6;
  * lib/layout: this hook does not change meaning when that constant does.
  */
 export function useTabBarTopEdge(): number {
-  return useSafeAreaInsets().bottom;
+  // The custom bar is a JS overlay, so its top edge is the home indicator plus
+  // the bar's own reserved height — not `insets.bottom` alone, which since the
+  // UITabBar was removed reports only the home indicator. The player card
+  // floats above THIS, so reading the raw inset would park it under the bar.
+  return useSafeAreaInsets().bottom + TAB_BAR_RESERVE;
 }
 
 /**
