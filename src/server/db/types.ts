@@ -26,6 +26,12 @@ export interface UserRow {
   google_id: string | null;
   is_admin: boolean;
   default_account_type: AccountType | null;
+  /**
+   * Tokens issued before this instant are rejected by requireAuth. Bumped on
+   * password change so a stolen bearer token dies with the password. See
+   * migration 0012.
+   */
+  sessions_valid_from: string;
   created_at: string;
   updated_at: string;
 }

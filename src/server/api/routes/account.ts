@@ -7,6 +7,7 @@ import { HTTPException } from "hono/http-exception";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import argon2 from "argon2";
+import { SignJWT } from "jose";
 import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { UpdateProfileRequest } from "../../../lib/schemas";
 import { getSql } from "../../db";
@@ -75,9 +76,53 @@ app.post("/password", zValidator("json", ChangePasswordRequest), async (c) => {
     throw new HTTPException(401, { message: "Current password is incorrect" });
   }
 
+  // Bumping sessions_valid_from is the point of the whole endpoint: JWTs are
+  // stateless and live 7 days, so without this a user who changes their
+  // password because someone else has it leaves that someone else holding a
+  // working bearer token for the rest of the week.
   const newHash = await argon2.hash(new_password, { type: argon2.argon2id });
-  await sql`UPDATE users SET password_hash = ${newHash}, updated_at = now() WHERE id = ${user.id}`;
-  return c.json({ ok: true });
+
+  // Cutoff is rounded UP to the next whole second, and the replacement token is
+  // stamped with exactly that second.
+  //
+  // JWT `iat` has one-second granularity, so a cutoff of plain now() cannot
+  // separate a token minted at 12:00:00.100 from one minted at 12:00:00.900 —
+  // both carry iat 12:00:00. Comparing in whole seconds then had to use a
+  // strict `<` to keep the replacement alive, which also kept alive any stolen
+  // token minted in that same second. That is the exact window an attacker
+  // occupies: they are using the account, the victim changes the password, and
+  // both requests land in the same second.
+  //
+  // Rounding the cutoff up removes the ambiguity instead of papering over it:
+  // every token issued at or before this second is strictly older than the
+  // cutoff and dies, and the replacement is explicitly dated to the cutoff so
+  // it survives without needing a lenient comparison.
+  const [row] = await sql<Array<{ sessions_valid_from: Date }>>`
+    UPDATE users
+    SET password_hash = ${newHash},
+        sessions_valid_from = date_trunc('second', now()) + interval '1 second',
+        updated_at = now()
+    WHERE id = ${user.id}
+    RETURNING sessions_valid_from
+  `;
+  if (!row) {
+    throw new HTTPException(404, { message: "Account not found" });
+  }
+
+  // Every outstanding token for this account — including the one that made this
+  // request — is now dead. Hand back a fresh one so the caller can swap it in
+  // and stay signed in; clients that ignore it simply land back on sign-in,
+  // which is the correct outcome, not a regression.
+  const env = getEnv();
+  const cutoffSec = Math.floor(new Date(row.sessions_valid_from).getTime() / 1000);
+  const token = await new SignJWT({ email: user.email })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(user.id)
+    .setIssuedAt(cutoffSec)
+    .setExpirationTime("7d")
+    .sign(new TextEncoder().encode(env.AUTH_SECRET));
+
+  return c.json({ ok: true, token });
 });
 
 app.post("/export", async (c) => {
