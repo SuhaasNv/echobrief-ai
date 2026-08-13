@@ -366,14 +366,14 @@ function CenterButton({
               // sitting through the bar rather than pasted on top of it.
               borderWidth: 4,
               borderColor: background,
-              // A confident seat, not an alarm. A design review read the old
-              // 0.55/12 halo as "hot" — the lift and the red fill already carry
-              // all the prominence the primary verb needs, so the glow only has
-              // to ground the circle, not announce it.
-              shadowColor: danger,
-              shadowOffset: { width: 0, height: 3 },
-              shadowOpacity: focused ? 0.3 : 0.2,
-              shadowRadius: 7,
+              // A confident seat, not an alarm. Two review passes read a red
+              // halo as "hot"; the lift and the fill already carry the
+              // prominence, so the shadow is now neutral black at low opacity —
+              // it grounds the circle against the bar without ringing it in red.
+              shadowColor: "#000000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.45,
+              shadowRadius: 8,
             },
             style,
           ]}

@@ -143,7 +143,11 @@ export function StatHeader({
             screen's usage bar. On a duration with no threshold it read as a
             warning about a recording cap that does not exist. */}
         <Tile label="Recorded" value={durationValue} unit={durationUnit} />
-        <Tile label="Tasks" value={String(tasks)} tone="text-tint" />
+        {/* Tinted only when there is something to point at. A blue "0" spends
+            the loudest accent in the header on nothing — the eye is pulled to a
+            zero. At zero the figure drops to the neutral label colour so it
+            reads as "none yet" rather than as an emphasised result. */}
+        <Tile label="Tasks" value={String(tasks)} tone={tasks > 0 ? "text-tint" : "text-label"} />
       </View>
 
       {/* Reconciles the tiles with the list: Recorded and Tasks can only count
