@@ -20,6 +20,7 @@ import { createQueryClient, installQueryPlatformBindings } from "@/lib/query";
 import { hydrateSession } from "@/lib/api/token-store";
 import { subscribeToSessionEvents } from "@/lib/api/session-events";
 import { navigationTheme } from "@/lib/navigation-theme";
+import { ShotDriver } from "@/lib/shot-driver";
 import { CrashScreen, ErrorBoundary } from "@/components/error-boundary";
 
 // Hold the splash until the Keychain read resolves. Without this the auth guard
@@ -135,6 +136,8 @@ export default function RootLayout() {
                 <Stack.Screen name="(app)" />
               </Stack>
             </ThemeProvider>
+            {/* Inert unless EXPO_PUBLIC_SHOT_MODE=1 at build time. */}
+            <ShotDriver />
           </QueryClientProvider>
         </ErrorBoundary>
       </SafeAreaProvider>
