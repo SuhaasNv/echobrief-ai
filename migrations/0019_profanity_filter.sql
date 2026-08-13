@@ -1,0 +1,63 @@
+-- ============================================================================
+-- EchoBrief AI — Profanity filtering, at the point where it can actually work
+-- Migration: 0019_profanity_filter.sql
+--
+-- One boolean: when set, AssemblyAI is asked to return the transcript with
+-- profanity replaced by asterisks (its `filter_profanity` parameter). When
+-- clear, the transcript is verbatim, which is what every meeting in this
+-- database already is.
+--
+-- WHY A VENDOR PARAMETER AND NOT A WORD LIST
+--
+-- A homegrown filter would be wrong in both directions — it would miss the
+-- inflections and miss nothing of "Scunthorpe" — and, worse, it could only run
+-- on the way OUT. The raw words would still be sitting in transcripts.raw_text
+-- and in transcript_chunks, so the setting would promise "this is not in your
+-- transcript" while the transcript held it. Filtering at the provider is the
+-- only version where the sentence on the settings screen is true.
+--
+-- WHY NOT NULL DEFAULT FALSE, WITH NO "NEVER CHOSEN" THIRD STATE
+--
+-- 0018 made the three summary enums nullable because NULL there means "this
+-- user has never expressed a preference", which is genuinely different from
+-- picking the default. That distinction does not exist here. This is a boolean,
+-- and unlike `detect_action_items` — which was NOT NULL DEFAULT TRUE because
+-- extraction has always been on — filtering has always been OFF. So FALSE is
+-- simultaneously the platform behaviour, the vendor default, and the value that
+-- leaves every existing account transcribing exactly as it did yesterday. A
+-- nullable column would carry a third state that resolves to FALSE anyway.
+--
+-- WHY OFF IS THE DEFAULT AND NOT ON
+--
+-- A filtered transcript is a lossy record of what was said, and the loss is
+-- permanent: AssemblyAI returns the asterisks, not the words plus a mask, so
+-- there is no unfiltered copy to fall back to. This is a professional meeting
+-- recorder, and the people who most need the transcript — someone reviewing a
+-- hostile-workplace complaint, someone reconstructing what was actually agreed
+-- in a heated call — need the real words. Defaulting to ON would destroy that
+-- evidence for every user who never opened the setting.
+--
+-- The counter-argument is real: transcripts are shown to colleagues over share
+-- links, and swearing in a shared document is a hazard. But that is a concern
+-- about an AUDIENCE, at read time, and answering it by destroying the source at
+-- capture time is the wrong lever — it would also censor the copy the author
+-- keeps for themselves. The user who wants that trade can make it in one tap;
+-- the user who needs the record cannot recover it after the fact.
+--
+-- WHEN IT APPLIES
+--
+-- At transcription time only. Toggling it does not rewrite existing meetings,
+-- and it does not re-filter a meeting whose transcription already succeeded and
+-- is being retried (the worker skips transcription when a transcripts row
+-- exists — that skip is what stops one transient OpenAI failure from buying
+-- three AssemblyAI runs). The settings screen says both of these out loud.
+-- ============================================================================
+
+ALTER TABLE public.user_preferences
+  ADD COLUMN IF NOT EXISTS filter_profanity BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- No CHECK constraint: unlike the 0018 enums there is no vocabulary to keep in
+-- step with the client, and BOOLEAN already admits exactly two values.
+
+-- No index. Read only as part of the one row already fetched by the
+-- (user_id, workspace_id) primary key when a meeting is transcribed.

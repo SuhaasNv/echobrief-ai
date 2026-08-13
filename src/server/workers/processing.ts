@@ -26,6 +26,8 @@ import { analyzeMeeting, scoreMeeting } from "../services/llm";
 import { embedChunks } from "../services/openai";
 import { sendProcessingCompleteEmail, sendProcessingFailedEmail } from "../services/resend";
 import { chunkTranscript, chunkRawText } from "../lib/chunking";
+import { sanitizeTitle } from "../lib/sanitization";
+import { materializeSegmentedAudio } from "./segment-concat";
 import { getEnv } from "../env";
 import { logTranscription, logPipelineAICost } from "../services/usage-tracker";
 
@@ -58,6 +60,51 @@ function safeJson(raw: string): unknown {
   } catch {
     return null;
   }
+}
+
+/**
+ * A title the recorder pre-filled rather than one a person chose.
+ *
+ * The recorder seeds the field with a timestamp — "Thu, Aug 13 at 3:25 PM" —
+ * so the user has something to edit instead of an empty box. That string is a
+ * placeholder in every sense: it repeats the date column it sits beside, and
+ * every recording gets one, so a list of them is a list of identical rows.
+ *
+ * Kept in POSIX form because the check runs inside the UPDATE below rather than
+ * in JS. The mobile client has the same pattern in `src/lib/format.ts` for the
+ * same purpose; if you change one, change both. They are duplicated rather than
+ * shared because the client needs it synchronously during render and the two
+ * copies have never had reason to disagree.
+ */
+const PLACEHOLDER_TITLE_PATTERN = "^\\w{3},?\\s+\\w{3}\\s+\\d{1,2}(\\s+at)?\\s+\\d{1,2}:\\d{2}";
+
+/**
+ * Name the meeting from what was said, without overwriting a name the user chose.
+ *
+ * The guard is in the WHERE clause, not in JS, because processing takes minutes
+ * and renaming a meeting while it processes is a completely ordinary thing to
+ * do. Reading the title, deciding in JS, then writing back would lose that
+ * rename to a race whose window is the whole analysis step.
+ *
+ * A blank or missing title from the model is not an error and not worth a retry
+ * — the recording keeps its timestamp, which is exactly what it had before this
+ * step existed. Older rows analysed before the schema carried a title reach
+ * here as `undefined` for the same reason.
+ */
+async function applyGeneratedTitle(
+  meetingId: string,
+  generated: string | undefined,
+): Promise<void> {
+  const title = sanitizeTitle(generated ?? "");
+  if (title.length === 0) return;
+
+  const sql = getSql();
+  await sql`
+    UPDATE meetings
+    SET title = ${title}
+    WHERE id = ${meetingId}
+      AND (title = '' OR title ~* ${PLACEHOLDER_TITLE_PATTERN})
+  `;
 }
 
 export async function processMeeting(job: ProcessingJob): Promise<void> {
@@ -140,10 +187,32 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
     // a backlog for a long time, and someone who adds a vocabulary term while
     // their upload is still queued expects it to apply to that upload. The
     // payload would have frozen the list at enqueue time.
+    //
+    // `filter_profanity` belongs in THIS load and not the summary one below,
+    // because it changes what AssemblyAI sends back rather than how the summary
+    // is written. Everything downstream — the stored transcript, the diarized
+    // text the analyst reads, the summary, the action items, the search chunks —
+    // is derived from that one response, so filtering here filters all of them
+    // and there is never an unfiltered copy sitting in the database
+    // contradicting what the transcript screen shows.
+    //
+    // One consequence, accepted deliberately: a summary that quotes a filtered
+    // meeting quotes the asterisks, and vector search cannot match a word that
+    // was never indexed. The alternative — feeding the analysis step an
+    // unfiltered transcript — would mean storing the raw words to have them,
+    // which is the thing the setting says it does not do.
+    //
+    // And one more: this whole branch is skipped when a transcripts row already
+    // exists, so a RETRY of a meeting whose transcription succeeded keeps the
+    // filtering it was transcribed with, even if the setting changed in
+    // between. That is the same rule as "it does not rewrite old meetings", and
+    // it is worth more than re-filtering: the skip is what stops one transient
+    // OpenAI failure from paying for three AssemblyAI runs. The settings copy
+    // says the setting applies at transcription time for exactly this reason.
     const prefRows = await sql<
-      Array<Pick<UserPreferencesRow, "transcription_language" | "vocabulary">>
+      Array<Pick<UserPreferencesRow, "transcription_language" | "vocabulary" | "filter_profanity">>
     >`
-      SELECT transcription_language, vocabulary
+      SELECT transcription_language, vocabulary, filter_profanity
       FROM user_preferences
       WHERE user_id = ${job.user_id} AND workspace_id = ${workspaceId}
     `;
@@ -169,11 +238,33 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
         ? null
         : (prefs?.transcription_language ?? job.language ?? "en");
 
-    const audioUrl = await createSignedReadUrl(job.audio_key, 1800);
+    /**
+     * Join a segmented recording into one object first.
+     *
+     * A no-op returning job.audio_key for every meeting uploaded as a single
+     * file, which is all of them before this shipped. Placed inside the
+     * transcribe branch because that is the only consumer: a meeting that
+     * already has a transcript never needs its audio joined, and doing it
+     * anyway would re-upload the whole recording on a retry that exists to
+     * avoid exactly that kind of waste.
+     */
+    const audioKey = await materializeSegmentedAudio(
+      job.meeting_id,
+      job.user_id,
+      workspaceId,
+      job.audio_key,
+    );
+
+    const audioUrl = await createSignedReadUrl(audioKey, 1800);
     const transcribeStart = Date.now();
     const result = await transcribeAudioUrl(audioUrl, {
       language,
       wordBoost: prefs?.vocabulary ?? [],
+      // No row means this account has never saved a preference, which is not the
+      // same as asking to be censored. The column default and this fallback are
+      // both FALSE, so a missing row transcribes verbatim — the behaviour every
+      // meeting in the product has had until now.
+      filterProfanity: prefs?.filter_profanity ?? false,
     });
 
     // postgres.js double-encodes objects when bound as text+::jsonb, storing
@@ -231,12 +322,50 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
   // ---- 2. Analyze -------------------------------------------------------
   await sql`UPDATE meetings SET status = 'analyzing' WHERE id = ${job.meeting_id}`;
 
+  /**
+   * How this user asked their summaries to be written.
+   *
+   * Read here rather than reusing the row fetched during transcription: that
+   * one is loaded inside the audio branch, so a pasted-transcript meeting would
+   * skip it entirely and silently lose the user's formatting choices. Read at
+   * ANALYSIS time for the same reason the vocabulary is read at transcription
+   * time — a job can sit behind a backlog, and someone who changes the setting
+   * while their upload is queued expects it to apply to that upload.
+   *
+   * Every field may be null. Null means "never chosen" and contributes no
+   * instruction, so a user who has not touched these settings gets byte-for-byte
+   * the prompt that shipped before they existed.
+   */
+  const summaryPrefRows = await sql<
+    Array<
+      Pick<
+        UserPreferencesRow,
+        "summary_style" | "summary_length" | "summary_tone" | "detect_action_items"
+      >
+    >
+  >`
+    SELECT summary_style, summary_length, summary_tone, detect_action_items
+    FROM user_preferences
+    WHERE user_id = ${job.user_id} AND workspace_id = ${workspaceId}
+  `;
+  const summaryPrefs = summaryPrefRows[0]
+    ? {
+        style: summaryPrefRows[0].summary_style,
+        length: summaryPrefRows[0].summary_length,
+        tone: summaryPrefRows[0].summary_tone,
+        detectActionItems: summaryPrefRows[0].detect_action_items,
+      }
+    : null;
+
   const analyzeStart = Date.now();
-  const analysis = await analyzeMeeting(analysis_text);
+  const analysis = await analyzeMeeting(analysis_text, summaryPrefs);
+
+  await applyGeneratedTitle(job.meeting_id, analysis.title);
 
   await sql`
     INSERT INTO summaries (
-      meeting_id, executive, key_topics, decisions, open_questions, chapters, model
+      meeting_id, executive, key_topics, decisions, open_questions, chapters,
+      participants, notable_moments, model
     ) VALUES (
       ${job.meeting_id},
       ${analysis.summary.executive},
@@ -244,6 +373,19 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
       ${sql.array(analysis.summary.decisions)},
       ${sql.array(analysis.summary.open_questions)},
       ${JSON.stringify(analysis.summary.chapters)}::jsonb,
+      -- Defaulted, not required: the field has been in ANALYSIS_SCHEMA since
+      -- speaker naming was designed but had no column until 0017, so rows
+      -- analysed before that reach here with nothing, and re-analysing one must
+      -- not fail on it.
+      ${sql.array(analysis.summary.participants ?? [])},
+      -- analysis.notable_moments, NOT analysis.summary.notable_moments. The one
+      -- hanging off summary is the model's raw claim; this one has had every
+      -- quote matched against the transcript, with the unfindable ones dropped
+      -- and the speaker and timestamp read off the line the words were on.
+      -- Writing the raw list here would put an unverified statement about a
+      -- named colleague into the record, which is the entire thing this feature
+      -- is built not to do.
+      ${JSON.stringify(analysis.notable_moments)}::jsonb,
       ${getEnv().OPENAI_MODEL_PRIMARY}
     )
     ON CONFLICT (meeting_id) DO UPDATE SET
@@ -252,6 +394,8 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
       decisions = EXCLUDED.decisions,
       open_questions = EXCLUDED.open_questions,
       chapters = EXCLUDED.chapters,
+      participants = EXCLUDED.participants,
+      notable_moments = EXCLUDED.notable_moments,
       model = EXCLUDED.model,
       generated_at = now()
   `;

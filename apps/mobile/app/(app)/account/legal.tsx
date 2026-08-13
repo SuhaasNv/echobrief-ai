@@ -36,9 +36,22 @@ export default function LegalScreen() {
         title="Processors"
         footer="Each one receives only what it needs to do its part, and none of them is used to train models on your content."
       >
-        <ValueRow icon="waveform" label="Transcription" value="AssemblyAI" />
-        <ValueRow icon="doc.plaintext" iconTone="violet" label="Summaries" value="OpenAI" />
-        <ValueRow icon="internaldrive" iconTone="neutral" label="Audio storage" value="Cloudflare R2" />
+        {/*
+          All three neutral. Summaries carried iconTone="violet" — violet means
+          "a model produced this" elsewhere in the app, which is true of the
+          summary but not of the ROW: these three rows all name a subprocessor,
+          and colouring one of them made a nine-row screen look like it had a
+          stuck pressed state. The distinction the colour was reaching for is
+          already carried by the value beside it.
+        */}
+        <ValueRow icon="waveform" iconTone="neutral" label="Transcription" value="AssemblyAI" />
+        <ValueRow icon="doc.plaintext" iconTone="neutral" label="Summaries" value="OpenAI" />
+        <ValueRow
+          icon="internaldrive"
+          iconTone="neutral"
+          label="Audio storage"
+          value="Cloudflare R2"
+        />
       </Section>
 
       <Footnote>

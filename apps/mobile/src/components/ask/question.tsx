@@ -46,18 +46,34 @@ export function PillButton({
   onPress,
   accessibilityHint,
   disabled = false,
+  tone = "neutral",
 }: {
   label: string;
   onPress: () => void;
   accessibilityHint?: string;
   /** Renders dimmed and inert. Used while a rate limit is still counting down. */
   disabled?: boolean;
+  /**
+   * "danger" tints the border and label for the one control in Ask that
+   * destroys something.
+   *
+   * Tinted, not FILLED. A solid danger pill would need a legible foreground on
+   * top of --danger, and there is no on-danger token in this palette — inventing
+   * a hex here would be the first colour in the app that answers to nothing. The
+   * tint is loud enough beside three neutral pills, and the confirm card around
+   * it is already carrying the warning.
+   */
+  tone?: "neutral" | "danger";
 }) {
   return (
     <Pressable
       onPress={() => {
         if (disabled) return;
-        haptics.tap();
+        // Consequential controls get the heavier tap. This is the same
+        // distinction haptics.medium documents: a destructive commit is not the
+        // same event as ticking something off.
+        if (tone === "danger") haptics.medium();
+        else haptics.tap();
         onPress();
       }}
       disabled={disabled}
@@ -66,13 +82,13 @@ export function PillButton({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      className={`min-h-[44px] justify-center self-start rounded-full border border-edge bg-surface px-4 ${
-        disabled ? "" : "active:bg-elevated"
-      }`}
+      className={`min-h-[44px] justify-center self-start rounded-full border px-4 ${
+        tone === "danger" ? "border-danger/50 bg-danger/10" : "border-edge bg-surface"
+      } ${disabled ? "" : "active:bg-elevated"}`}
       style={disabled ? { opacity: 0.55 } : undefined}
     >
       <Text
-        className="text-[15px] font-medium text-label"
+        className={`text-[15px] font-medium ${tone === "danger" ? "text-danger" : "text-label"}`}
         style={{ fontVariant: ["tabular-nums"] }}
         maxFontSizeMultiplier={1.4}
       >

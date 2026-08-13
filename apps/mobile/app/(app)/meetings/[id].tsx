@@ -393,7 +393,13 @@ export default function MeetingDetailScreen() {
         // Clears the floating player card and the tab bar beneath it, so the
         // last lines of a transcript are readable rather than parked under the
         // transport.
-        contentContainerStyle={{ paddingBottom: follow.bottomInset }}
+        //
+        // contentPadding, NOT bottomInset. "automatic" above already inset this
+        // content by the safe area at both ends, and on a tab screen that bottom
+        // inset IS the tab bar — so bottomInset, which includes the bar, spent it
+        // twice and left the transcript scrolling a bar-height past its own end.
+        // contentPadding is the same clearance with UIKit's share taken out.
+        contentContainerStyle={{ paddingBottom: follow.contentPadding }}
         /**
          * The ribbon pins instead of scrolling away.
          *
@@ -415,7 +421,29 @@ export default function MeetingDetailScreen() {
          * child is dropped from the children array, so a fixed [1] would pin the
          * segmented control on single-speaker meetings.
          */
-        stickyHeaderIndices={showRibbon ? [1] : undefined}
+        /**
+         * Pinned only where it earns its ~79pt.
+         *
+         * Three conditions, and it previously satisfied only the first:
+         *
+         *   `showRibbon` — there are bands to draw at all.
+         *
+         *   `has_audio` — RibbonScrubber degrades to a STATIC strip with no
+         *   gesture when there is nothing to play (see its `available` guard).
+         *   Pinning an inert colour bar to the top of a transcript-only meeting
+         *   is pure cost.
+         *
+         *   `tab === "transcript"` — the Summary pane has no timeline to scrub
+         *   to, so on Summary the strip was permanent chrome serving nothing.
+         *
+         * The tab condition also fixes the worse half: the segmented control is
+         * the NEXT child, so pinning the ribbon let the screen's actual
+         * navigation scroll away while the decoration stayed. Now Summary keeps
+         * its controls reachable, and the map only pins on the pane it maps.
+         */
+        stickyHeaderIndices={
+          showRibbon && meeting.has_audio && tab === "transcript" ? [1] : undefined
+        }
         {...follow.scrollProps}
       >
         <View className="px-4 pb-3 pt-1">
@@ -478,7 +506,18 @@ export default function MeetingDetailScreen() {
                         <View
                           className={`h-2 w-2 rounded-full ${SPEAKER_DOT[i % SPEAKER_DOT.length]}`}
                         />
-                        <Text className="text-[11px] text-label-secondary">{s.label}</Text>
+                        <Text
+                          className="text-[11px] text-label-secondary"
+                          // Capped and clipped: this sits in a PINNED block,
+                          // and a named speaker ("Priya Raghunathan") wraps
+                          // the flex-wrap legend to a second and third row —
+                          // so the header grows precisely as someone adopts
+                          // the naming feature the legend exists to sell.
+                          maxFontSizeMultiplier={1.2}
+                          numberOfLines={1}
+                        >
+                          {s.label}
+                        </Text>
                       </View>
                     )}
                   </Pressable>

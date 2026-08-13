@@ -24,8 +24,32 @@ export function isPlaceholderTitle(title: string): boolean {
   return trimmed.length === 0 || TIMESTAMP_TITLE.test(trimmed);
 }
 
-export function displayTitle(title: string): string {
-  return isPlaceholderTitle(title) ? "Untitled recording" : title;
+/**
+ * What to show as a recording's name.
+ *
+ * The recorder pre-fills the field with a timestamp so the user has something to
+ * edit rather than an empty box, and sends "" when that placeholder was never
+ * replaced. So an empty title means exactly one thing: nobody named this and the
+ * model has not yet either.
+ *
+ * The fallback is the recording's own date, formatted HERE — on the device, in
+ * the user's locale. That matters: `defaultTitle()` builds its placeholder with
+ * `toLocaleString(undefined, ...)`, so in French it is "jeu. 13 août à 15:15".
+ * The previous design shipped that string to the server and relied on a REGEX
+ * to recognise it as a placeholder later — a pattern written for the English
+ * shape. A non-English user's title was therefore mistaken for one they had
+ * chosen, and the AI title never replaced it. Formatting on the client removes
+ * the regex from both sides instead of making it cleverer.
+ *
+ * "Untitled recording" survives only when there is no date either, which an
+ * import with no filename and no typed name can produce.
+ */
+export function displayTitle(title: string, recordedAt?: string | null): string {
+  const trimmed = title.trim();
+  if (trimmed.length > 0) return trimmed;
+
+  const fallback = formatListDate(recordedAt);
+  return fallback ?? "Untitled recording";
 }
 
 /**

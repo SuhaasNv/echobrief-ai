@@ -73,7 +73,7 @@ export function SiteFooter() {
         ))}
       </div>
       <div className="mx-auto flex flex-col items-start justify-between gap-2 border-t border-border/60 px-6 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center max-w-6xl">
-        <span>© {new Date().getFullYear()} EchoBrief Labs</span>
+        <span>© {new Date().getFullYear()} Puffin Labs</span>
         <span className="font-mono">Built with TanStack Start · OpenAI · AssemblyAI · Railway</span>
       </div>
     </footer>

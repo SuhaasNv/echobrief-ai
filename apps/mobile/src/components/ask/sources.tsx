@@ -14,6 +14,32 @@ const CARD_GAP = 10;
 const EDGE = 16;
 
 /**
+ * Floor for every card, so a one-line source sits level with a four-line one.
+ *
+ * This replaces `alignItems: "stretch"` on the rail's content container, which
+ * looked like it did the same job and did something very different. The rail is
+ * HORIZONTAL, so its cross axis is vertical, and `stretch` there does not mean
+ * "match the tallest sibling" — it means "fill the container". Inside the
+ * screen's vertical ScrollView that container has no bounded height, so a
+ * single source card grew to roughly 900pt: three lines of text at the top of a
+ * near-full-screen box.
+ *
+ * That was also why the screen barely scrolled. A 900pt horizontal ScrollView
+ * covers nearly the whole viewport, so almost every vertical drag began inside
+ * it and had to be handed up to the outer scroll view before anything moved —
+ * which is what "I have to keep holding it" is.
+ *
+ * A fixed floor works because the card's height is already bounded: every text
+ * line count is capped (title 2, timestamp 1, excerpt 4), so the tallest a card
+ * can be at the default text size is 40 + 18 + 76 line + 16 gaps + 32 padding
+ * = 182. Setting the floor to that maximum makes every card identical without
+ * any dependence on the container. Above the default text size cards may grow
+ * past it and the rail can go ragged again — a far better failure than a card
+ * that eats the screen.
+ */
+const CARD_MIN_HEIGHT = 182;
+
+/**
  * A single retrieved passage.
  *
  * Leads with the meeting name and the moment inside it. The legacy pattern is a
@@ -54,8 +80,10 @@ function SourceCard({ citation, index }: { citation: SearchCitation; index: numb
         accessibilityRole="button"
         accessibilityLabel={`${citation.meeting_title}, ${span}. ${citation.excerpt}`}
         accessibilityHint="Opens the meeting this came from"
-        className="h-full overflow-hidden rounded-card border border-edge bg-surface p-4 active:bg-elevated"
-        style={{ width: CARD_WIDTH, borderCurve: "continuous" }}
+        // Not h-full. Combined with the rail's old `alignItems: "stretch"` that
+        // made the card fill an unbounded parent — see CARD_MIN_HEIGHT.
+        className="overflow-hidden rounded-card border border-edge bg-surface p-4 active:bg-elevated"
+        style={{ width: CARD_WIDTH, minHeight: CARD_MIN_HEIGHT, borderCurve: "continuous" }}
       >
         <View className="absolute inset-x-0 top-0 h-px bg-highlight" pointerEvents="none" />
 
@@ -75,10 +103,7 @@ function SourceCard({ citation, index }: { citation: SearchCitation; index: numb
             {span}
           </Text>
 
-          <Text
-            className="text-[13px] leading-[19px] text-label-secondary"
-            numberOfLines={4}
-          >
+          <Text className="text-[13px] leading-[19px] text-label-secondary" numberOfLines={4}>
             {citation.excerpt}
           </Text>
         </View>
@@ -117,17 +142,19 @@ export function SourcesRail({ citations }: { citations: SearchCitation[] }) {
         decelerationRate="fast"
         snapToInterval={CARD_WIDTH + CARD_GAP}
         snapToAlignment="start"
-        // Cards stretch to the tallest in the row, so a two-line title never
-        // leaves a short card sitting in a ragged rail.
-        contentContainerStyle={{
-          gap: CARD_GAP,
-          paddingHorizontal: EDGE,
-          alignItems: "stretch",
-        }}
+        // No alignItems here. Evenness comes from CARD_MIN_HEIGHT on the card
+        // itself; `stretch` on a horizontal rail means "fill the container",
+        // not "match the tallest sibling", and read the note on that constant
+        // before putting it back.
+        contentContainerStyle={{ gap: CARD_GAP, paddingHorizontal: EDGE }}
         style={{ marginHorizontal: -EDGE }}
       >
         {citations.map((citation, i) => (
-          <SourceCard key={`${citation.meeting_id}-${citation.start_sec}-${i}`} citation={citation} index={i} />
+          <SourceCard
+            key={`${citation.meeting_id}-${citation.start_sec}-${i}`}
+            citation={citation}
+            index={i}
+          />
         ))}
       </ScrollView>
     </View>

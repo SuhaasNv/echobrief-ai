@@ -4,14 +4,17 @@ import { router } from "expo-router";
 
 import { useChangePassword } from "@/lib/api/account";
 import { haptics } from "@/lib/haptics";
-import { CheckGlyph, Section, TextFieldRow, SETTINGS_HEX } from "@/components/settings/rows";
+import { CheckGlyph, Section, TextFieldRow } from "@/components/settings/rows";
 import { Footnote, SettingsScroll } from "@/components/settings/screen";
+import { useColorToken } from "@/lib/tokens";
 
 const MIN_LENGTH = 8;
 
 export default function PasswordScreen() {
   const change = useChangePassword();
   const nextField = useRef<TextInput>(null);
+  // Dark text on the near-white primary button, spinner included.
+  const onPrimary = useColorToken("--background");
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -78,9 +81,6 @@ export default function PasswordScreen() {
         {/* The requirement checks itself off as it is met, rather than sitting
             in a footer as a rule the user has to re-read. */}
         <View className="flex-row items-center gap-2.5 px-4 py-3" style={{ minHeight: 44 }}>
-          <View className="w-[15px] items-center">
-            {longEnough ? <CheckGlyph color={SETTINGS_HEX.tint} /> : null}
-          </View>
           <Text
             className={`flex-1 text-[13px] ${
               longEnough ? "text-label-secondary" : "text-label-tertiary"
@@ -92,6 +92,13 @@ export default function PasswordScreen() {
               ? `At least ${MIN_LENGTH} characters`
               : `Use at least ${MIN_LENGTH} characters`}
           </Text>
+          {/* Trailing, not leading. A 15pt glyph column in front of this
+              line pushed its text to 16 + 15 + 10 = 41pt while the field
+              above starts at 16pt — a 25pt step that aligned to nothing on
+              the screen. Moving it after the text restores the shared left
+              edge and still reserves its width, so the checkmark appearing
+              does not shift the sentence. */}
+          <View className="w-[15px] items-center">{longEnough ? <CheckGlyph /> : null}</View>
         </View>
       </Section>
 
@@ -115,7 +122,7 @@ export default function PasswordScreen() {
           }`}
         >
           {change.isPending ? (
-            <ActivityIndicator color="#06070A" />
+            <ActivityIndicator color={onPrimary} />
           ) : (
             <Text
               className={`text-[17px] font-semibold ${

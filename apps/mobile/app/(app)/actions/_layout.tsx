@@ -2,10 +2,11 @@ import { Stack, usePathname } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useTabBarInset } from "@/lib/layout";
-import { stackScreenOptions } from "@/lib/screen-options";
+import { useStackScreenOptions } from "@/lib/screen-options";
 import { CrashScreen, ErrorBoundary } from "@/components/error-boundary";
 
 export default function ActionsStack() {
+  const screenOptions = useStackScreenOptions();
   const queryClient = useQueryClient();
   const pathname = usePathname();
   const tabBarInset = useTabBarInset();
@@ -19,14 +20,10 @@ export default function ActionsStack() {
         if (attempts > 1) queryClient.clear();
       }}
       fallback={(props) => (
-        <CrashScreen
-          {...props}
-          title="Your action items could not be drawn"
-          bottomInset={tabBarInset}
-        />
+        <CrashScreen {...props} title="Your action items didn’t load" bottomInset={tabBarInset} />
       )}
     >
-      <Stack screenOptions={stackScreenOptions}>
+      <Stack screenOptions={screenOptions}>
         <Stack.Screen name="index" options={{ title: "Actions" }} />
       </Stack>
     </ErrorBoundary>

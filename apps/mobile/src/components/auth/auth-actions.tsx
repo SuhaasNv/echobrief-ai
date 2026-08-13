@@ -9,6 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { SPRING, TIMING } from "@/lib/motion";
+import { useColorToken } from "@/lib/tokens";
 import { AUTH_ERROR_IN, AUTH_ERROR_OUT } from "./motion";
 
 /**
@@ -38,6 +39,9 @@ export function AuthSubmitButton({
 }) {
   const pressed = useSharedValue(0);
   const pending = useSharedValue(0);
+  // ActivityIndicator takes its colour as a prop. Same pairing as the label
+  // above it: canvas on the near-white pill.
+  const onPrimary = useColorToken("--background");
 
   // The button stays near-white while the request is in flight even though it
   // is no longer pressable. Dropping to the disabled fill would put a #06070A
@@ -98,7 +102,7 @@ export function AuthSubmitButton({
           style={spinnerStyle}
           pointerEvents="none"
         >
-          <ActivityIndicator color="#06070A" />
+          <ActivityIndicator color={onPrimary} />
         </Animated.View>
       </Pressable>
     </Animated.View>
@@ -139,7 +143,7 @@ export function AuthFormError({ message }: { message: string }) {
 }
 
 /**
- * "New to EchoBrief? Create an account" — prompt in body colour, action in tint.
+ * "New to Puffin? Create an account" — prompt in body colour, action in tint.
  *
  * `onPress` exists because the two directions are not symmetrical. Sign-in
  * pushes sign-up, so it wants a Link. Sign-up going back to sign-in must POP:

@@ -1,6 +1,7 @@
 import { Stack, usePathname } from "expo-router";
 
 import { useTabBarInset } from "@/lib/layout";
+import { useStackScreenOptions } from "@/lib/screen-options";
 import { CrashScreen, ErrorBoundary } from "@/components/error-boundary";
 
 /**
@@ -19,20 +20,33 @@ import { CrashScreen, ErrorBoundary } from "@/components/error-boundary";
 export default function RecordStack() {
   const pathname = usePathname();
   const tabBarInset = useTabBarInset();
+  // Only the upload form uses these. The recorder itself is headerless — see
+  // the note above — so the stack default stays off and one screen opts in.
+  const screenOptions = useStackScreenOptions();
 
   return (
     <ErrorBoundary
       resetKey={pathname}
       fallback={(props) => (
-        <CrashScreen
-          {...props}
-          title="The recorder could not be drawn"
-          bottomInset={tabBarInset}
-        />
+        <CrashScreen {...props} title="The recorder didn’t open" bottomInset={tabBarInset} />
       )}
     >
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
+        {/* The upload form is a pushed screen and needs a way back and a name,
+            so it takes the header every other stack in the app uses. Inline
+            title, matching the account sub-screens: a large title on a
+            four-row form spends a fifth of the canvas restating the control
+            that opened it. */}
+        <Stack.Screen
+          name="import"
+          options={{
+            ...screenOptions,
+            headerShown: true,
+            headerLargeTitleEnabled: false,
+            title: "Upload a recording",
+          }}
+        />
       </Stack>
     </ErrorBoundary>
   );

@@ -1,23 +1,31 @@
 import { useRef, useState } from "react";
-import { Alert, Text, TextInput } from "react-native";
+import { Alert, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import Animated from "react-native-reanimated";
 
 import { authErrorMessage, useSignUp } from "@/lib/api/auth";
+import { googleAuthErrorMessage, useGoogleSignIn } from "@/lib/api/google-auth";
 import { haptics } from "@/lib/haptics";
 import { AuthScreen, HorizonLabel } from "@/components/auth/auth-screen";
 import { AuthField, AuthFieldGroup } from "@/components/auth/auth-field";
-import {
-  AuthFooterLink,
-  AuthFormError,
-  AuthSubmitButton,
-} from "@/components/auth/auth-actions";
+import { AuthFooterLink, AuthFormError, AuthSubmitButton } from "@/components/auth/auth-actions";
+import { AuthOrDivider, GoogleAuthButton } from "@/components/auth/google-button";
 import { useAuthEntrance } from "@/components/auth/motion";
 
 const MIN_PASSWORD_LENGTH = 8;
 
 export default function SignUpScreen() {
   const signUp = useSignUp();
+  /**
+   * The same hook sign-in uses, on purpose.
+   *
+   * There is no separate "sign up with Google": the API's callback creates the
+   * user if the Google identity is new and links it to an existing account if
+   * the verified email already has one. One entry point covers both, so a
+   * second mutation here would only be able to disagree with the server about
+   * which of the two just happened.
+   */
+  const googleSignIn = useGoogleSignIn();
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const enter = useAuthEntrance();
@@ -26,8 +34,28 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const busy = signUp.isPending || googleSignIn.isPending;
   const passwordLongEnough = password.length >= MIN_PASSWORD_LENGTH;
-  const canSubmit = /.+@.+\..+/.test(email) && passwordLongEnough && !signUp.isPending;
+  const canSubmit = /.+@.+\..+/.test(email) && passwordLongEnough && !busy;
+
+  /** One row for both routes — see the note on the sign-in screen. */
+  const errorMessage = signUp.isError
+    ? authErrorMessage(signUp.error)
+    : googleSignIn.isError
+      ? googleAuthErrorMessage(googleSignIn.error)
+      : null;
+
+  const onGoogle = () => {
+    if (busy) return;
+    googleSignIn.mutate(undefined, {
+      onSuccess: (outcome) => {
+        if (outcome.status !== "signed-in") return;
+        haptics.success();
+        router.replace("/(app)/meetings");
+      },
+      onError: () => haptics.error(),
+    });
+  };
 
   const onSubmit = () => {
     if (!canSubmit) return;
@@ -92,7 +120,7 @@ export default function SignUpScreen() {
             returnKeyType="next"
             submitBehavior="submit"
             onSubmitEditing={() => emailRef.current?.focus()}
-            editable={!signUp.isPending}
+            editable={!busy}
             divider
           />
           <AuthField
@@ -110,7 +138,7 @@ export default function SignUpScreen() {
             submitBehavior="submit"
             onSubmitEditing={() => passwordRef.current?.focus()}
             enablesReturnKeyAutomatically
-            editable={!signUp.isPending}
+            editable={!busy}
             divider
           />
           <AuthField
@@ -129,7 +157,7 @@ export default function SignUpScreen() {
             passwordRules={`minlength: ${MIN_PASSWORD_LENGTH};`}
             returnKeyType="go"
             onSubmitEditing={onSubmit}
-            editable={!signUp.isPending}
+            editable={!busy}
           />
         </AuthFieldGroup>
 
@@ -147,7 +175,7 @@ export default function SignUpScreen() {
         </Text>
       </Animated.View>
 
-      {signUp.isError ? <AuthFormError message={authErrorMessage(signUp.error)} /> : null}
+      {errorMessage ? <AuthFormError message={errorMessage} /> : null}
 
       <Animated.View entering={enter(2)} className="mt-4">
         <AuthSubmitButton
@@ -156,6 +184,22 @@ export default function SignUpScreen() {
           enabled={canSubmit}
           busy={signUp.isPending}
         />
+
+        <View className="mt-5">
+          <AuthOrDivider />
+        </View>
+
+        <View className="mt-5">
+          {/* "Continue with", not "Sign up with". Google's guidelines allow it,
+              and it is the honest verb: the same press signs in an existing
+              account the server links by verified email. */}
+          <GoogleAuthButton
+            label="Continue with Google"
+            onPress={onGoogle}
+            enabled={!busy}
+            busy={googleSignIn.isPending}
+          />
+        </View>
       </Animated.View>
 
       <Animated.View entering={enter(3)} className="mt-7">
@@ -164,9 +208,7 @@ export default function SignUpScreen() {
           action="Sign in"
           // Pop rather than push. replace() is the fallback for a cold deep
           // link straight to sign-up, where there is no stack to pop.
-          onPress={() =>
-            router.canGoBack() ? router.back() : router.replace("/(auth)/sign-in")
-          }
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/(auth)/sign-in"))}
         />
       </Animated.View>
     </AuthScreen>

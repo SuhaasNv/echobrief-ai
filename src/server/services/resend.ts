@@ -5,7 +5,7 @@
 import { Resend } from "resend";
 import { getEnv } from "../env";
 
-const FROM_ADDRESS = "EchoBrief <hello@echobrief.ai>";
+const FROM_ADDRESS = "Puffin <hello@echobrief.ai>";
 
 let _client: Resend | null = null;
 
@@ -73,7 +73,7 @@ export async function sendWorkspaceInvite(
   await client.emails.send({
     from: FROM_ADDRESS,
     to,
-    subject: `You're invited to ${workspaceName} on EchoBrief`,
+    subject: `You're invited to ${workspaceName} on Puffin`,
     html: `
       <p>You've been invited to join <strong>${escapeHtml(workspaceName)}</strong>.</p>
       <p><a href="${inviteUrl}">Accept invitation →</a></p>
@@ -101,10 +101,10 @@ export async function sendAccountExportEmail(
   await client.emails.send({
     from: FROM_ADDRESS,
     to,
-    subject: "Your EchoBrief data export is ready",
+    subject: "Your Puffin data export is ready",
     html: `
       <h2>Your Data Export is Ready</h2>
-      <p>We've prepared a complete export of your EchoBrief account data.</p>
+      <p>We've prepared a complete export of your Puffin account data.</p>
       
       <p style="margin: 24px 0;">
         <a href="${downloadUrl}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">

@@ -36,9 +36,7 @@ function Bar({
   height?: number;
   className?: string;
 }) {
-  return (
-    <View className={`rounded-full bg-fill ${className}`} style={{ width, height }} />
-  );
+  return <View className={`rounded-full bg-fill ${className}`} style={{ width, height }} />;
 }
 
 function CardSkeleton() {

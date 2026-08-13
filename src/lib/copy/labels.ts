@@ -60,7 +60,7 @@ const PROFESSIONAL: LabelSet = {
     plural: "Action Items",
   },
   chat: {
-    title: "Ask EchoBrief",
+    title: "Ask Puffin",
   },
   notes: {
     library: "Notes library",
@@ -100,7 +100,7 @@ const STUDENT: LabelSet = {
     plural: "Tasks",
   },
   chat: {
-    title: "Ask EchoBrief",
+    title: "Ask Puffin",
   },
   notes: {
     library: "Class notes",
@@ -120,7 +120,7 @@ const STUDENT: LabelSet = {
     dashboard: "Dashboard",
     upload: "Record",
     meetings: "Lectures",
-    chat: "Ask EchoBrief",
+    chat: "Ask Puffin",
     actions: "Tasks",
     notes: "Class notes",
     analytics: "Analytics",

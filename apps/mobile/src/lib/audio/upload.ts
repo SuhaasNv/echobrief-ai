@@ -1,6 +1,8 @@
 import { File, UploadType } from "expo-file-system";
 
 import { api } from "@/lib/api/client";
+import { beginUpload, finishUpload, reportUpload } from "@/lib/api/upload-progress";
+import type { SupportedContentType } from "@/lib/audio/file-import";
 import { addPendingMeeting, forgetMeeting } from "@/lib/notifications/store";
 import { syncBackgroundTaskRegistration } from "@/lib/notifications/task";
 
@@ -20,6 +22,12 @@ import { syncBackgroundTaskRegistration } from "@/lib/notifications/task";
  *
  * Step 1 inserts the meeting row immediately. If the PUT then fails, that row is
  * stranded at 5% forever, so every failure path after step 1 deletes it.
+ *
+ * This is also the path a file IMPORTED from the Files app takes. It is the same
+ * three hops with a different container and a different name, and the whole
+ * point of the import feature is that what lands is an ordinary meeting — so it
+ * gets an ordinary upload rather than a second uploader that would have to be
+ * kept in step with this one.
  */
 
 interface UploadUrlResponse {
@@ -38,17 +46,55 @@ export interface UploadCallbacks {
 }
 
 /** iOS records AAC in an MP4 container; audio/mp4 is already in SupportedMime. */
-const CONTENT_TYPE = "audio/mp4";
+const CONTENT_TYPE: SupportedContentType = "audio/mp4";
+
+/** UploadUrlRequest caps duration_sec at four hours. */
+const MAX_DURATION_SEC = 4 * 60 * 60;
+
+/**
+ * The duration we are willing to declare, or nothing.
+ *
+ * UploadUrlRequest takes `duration_sec` as an OPTIONAL positive integer under
+ * four hours, so anything outside that is dropped rather than clamped: an
+ * invented length on the row is worse than no length, and it would 400 the
+ * presign — the request that creates the meeting — rather than degrading.
+ *
+ * Absent is the normal case for an imported file. The picker exposes no
+ * duration, and the worker writes the real one back off the transcription
+ * result (src/server/workers/processing.ts), so the row is only briefly blank.
+ */
+function declarableDuration(seconds: number | null): number | undefined {
+  if (seconds === null || !Number.isFinite(seconds)) return undefined;
+
+  const rounded = Math.round(seconds);
+  return rounded > 0 && rounded <= MAX_DURATION_SEC ? rounded : undefined;
+}
 
 export async function uploadRecording(
   fileUri: string,
   opts: {
     title: string;
-    durationSec: number;
-    recordedAt: Date;
+    /** Null when nothing on this device knows the length. See above. */
+    durationSec: number | null;
+    /** Null when the source carries no believable recording date. */
+    recordedAt: Date | null;
+    /**
+     * Container the bytes are in. Defaults to the recorder's own, and is passed
+     * explicitly only by the import path — it decides both the signature on the
+     * PUT and the extension the server gives the R2 key, so it must be the same
+     * value the client validated against SupportedMime.
+     */
+    contentType?: SupportedContentType;
+    /**
+     * Name to store alongside the meeting. Defaults to a timestamp, which is
+     * all a recording has. Untrusted when it comes from a file provider — see
+     * sanitizeFilename in lib/audio/file-import.ts.
+     */
+    filename?: string;
   },
   callbacks: UploadCallbacks = {},
 ): Promise<UploadResult> {
+  const contentType = opts.contentType ?? CONTENT_TYPE;
   const file = new File(fileUri);
 
   if (!file.exists) {
@@ -65,14 +111,23 @@ export async function uploadRecording(
   const presigned = await api.apiRequest<UploadUrlResponse>("/meetings/upload-url", {
     method: "POST",
     body: {
-      filename: `${Date.now()}.m4a`,
-      content_type: CONTENT_TYPE,
+      filename: opts.filename ?? `${Date.now()}.m4a`,
+      content_type: contentType,
       size,
-      duration_sec: Math.round(opts.durationSec),
+      // JSON.stringify drops undefined keys, so an unknown duration or date is
+      // genuinely absent from the body rather than sent as null — which is what
+      // the optional fields on UploadUrlRequest expect.
+      duration_sec: declarableDuration(opts.durationSec),
       title: opts.title,
-      recorded_at: opts.recordedAt.toISOString(),
+      recorded_at: opts.recordedAt?.toISOString(),
     },
   });
+
+  // The row exists from here on, which is what makes the meeting reachable
+  // while its bytes are still going up — so this is where the meeting screen's
+  // ring starts. `onProgress` is kept alongside it rather than replaced: it is
+  // this function's own contract and the import screen still passes one.
+  beginUpload(presigned.meeting_id);
 
   try {
     const task = file.createUploadTask(presigned.upload_url, {
@@ -80,13 +135,16 @@ export async function uploadRecording(
       // Binary, never multipart: multipart rewrites the body and breaks the
       // signed content-length.
       uploadType: UploadType.BINARY_CONTENT,
-      mimeType: CONTENT_TYPE,
-      headers: { "content-type": CONTENT_TYPE },
+      mimeType: contentType,
+      headers: { "content-type": contentType },
       // Background session so a large upload survives the user leaving the app,
       // which is exactly when they will leave it.
       sessionType: "background",
       onProgress: ({ bytesSent, totalBytes }) => {
-        if (totalBytes > 0) callbacks.onProgress?.(bytesSent / totalBytes);
+        if (totalBytes <= 0) return;
+        const ratio = bytesSent / totalBytes;
+        callbacks.onProgress?.(ratio);
+        reportUpload(presigned.meeting_id, ratio);
       },
     });
 
@@ -98,6 +156,10 @@ export async function uploadRecording(
       throw new Error(`Storage rejected the upload (${result.status}).`);
     }
   } catch (error) {
+    // The row is about to be deleted, so stop reporting against it — a progress
+    // entry for a meeting that no longer exists would outlive its subject.
+    finishUpload(presigned.meeting_id);
+
     // The meeting row already exists. Leaving it behind puts a permanent 5%
     // ghost in the library, so remove it before surfacing the failure.
     await api
@@ -114,6 +176,10 @@ export async function uploadRecording(
     method: "POST",
     body: { meeting_id: presigned.meeting_id },
   });
+
+  // On the confirm, not the last byte: between the final PUT and this returning,
+  // the server does not yet consider the recording uploaded.
+  finishUpload(presigned.meeting_id);
 
   // Processing has started, so this meeting is now something the user is
   // waiting on. Recorded BEFORE returning, because the whole point is that they

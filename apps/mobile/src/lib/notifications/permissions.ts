@@ -53,7 +53,7 @@ function askForConsent(): Promise<boolean> {
   return new Promise((resolve) => {
     Alert.alert(
       "Get a nudge when it is ready",
-      "Transcribing and summarizing a meeting takes a few minutes. Turn on notifications and EchoBrief will tell you the moment your summary and action items are ready, so you can put your phone away.",
+      "Transcribing and summarizing a meeting takes a few minutes. Turn on notifications and Puffin will tell you the moment your summary and action items are ready, so you can put your phone away.",
       [
         { text: "Not now", style: "cancel", onPress: () => resolve(false) },
         { text: "Notify me", onPress: () => resolve(true) },

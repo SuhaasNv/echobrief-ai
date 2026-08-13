@@ -19,7 +19,7 @@ import {
 import { createQueryClient, installQueryPlatformBindings } from "@/lib/query";
 import { hydrateSession } from "@/lib/api/token-store";
 import { subscribeToSessionEvents } from "@/lib/api/session-events";
-import { navigationTheme } from "@/lib/navigation-theme";
+import { useNavigationTheme } from "@/lib/navigation-theme";
 import { ShotDriver } from "@/lib/shot-driver";
 import { CrashScreen, ErrorBoundary } from "@/components/error-boundary";
 
@@ -45,6 +45,10 @@ export default function RootLayout() {
     SpaceGrotesk_600SemiBold,
     SpaceGrotesk_700Bold,
   });
+
+  // Read above the `!ready` return, like every other hook here: it is a hook
+  // now that its colours come from the tokens rather than from hardcoded hexes.
+  const navigationTheme = useNavigationTheme();
 
   const ready = sessionReady && fontsLoaded;
 

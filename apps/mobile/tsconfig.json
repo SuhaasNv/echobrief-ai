@@ -4,16 +4,20 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
-      "@/*": ["./src/*"],
-      "@echobrief/shared": ["../../packages/shared/src/index.ts"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@echobrief/shared": [
+        "../../packages/shared/src/index.ts"
+      ]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts",
     "uniwind-env.d.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

@@ -142,7 +142,14 @@ app.post("/password", zValidator("json", ChangePasswordRequest), async (c) => {
 /** The stored columns the API cares about; created_at/updated_at are internal. */
 type StoredPreferences = Pick<
   UserPreferencesRow,
-  "transcription_language" | "vocabulary" | "audio_retention_days"
+  | "transcription_language"
+  | "vocabulary"
+  | "audio_retention_days"
+  | "summary_style"
+  | "summary_length"
+  | "summary_tone"
+  | "detect_action_items"
+  | "filter_profanity"
 >;
 
 /**
@@ -156,6 +163,16 @@ function toPreferences(row: StoredPreferences | undefined): UserPreferences {
     vocabulary: row?.vocabulary ?? [],
     audio_retention_days: row?.audio_retention_days ?? null,
     default_audio_retention_days: DEFAULT_AUDIO_RETENTION_DAYS,
+    summary_style: row?.summary_style ?? null,
+    summary_length: row?.summary_length ?? null,
+    summary_tone: row?.summary_tone ?? null,
+    // Column default, mirrored: extraction has always been on, so an account
+    // with no row saved must not read as having turned it off.
+    detect_action_items: row?.detect_action_items ?? true,
+    // Mirrored the other way for the same reason: filtering has always been
+    // off, and an account with no row must not read as having asked for a
+    // censored transcript it never chose.
+    filter_profanity: row?.filter_profanity ?? false,
   };
 }
 
@@ -165,7 +182,9 @@ app.get("/preferences", async (c) => {
   const sql = getSql();
 
   const rows = await sql<StoredPreferences[]>`
-    SELECT transcription_language, vocabulary, audio_retention_days
+    SELECT transcription_language, vocabulary, audio_retention_days,
+           summary_style, summary_length, summary_tone, detect_action_items,
+           filter_profanity
     FROM user_preferences
     WHERE user_id = ${user.id} AND workspace_id = ${workspaceId}
   `;
@@ -193,6 +212,21 @@ app.patch("/preferences", zValidator("json", UpdatePreferencesRequest), async (c
   if (patch.audio_retention_days !== undefined) {
     sets.push(sql`audio_retention_days = EXCLUDED.audio_retention_days`);
   }
+  if (patch.summary_style !== undefined) {
+    sets.push(sql`summary_style = EXCLUDED.summary_style`);
+  }
+  if (patch.summary_length !== undefined) {
+    sets.push(sql`summary_length = EXCLUDED.summary_length`);
+  }
+  if (patch.summary_tone !== undefined) {
+    sets.push(sql`summary_tone = EXCLUDED.summary_tone`);
+  }
+  if (patch.detect_action_items !== undefined) {
+    sets.push(sql`detect_action_items = EXCLUDED.detect_action_items`);
+  }
+  if (patch.filter_profanity !== undefined) {
+    sets.push(sql`filter_profanity = EXCLUDED.filter_profanity`);
+  }
   const setClause = sets.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc}, ${cur}`));
 
   // One upsert rather than SELECT-then-INSERT-or-UPDATE: two devices saving
@@ -205,16 +239,31 @@ app.patch("/preferences", zValidator("json", UpdatePreferencesRequest), async (c
   // saving a vocabulary term from silently reassigning someone's language.
   const rows = await sql<StoredPreferences[]>`
     INSERT INTO user_preferences (
-      user_id, workspace_id, transcription_language, vocabulary, audio_retention_days
+      user_id, workspace_id, transcription_language, vocabulary, audio_retention_days,
+      summary_style, summary_length, summary_tone, detect_action_items,
+      filter_profanity
     ) VALUES (
       ${user.id},
       ${workspaceId},
       ${patch.transcription_language ?? null},
       ${sql.array(patch.vocabulary ?? [])}::text[],
-      ${patch.audio_retention_days ?? null}
+      ${patch.audio_retention_days ?? null},
+      ${patch.summary_style ?? null},
+      ${patch.summary_length ?? null},
+      ${patch.summary_tone ?? null},
+      -- Defaults to on when a fresh row is created without it, matching the
+      -- column default. Extraction has always been on, so an account that saves
+      -- only a vocabulary term must not silently turn it off.
+      ${patch.detect_action_items ?? true},
+      -- Defaults to OFF on a fresh row, matching the column default. Saving a
+      -- vocabulary term must never be what starts censoring someone's
+      -- transcripts; opting into a lossy record has to be a deliberate tap.
+      ${patch.filter_profanity ?? false}
     )
     ON CONFLICT (user_id, workspace_id) DO UPDATE SET ${setClause}, updated_at = now()
-    RETURNING transcription_language, vocabulary, audio_retention_days
+    RETURNING transcription_language, vocabulary, audio_retention_days,
+              summary_style, summary_length, summary_tone, detect_action_items,
+              filter_profanity
   `;
 
   // Returning the merged row saves the client a follow-up GET and, more

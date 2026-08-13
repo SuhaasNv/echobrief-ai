@@ -21,7 +21,7 @@ export default function AboutScreen() {
   return (
     <SettingsScroll>
       <Section title="Version">
-        <ValueRow icon="info.circle" iconTone="neutral" label="EchoBrief" value={version} mono />
+        <ValueRow icon="info.circle" iconTone="neutral" label="Puffin" value={version} mono />
         <ValueRow label="Build" value={build} mono />
       </Section>
 
@@ -33,7 +33,7 @@ export default function AboutScreen() {
           icon="envelope"
           label="Email support"
           external
-          onPress={() => openSupportEmail(`EchoBrief iOS ${version} (${build})`)}
+          onPress={() => openSupportEmail(`Puffin iOS ${version} (${build})`)}
         />
         <Row
           icon="questionmark.circle"
@@ -63,7 +63,7 @@ export default function AboutScreen() {
       </Section>
 
       <Footnote>
-        EchoBrief turns meeting audio into transcripts, summaries, and action items you can search
+        Puffin turns meeting audio into transcripts, summaries, and action items you can search
         across every meeting you have captured.
       </Footnote>
     </SettingsScroll>

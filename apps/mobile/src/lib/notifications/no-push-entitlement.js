@@ -5,7 +5,7 @@ const { withEntitlementsPlist } = require("expo/config-plugins");
  *
  * THIS FILE IS LORE-BEARING. Do not remove it without reading all of this.
  *
- * EchoBrief signs with a FREE Apple developer account. Free accounts cannot
+ * Puffin signs with a FREE Apple developer account. Free accounts cannot
  * provision ANY entitlement, so an entitlements file containing even one key
  * fails code signing outright. The app therefore has to ship with a literally
  * empty `<dict/>`.
@@ -34,7 +34,7 @@ const { withEntitlementsPlist } = require("expo/config-plugins");
  *   without this plugin -> <key>aps-environment</key><string>development</string>
  *   with this plugin    -> <dict/>
  *
- * This costs nothing, because EchoBrief only ever posts LOCAL notifications.
+ * This costs nothing, because Puffin only ever posts LOCAL notifications.
  * Local notifications go through UNUserNotificationCenter and require no
  * entitlement. `aps-environment` is only needed to register for REMOTE push.
  * The moment anyone calls `getExpoPushTokenAsync()` or

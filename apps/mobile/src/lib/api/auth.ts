@@ -48,8 +48,13 @@ interface WorkspaceListResponse {
  * The workspace id is optional on every request — the server falls back to the
  * user's oldest workspace — so a failure here is non-fatal and must not block
  * sign-in.
+ *
+ * Exported because Google sign-in has to land in exactly this state. The JWT
+ * the SSO callback issues has the same claims and the same 7-day life as the
+ * one /auth/login issues, so the only way the two can drift is if a second
+ * adoption path is written alongside this one. There is deliberately only one.
  */
-async function adoptSession(token: string): Promise<void> {
+export async function adoptSession(token: string): Promise<void> {
   tokenStore.setToken(token);
 
   try {
@@ -112,12 +117,12 @@ export function useSignUp() {
  */
 export function authErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) {
-    return "Can't reach EchoBrief. Check your connection and try again.";
+    return "Can't reach Puffin. Check your connection and try again.";
   }
 
   if (error.status === 401) return "Email or password is incorrect.";
   // The server's rate-limit copy already names the retry window.
   if (error.status === 429) return error.message;
   if (error.status === 400) return error.message;
-  return "Can't reach EchoBrief. Check your connection and try again.";
+  return "Can't reach Puffin. Check your connection and try again.";
 }

@@ -20,7 +20,7 @@ interface LoginResponse {
 }
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign in — EchoBrief" }] }),
+  head: () => ({ meta: [{ title: "Sign in — Puffin" }] }),
   component: LoginPage,
 });
 
@@ -91,7 +91,7 @@ function LoginPage() {
   return (
     <AuthShell
       title="Welcome back."
-      subtitle="Sign in to your EchoBrief workspace."
+      subtitle="Sign in to your Puffin workspace."
       footer={
         <>
           New here?{" "}

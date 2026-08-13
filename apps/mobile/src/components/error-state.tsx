@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
 import { haptics } from "@/lib/haptics";
+import { useColorToken } from "@/lib/tokens";
 
 /**
  * The app's one failure surface.
@@ -36,6 +37,9 @@ export function ErrorState({
   busy?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
+  // The busy button drops to bg-fill, where --label-tertiary is below AA — the
+  // spinner uses the secondary label for the same reason its text would.
+  const spinner = useColorToken("--label-secondary");
 
   return (
     <Animated.View
@@ -88,7 +92,7 @@ export function ErrorState({
           }`}
         >
           {busy ? (
-            <ActivityIndicator color="#9CA1A9" />
+            <ActivityIndicator color={spinner} />
           ) : (
             // Primary commit action: near-white with dark text. Blue is navigation.
             <Text className="text-[17px] font-semibold text-background" maxFontSizeMultiplier={1.6}>
@@ -112,10 +116,7 @@ export function ErrorState({
 export function StaleNotice({ children }: { children: string }) {
   return (
     <View className="bg-fill px-4 py-2" accessibilityLiveRegion="polite">
-      <Text
-        className="text-center text-[13px] text-label-secondary"
-        maxFontSizeMultiplier={1.6}
-      >
+      <Text className="text-center text-[13px] text-label-secondary" maxFontSizeMultiplier={1.6}>
         {children}
       </Text>
     </View>

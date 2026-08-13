@@ -1,4 +1,10 @@
 import { useCallback, useRef, useState } from "react";
+// Subpath rather than the barrel — see the note in components/ask/action.tsx.
+import {
+  describeAskPlan,
+  parseAskActionPlan,
+  type AskActionPlan,
+} from "@echobrief/shared/ask-actions";
 
 import { api } from "./client";
 
@@ -37,6 +43,15 @@ export interface SearchController {
    * nothing.
    */
   turns: ChatTurn[];
+  /**
+   * Set when the turn was an INSTRUCTION rather than a question.
+   *
+   * Mutually exclusive with `answer` by construction: the endpoint sends either
+   * a streamed answer or an empty body plus this plan, never both. Nothing here
+   * has been executed — see components/ask/action.tsx, which is what decides
+   * between running it and asking first.
+   */
+  action: AskActionPlan | null;
   ask: (query: string) => Promise<void>;
   stop: () => void;
   reset: () => void;
@@ -61,6 +76,7 @@ export function useSearch(): SearchController {
   const [answer, setAnswer] = useState("");
   const [citations, setCitations] = useState<SearchCitation[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [action, setAction] = useState<AskActionPlan | null>(null);
 
   const [turns, setTurns] = useState<ChatTurn[]>([]);
 
@@ -98,6 +114,7 @@ export function useSearch(): SearchController {
     setAnswer("");
     setCitations([]);
     setError(null);
+    setAction(null);
     setTurns([]);
     turnsRef.current = [];
     lastExchangeRef.current = null;
@@ -130,6 +147,7 @@ export function useSearch(): SearchController {
       setAnswer("");
       setCitations([]);
       setError(null);
+      setAction(null);
       setPhase("searching");
       bufferRef.current = "";
 
@@ -167,7 +185,43 @@ export function useSearch(): SearchController {
           }
         }
 
-        setPhase("streaming");
+        /**
+         * An instruction turn. Same header trick as citations, for the same
+         * reason — it lands before the (empty) body.
+         *
+         * VALIDATED, NOT CAST. Every other header on this endpoint is
+         * decoration; this one decides whether a Delete button appears on
+         * screen, so a malformed or truncated envelope must produce no card at
+         * all rather than a half-built one. parseAskActionPlan returns null on
+         * anything it does not fully recognise, and the turn then falls through
+         * to the normal empty-answer path — the safe direction.
+         */
+        const rawAction = response.headers.get("x-ask-action");
+        if (rawAction) {
+          // JSON.parse throws on a truncated header, so the decode is inside
+          // the guard too.
+          let decoded: unknown = null;
+          try {
+            decoded = JSON.parse(decodeURIComponent(rawAction)) as unknown;
+          } catch {
+            decoded = null;
+          }
+
+          const plan = parseAskActionPlan(decoded);
+          if (plan) {
+            setAction(plan);
+            // The thread needs a line for this turn, both to redraw above the
+            // next question and to give the answering model an assistant half.
+            // Composed from typed fields — no generated prose enters the
+            // conversation. See describeAskPlan.
+            full = describeAskPlan(plan);
+          }
+        }
+
+        // Deliberately not "streaming" on an action turn: no tokens are coming,
+        // and flipping through a state that renders a live answer card would
+        // put a violet caret on screen for a turn that produces no answer.
+        if (!rawAction) setPhase("streaming");
 
         flushTimer = setInterval(() => {
           if (bufferRef.current) {
@@ -210,5 +264,5 @@ export function useSearch(): SearchController {
     [stop],
   );
 
-  return { phase, question, answer, citations, error, turns, ask, stop, reset };
+  return { phase, question, answer, citations, error, turns, action, ask, stop, reset };
 }

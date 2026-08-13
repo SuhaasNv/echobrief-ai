@@ -18,6 +18,7 @@ import Svg, { Path } from "react-native-svg";
 import { DELETE_UNDO_MS, undoMeetingDelete, useMeetingDeletePending } from "@/lib/api/meetings";
 import { haptics } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
+import { useColorToken } from "@/lib/tokens";
 
 /**
  * Swipe-to-delete, built on Gesture.Pan rather than on a Swipeable component.
@@ -70,7 +71,7 @@ function resist(x: number): number {
   return -ACTION_WIDTH + (x + ACTION_WIDTH) * OVERSHOOT_RESISTANCE;
 }
 
-function TrashGlyph({ color }: { color: string }) {
+function TrashGlyph({ color }: { color?: string }) {
   return (
     <Svg width={17} height={18} viewBox="0 0 17 18">
       <Path
@@ -190,6 +191,9 @@ export function SwipeToDelete({
   /** Rendered over the row while `pending`. Lists without undo pass nothing. */
   undoOverlay?: React.ReactNode;
 }) {
+  // The glyph on the destructive action, drawn on bg-danger — see the note at
+  // the call site for why it is the canvas colour and not near-white.
+  const onDanger = useColorToken("--background");
   const translateX = useSharedValue(0);
   const startX = useSharedValue(0);
   /**
@@ -391,12 +395,11 @@ export function SwipeToDelete({
                   holds in a light theme, where both flip together and it becomes
                   white on #C81C2A at 5.8:1.
 
-                  The glyph takes the hex directly because react-native-svg strokes
-                  are not styled by className. Safe only because app.json pins
-                  userInterfaceStyle to "dark" — the same reason lib/screen-options
-                  hardcodes its palette. If that ever becomes "automatic", this and
-                  that file both need a resolved variable. */}
-              <TrashGlyph color="#06070A" />
+                  The glyph reads the token rather than the class, because
+                  react-native-svg strokes are not styled by className. It is the
+                  same value text-background resolves to, so the two cannot drift
+                  apart the way a copied hex could. */}
+              <TrashGlyph color={onDanger} />
               <Text
                 className="text-[12px] font-semibold text-background"
                 maxFontSizeMultiplier={1.3}

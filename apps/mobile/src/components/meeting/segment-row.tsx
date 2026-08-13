@@ -26,6 +26,12 @@ export interface SegmentRowProps {
   label: string | null;
   /** Tailwind text colour class for the speaker name. */
   labelClass: string;
+  /**
+   * Raw diarization id behind `label` ("A"), or null for an unattributed line.
+   * A primitive rather than the speaker object, so the comparator below stays a
+   * string compare and a poll cannot dirty 800 rows.
+   */
+  speakerId: string | null;
   text: string;
   /** Gutter width, sized by the meeting's longest timestamp. */
   gutter: number;
@@ -37,6 +43,8 @@ export interface SegmentRowProps {
   onSeek?: (index: number) => void;
   /** Reports geometry for auto-scroll. Stable across renders. */
   onMeasure?: (index: number, y: number, height: number) => void;
+  /** Open the naming sheet for this turn's voice. Stable across renders. */
+  onNameSpeaker?: (speakerId: string) => void;
 }
 
 function areEqual(a: SegmentRowProps, b: SegmentRowProps): boolean {
@@ -45,12 +53,14 @@ function areEqual(a: SegmentRowProps, b: SegmentRowProps): boolean {
     a.time === b.time &&
     a.label === b.label &&
     a.labelClass === b.labelClass &&
+    a.speakerId === b.speakerId &&
     a.gutter === b.gutter &&
     a.spacing === b.spacing &&
     a.index === b.index &&
     a.active === b.active &&
     a.onSeek === b.onSeek &&
-    a.onMeasure === b.onMeasure
+    a.onMeasure === b.onMeasure &&
+    a.onNameSpeaker === b.onNameSpeaker
   );
 }
 
@@ -59,12 +69,14 @@ export const SegmentRow = memo(function SegmentRow({
   time,
   label,
   labelClass,
+  speakerId,
   text,
   gutter,
   spacing,
   active,
   onSeek,
   onMeasure,
+  onNameSpeaker,
 }: SegmentRowProps) {
   const handleLayout = onMeasure
     ? (event: LayoutChangeEvent) => {
@@ -111,13 +123,44 @@ export const SegmentRow = memo(function SegmentRow({
         </Text>
 
         <View className="flex-1">
-          {label ? (
+          {/* Colour is never the sole carrier of identity: the name is always
+              spelled out next to it.
+
+              The name is also the way to CHANGE the name, which is why this is a
+              Pressable nested inside the row's own tap-to-seek one. Naming
+              belongs on the surface where the anonymity is actually a problem —
+              reading "Speaker B decided it" is the moment you want to fix it —
+              and reaching for a settings screen to do it is how the feature goes
+              unused. iOS gives the inner Pressable the touch, so the line around
+              the name still seeks. There is deliberately no underline or pencil:
+              this is the app's one long-form reading surface, and an editing
+              affordance repeated down 800 lines reads as a spell-checker.
+              Discovery is carried by the ribbon legend and the "Who talked" card,
+              which both say so in as many words. */}
+          {label && speakerId && onNameSpeaker ? (
+            <Pressable
+              onPress={() => onNameSpeaker(speakerId)}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              accessibilityHint="Puts a name to this voice"
+              className="self-start"
+              hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
+            >
+              {({ pressed }) => (
+                <Text
+                  className={`mb-1 text-[13px] font-semibold ${labelClass}`}
+                  style={{ opacity: pressed ? 0.4 : 1 }}
+                  maxFontSizeMultiplier={1.4}
+                >
+                  {label}
+                </Text>
+              )}
+            </Pressable>
+          ) : label ? (
             <Text
               className={`mb-1 text-[13px] font-semibold ${labelClass}`}
               maxFontSizeMultiplier={1.4}
             >
-              {/* Colour is never the sole carrier of identity: the name is always
-                  spelled out next to it. */}
               {label}
             </Text>
           ) : null}

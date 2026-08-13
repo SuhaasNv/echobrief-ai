@@ -29,7 +29,7 @@ const STATUS_FILTERS: Array<{ value: MeetingStatus | "all"; label: string }> = [
 ];
 
 export const Route = createFileRoute("/app/meetings")({
-  head: () => ({ meta: [{ title: "Meetings — EchoBrief" }] }),
+  head: () => ({ meta: [{ title: "Meetings — Puffin" }] }),
   component: MeetingsPage,
 });
 

@@ -20,9 +20,11 @@ import {
   Sparkles,
   Pencil,
   Trash2,
+  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { RevenueSection } from "@/components/admin/revenue-section";
 import { getAuthToken } from "@/lib/api/client";
 import {
   useMe,
@@ -71,11 +73,11 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Admin Console — EchoBrief" }] }),
+  head: () => ({ meta: [{ title: "Admin Console — Puffin" }] }),
   component: AdminGate,
 });
 
-type Section = "overview" | "users" | "meetings" | "queue" | "system";
+type Section = "overview" | "revenue" | "users" | "meetings" | "queue" | "system";
 
 function AdminGate() {
   const navigate = useNavigate();
@@ -122,6 +124,7 @@ function AdminGate() {
 
 const SECTIONS: Array<{ id: Section; label: string; icon: LucideIcon }> = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "revenue", label: "Revenue", icon: Wallet },
   { id: "users", label: "Users", icon: Users },
   { id: "meetings", label: "Meetings", icon: FileAudio },
   { id: "queue", label: "Queue", icon: ListChecks },
@@ -139,7 +142,7 @@ function AdminConsole({ adminEmail }: { adminEmail: string }) {
         <div className="border-b border-border/60 px-4 py-4">
           <Link to="/" className="block">
             <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              EchoBrief
+              Puffin
             </p>
             <div className="mt-1 flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-brand" />
@@ -205,6 +208,7 @@ function AdminConsole({ adminEmail }: { adminEmail: string }) {
 
         <div className="px-6 py-6">
           {section === "overview" && <OverviewSection />}
+          {section === "revenue" && <RevenueSection />}
           {section === "users" && <UsersSection />}
           {section === "meetings" && <MeetingsSection />}
           {section === "queue" && <QueueSection />}

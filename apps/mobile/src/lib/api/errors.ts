@@ -56,7 +56,7 @@ export function describeError(
   if (!online) {
     return {
       title: "You are offline",
-      body: `EchoBrief loads ${subject} again as soon as you are back on a network.`,
+      body: `Puffin loads ${subject} again as soon as you are back on a network.`,
       retryable: false,
     };
   }
@@ -96,7 +96,7 @@ export function describeError(
 
     if (error.status >= 500) {
       return {
-        title: "EchoBrief is having trouble",
+        title: "Puffin is having trouble",
         body: `The server could not return ${subject}. This is a fault on our side, not with your account.`,
         retryable: true,
       };
@@ -112,7 +112,7 @@ export function describeError(
   // No status at all: DNS, TLS, a dropped socket, or a body that was not JSON.
   // The network state says we are online, so this is worth retrying.
   return {
-    title: "Cannot reach EchoBrief",
+    title: "Cannot reach Puffin",
     body: `The request for ${subject} did not complete. The connection may have dropped part way through.`,
     retryable: true,
   };
@@ -122,19 +122,17 @@ export function describeError(
  * One sentence for a WRITE that failed: a save, a toggle, a delete.
  *
  * Separate from `describeError` because the two situations read differently.
- * "EchoBrief loads your name again once you are online" is nonsense on a save
+ * "Puffin loads your name again once you are online" is nonsense on a save
  * that has just been rolled back.
  */
-export function describeActionFailure(
-  error: unknown,
-  { online }: { online: boolean },
-): string {
+export function describeActionFailure(error: unknown, { online }: { online: boolean }): string {
   if (!online) {
     return "You are offline, so the change never reached the server.";
   }
 
   if (error instanceof ApiError) {
-    if (error.status === 401) return "Your session has ended. Sign in again and the change will stick.";
+    if (error.status === 401)
+      return "Your session has ended. Sign in again and the change will stick.";
     if (error.status === 403) return "This account does not have permission to make that change.";
     if (error.status === 429) return "The server is rate limiting this account right now.";
     if (error.status >= 500) {
@@ -143,5 +141,5 @@ export function describeActionFailure(
     return error.message;
   }
 
-  return "EchoBrief could not reach the server.";
+  return "Puffin could not reach the server.";
 }

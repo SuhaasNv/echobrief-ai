@@ -1,11 +1,12 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import { describeError, useOnline } from "@/lib/api/errors";
 import { useSubscription } from "@/lib/api/subscription";
 import { ErrorState, StaleNotice } from "@/components/error-state";
 import { UsageMeter } from "@/components/settings/meter";
-import { Section, ValueRow } from "@/components/settings/rows";
+import { Row, Section, ValueRow } from "@/components/settings/rows";
+import { PaywallSheet } from "@/components/paywall/sheet";
 import { Footnote, SettingsScroll } from "@/components/settings/screen";
 
 function titleCase(value: string): string {
@@ -60,6 +61,7 @@ function priceLabel(price: number | string | null, interval: string | null): str
 export default function PlanScreen() {
   const online = useOnline();
   const query = useSubscription();
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const onRefresh = useCallback(() => query.refetch(), [query]);
 
@@ -104,6 +106,17 @@ export default function PlanScreen() {
     ? formatBillingDate(subscription.current_period_end)
     : null;
 
+  /**
+   * Which paywall this account should actually see.
+   *
+   * The sheet has four trigger variants and only the generic one was ever
+   * passed, so its headline was always the brand name and the three
+   * benefit-led headlines were dead code. Someone sitting at their limit
+   * should be told that, not sold to in the abstract.
+   */
+  const minutesLimit = data.limits.transcription_minutes;
+  const atMinutesLimit = minutesLimit !== null && data.usage.transcription_minutes >= minutesLimit;
+
   return (
     <SettingsScroll onRefresh={onRefresh}>
       {/* Reached this far, so these figures are real. They can still be stale:
@@ -135,6 +148,26 @@ export default function PlanScreen() {
         {renews ? <ValueRow label="Renews" value={renews} mono /> : null}
       </Section>
 
+      {/* The user-initiated entry point — trigger #4, the only one that is
+          always available. Shown only on Free: an upgrade button on a screen
+          that already says "Plan: Pro" is asking someone to buy what they have.
+
+          A row rather than a filled button. The commit treatment belongs on the
+          paywall itself, where the price and the terms are; putting it here
+          would be a second commit affordance for a purchase this screen cannot
+          complete. */}
+      {subscription.tier === "free" ? (
+        <Section footer="Billed through the App Store. Cancel any time in your Apple ID settings.">
+          <Row
+            label="Upgrade to Pro"
+            detail="15 hours of recording and 500 questions a month"
+            icon="sparkles"
+            iconTone="violet"
+            onPress={() => setPaywallOpen(true)}
+          />
+        </Section>
+      ) : null}
+
       <Section title="Usage this period" footer="Usage resets at the start of each calendar month.">
         <UsageMeter
           label="Transcription"
@@ -156,10 +189,35 @@ export default function PlanScreen() {
         />
       </Section>
 
+      {/* Was: "Puffin does not sell subscriptions inside the app." That is
+          now false — it does, through StoreKit — and a footnote contradicting
+          the button 40pt above it is worse than no footnote. What replaces it is
+          the part a subscriber actually needs, which is where to cancel. */}
       <Footnote>
-        Plan changes, payment details, and invoices are handled in your account on the web.
-        EchoBrief does not sell subscriptions inside the app.
+        Subscriptions are billed by Apple. Manage or cancel yours in Settings › your name ›
+        Subscriptions on this device.
       </Footnote>
+
+      {/* Mounted only while open, so each presentation gets fresh purchase state
+          rather than reopening onto the previous attempt's error — the same
+          reason the speaker-naming sheet mounts rather than toggling a prop. */}
+      {paywallOpen ? (
+        <PaywallSheet
+          visible
+          trigger={atMinutesLimit ? "minutes_limit" : "settings"}
+          usage={{
+            // Minutes only. GET /subscription does not report a meeting count
+            // and this screen has no meetings query, so the sheet omits that
+            // clause rather than being handed a number nobody measured.
+            minutesThisMonth: data.usage.transcription_minutes,
+            // The limit was already in scope and simply not passed, which left
+            // the sheet with nothing specific to say and falling back to the
+            // brand name as its headline.
+            minutesLimit: data.limits.transcription_minutes,
+          }}
+          onDismiss={() => setPaywallOpen(false)}
+        />
+      ) : null}
     </SettingsScroll>
   );
 }

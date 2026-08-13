@@ -125,8 +125,12 @@ describe("IDOR: cross-user meeting access", () => {
 
   it("cannot rename another user's meeting", async () => {
     const res = await patchJson(`/meetings/${victimMeetingId}`, { title: "pwned" }, attacker.token);
-    // The UPDATE carries the ownership predicate, so it matches zero rows.
-    expect([200, 404]).toContain(res.status);
+    // 404, not 200. The ownership predicate always made the write safe (zero
+    // rows matched), but this route used to return {ok:true} on a miss — telling
+    // the caller an edit succeeded when nothing changed, and diverging from
+    // DELETE/share/speakers which all 404. The old assertion accepted BOTH codes,
+    // which is precisely why the inconsistency went unnoticed; it now pins 404.
+    expect(res.status).toBe(404);
 
     const sql = getSql();
     const [row] = await sql<[{ title: string }]>`

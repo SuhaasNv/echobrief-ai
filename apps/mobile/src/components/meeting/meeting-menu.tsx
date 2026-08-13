@@ -10,6 +10,7 @@ import { useShareLink } from "@/lib/api/meeting-share";
 import { useRenameMeeting } from "@/lib/api/meetings";
 import { formatDuration, formatListDate } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { useColorToken } from "@/lib/tokens";
 
 import { confirmDeleteMeeting, promptRenameMeeting } from "./delete-meeting";
 import { MeetingMenuSheet, type MenuGroup, type MenuRow } from "./menu-sheet";
@@ -46,17 +47,36 @@ import { showShareToast } from "./share-toast";
  * action, so each row carries its own handler.
  */
 
-const HEADER_GLYPH = "#4C99F8";
+/**
+ * Three dots. Not `ellipsis.circle`, and deliberately not a circle at all.
+ *
+ * This used to draw its own 10pt ring — a hand-copy of Apple's stock glyph —
+ * INSIDE the native navigation bar, which on iOS 26 already puts a Liquid Glass
+ * circle behind a header button. So there were two concentric circles, one
+ * system and one ours, which is what made the control read as heavy and generic.
+ * The back chevron opposite it is a bare glyph in that same glass circle; this
+ * is now the same, so the two header buttons finally match.
+ *
+ * Colour is --label, not --tint. Blue means "this navigates" everywhere else in
+ * the app; an overflow menu opens a sheet in place. Rendering it in the
+ * interactive accent made the menu button the loudest thing on a screen whose
+ * subject is the meeting, and left the back button — the genuinely navigational
+ * one — styled as chrome beside it.
+ *
+ * Still hand-drawn rather than expo-symbols: nothing else in the app imports it,
+ * and one glyph does not justify the dependency. With the ring gone the dots can
+ * be larger and tighter, which is what makes three dots look drawn rather than
+ * defaulted.
+ */
+function OverflowGlyph() {
+  // SVG fill takes a colour, not a class name.
+  const label = useColorToken("--label");
 
-/** `ellipsis.circle`, drawn rather than pulled from SF Symbols — nothing else
-    in this app imports expo-symbols, and one glyph does not justify starting. */
-function EllipsisCircle() {
   return (
     <Svg width={22} height={22} viewBox="0 0 22 22">
-      <Circle cx={11} cy={11} r={10} stroke={HEADER_GLYPH} strokeWidth={1.6} fill="none" />
-      <Circle cx={6.2} cy={11} r={1.35} fill={HEADER_GLYPH} />
-      <Circle cx={11} cy={11} r={1.35} fill={HEADER_GLYPH} />
-      <Circle cx={15.8} cy={11} r={1.35} fill={HEADER_GLYPH} />
+      <Circle cx={5.5} cy={11} r={1.75} fill={label} />
+      <Circle cx={11} cy={11} r={1.75} fill={label} />
+      <Circle cx={16.5} cy={11} r={1.75} fill={label} />
     </Svg>
   );
 }
@@ -94,7 +114,9 @@ export function MeetingMenuButton({
         haptics.error();
         Alert.alert(
           "Could not rename that meeting",
-          error instanceof Error ? error.message : "Try again in a moment.",
+          error instanceof Error
+            ? error.message
+            : "The rename didn’t save. Your title is unchanged — try again.",
         );
       },
     });
@@ -130,7 +152,7 @@ export function MeetingMenuButton({
           haptics.error();
           Alert.alert(
             "Could not create a share link",
-            "The server did not return a link. Try again in a moment.",
+            "The server did not return a link, so nothing was shared. Try again.",
           );
           return;
         }
@@ -327,7 +349,7 @@ export function MeetingMenuButton({
           // Opacity only, and no transform: this sits inside a native navigation
           // bar, where a scaled child fights the bar's own layout.
           <View style={{ opacity: pressed ? 0.4 : 1 }}>
-            <EllipsisCircle />
+            <OverflowGlyph />
           </View>
         )}
       </Pressable>

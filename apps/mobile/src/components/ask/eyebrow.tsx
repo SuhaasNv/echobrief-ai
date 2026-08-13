@@ -10,15 +10,29 @@ import { Text, View } from "react-native";
  * Capped at 1.4x Dynamic Type — past that it stops fitting on one line beside a
  * trailing count and wraps into a two-line label, which looks broken.
  */
-export function Eyebrow({ children, tone = "tertiary" }: {
+export function Eyebrow({
+  children,
+  tone = "tertiary",
+}: {
   children: string;
-  /** Violet is reserved for model output; only the answer band uses it. */
-  tone?: "tertiary" | "violet";
+  /**
+   * Violet is reserved for model output; only the answer band uses it.
+   *
+   * Danger is reserved for the moment BEFORE something irreversible — the
+   * confirm card that proposes deleting a recording, and a failed action. It is
+   * deliberately not used on the receipt afterwards: once the thing is done the
+   * card's job is to report and offer a way back, not to keep alarming.
+   */
+  tone?: "tertiary" | "violet" | "danger";
 }) {
   return (
     <Text
       className={`text-[11px] font-semibold uppercase ${
-        tone === "violet" ? "text-violet" : "text-label-tertiary"
+        tone === "violet"
+          ? "text-violet"
+          : tone === "danger"
+            ? "text-danger"
+            : "text-label-tertiary"
       }`}
       style={{ letterSpacing: 0.8 }}
       maxFontSizeMultiplier={1.4}

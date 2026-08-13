@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { AppState, View, useWindowDimensions } from "react-native";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
@@ -29,6 +29,19 @@ import { useIsFocused } from "expo-router";
  * share one composition instead of resembling each other by coincidence.
  */
 
+/**
+ * Terminal stop of the dissolve.
+ *
+ * Not read from --background, and deliberately: the three stops above it in
+ * that gradient are the SAME colour at 0.30, 0.80 and full alpha, written as
+ * rgba literals because expo-linear-gradient takes colour strings and cannot
+ * multiply an alpha onto one it is given. Resolving the last of four while the
+ * first three stay hardcoded would leave a ramp that half-follows the theme,
+ * which is a worse failure than one that does not follow it at all — the
+ * dissolve would end on a colour the band above it is not made of, and the seam
+ * this whole component exists to remove would come back. All four move together
+ * once there is a way to derive the alpha stops, or none of them do.
+ */
 const CANVAS = "#06070A";
 
 /**
@@ -94,6 +107,16 @@ export function AuthBackdrop({ variant }: { variant: AuthHeroVariant }) {
     ORB_BOTTOM_IN_SOURCE * videoHeight - height * (panelStart - ORB_TO_PANEL_GAP),
   );
 
+  // Metro resolves static assets through require(): it is how the bundler
+  // discovers the file and rewrites it to an asset reference at build time. An
+  // ESM import of an .mp4 is not equivalent — no type declaration exists for it
+  // here and it would bypass the asset pipeline. The rule targets CommonJS
+  // module imports, which this is not.
+  //
+  // The directive has to sit immediately above the code. Written above this
+  // explanation instead, "next line" resolved to a comment and the suppression
+  // silently did nothing.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const player = useVideoPlayer(require("../../assets/video/auth-orb.mp4"), (p) => {
     p.loop = true;
     p.muted = true;
@@ -104,13 +127,37 @@ export function AuthBackdrop({ variant }: { variant: AuthHeroVariant }) {
   useEffect(() => {
     // Both auth screens stay mounted once sign-up is pushed, so without the
     // focus check two H.264 decoders run for one visible screen.
-    if (reduceMotion || !isFocused) {
+    const shouldPlay = () => !reduceMotion && isFocused;
+
+    if (!shouldPlay()) {
       // Looping ambient video is exactly what Reduce Motion exists to stop.
       // Hold a frame rather than removing the visual entirely.
       player.pause();
       return;
     }
     player.play();
+
+    /**
+     * Resume after the app comes back from the background.
+     *
+     * iOS suspends the AVPlayer when the app leaves the foreground, and nothing
+     * restarts it on return: this effect's dependencies are the player, the
+     * Reduce Motion setting and screen focus, none of which change across a
+     * background/foreground cycle. So the effect never re-ran, `play()` was
+     * never called again, and the backdrop sat frozen on its last frame —
+     * reachable by swiping up and reopening, which is an entirely ordinary
+     * thing to do while typing a password from a password manager.
+     *
+     * Re-checking `shouldPlay()` inside the handler rather than trusting the
+     * closure: Reduce Motion can be toggled in Settings while the app is
+     * backgrounded, and coming back from THAT should honour the new preference,
+     * not the one that was true when the listener was attached.
+     */
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active" && shouldPlay()) player.play();
+    });
+
+    return () => sub.remove();
   }, [player, reduceMotion, isFocused]);
 
   return (

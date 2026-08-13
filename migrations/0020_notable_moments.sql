@@ -1,0 +1,66 @@
+-- ============================================================================
+-- EchoBrief AI — Notable moments: how a conversation went, from what was said
+-- Migration: 0020_notable_moments.sql
+--
+-- One JSONB column on `summaries` holding a short list of moments the analyst
+-- flagged: someone pushed back, someone hedged, the room converged, a risk was
+-- raised. Each entry carries the VERBATIM words that justify it.
+--
+-- WHAT THIS COLUMN IS ALLOWED TO CONTAIN, AND WHAT IT IS NOT
+--
+-- It holds speech acts, not emotional states. "Pushed back twice on the
+-- timeline" is a claim about words, and the words are stored beside it so the
+-- reader can check. "Sounded frustrated" is a claim about AUDIO, and nothing in
+-- this pipeline has ever heard audio — the analyst reads a transcript. Writing
+-- a feeling into a colleague's record on the strength of a text model's guess
+-- is a false statement about a real person in a document their team may read,
+-- and it is the specific failure this shape is built to make impossible.
+--
+-- WHY THE QUOTE IS PART OF THE STORED ROW AND NOT DERIVED AT READ TIME
+--
+-- The quote is the evidence, so it has to survive with the claim. Before an
+-- entry is written, `groundMoments` (src/server/lib/moments.ts) checks that its
+-- quote actually appears in the transcript and DROPS the entry when it does
+-- not. That check is only meaningful if the exact string that was verified is
+-- the one the reader sees; re-deriving or paraphrasing it later would quietly
+-- reintroduce the ungrounded claim the check exists to remove.
+--
+-- WHY NOT ASSEMBLYAI'S SENTIMENT ANALYSIS
+--
+-- Considered and rejected. Its `sentiment_analysis` parameter returns
+-- POSITIVE / NEUTRAL / NEGATIVE per sentence with a confidence and a speaker,
+-- which reads like a second, independent source of evidence. It is not:
+-- AssemblyAI's own documentation says the model "is based on the interpretation
+-- of the transcript", so it cannot hear tone of voice either. It is the same
+-- evidence as ours — words — reduced to three buckets, at extra cost per hour,
+-- with no quote to check it against. And its output shape is the dangerous one:
+-- a NEGATIVE label bound to a named speaker, with nothing on screen a reader
+-- could use to disagree with it.
+--
+-- WHY NOT NULL DEFAULT '[]' AND NO PREFERENCE COLUMN
+--
+-- Empty is the expected answer for most meetings, and an empty array is exactly
+-- what every summary row written before this migration should read back as. The
+-- client skips the section entirely when the list is empty, the way it already
+-- skips decisions and open questions, so an ordinary meeting shows no trace of
+-- this feature rather than a card insisting the conversation was "neutral".
+--
+-- No setting to turn it off, unlike 0018 and 0019. Those two govern things a
+-- user pays for or cannot undo — how their summary is written, and whether the
+-- only copy of their transcript is censored at capture. This costs no extra API
+-- call (it rides inside the analysis request that already runs) and it is
+-- invisible when it has nothing to say, so an "off" switch would control a
+-- section the user is not being shown anyway.
+-- ============================================================================
+
+ALTER TABLE public.summaries
+  ADD COLUMN IF NOT EXISTS notable_moments JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+-- No CHECK constraint. The shape is validated in TypeScript before the write
+-- (see groundMoments), and a JSONB CHECK that re-encoded the `kind` vocabulary
+-- here would have to be kept in step with the enum in prompts.ts by hand — the
+-- 0018 constraints are worth that upkeep because they guard a value the CLIENT
+-- sends, while this array is only ever written by the worker.
+
+-- No index. Read only as part of the single summaries row already fetched by
+-- meeting_id when the detail screen loads.

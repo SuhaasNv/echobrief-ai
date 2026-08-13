@@ -27,7 +27,7 @@ import {
 } from "@/components/app/live-recorder";
 
 export const Route = createFileRoute("/app/upload")({
-  head: () => ({ meta: [{ title: "Upload — EchoBrief" }] }),
+  head: () => ({ meta: [{ title: "Upload — Puffin" }] }),
   component: UploadPage,
 });
 

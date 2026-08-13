@@ -180,9 +180,14 @@ interface SheetContentProps {
   title: string;
   /** "Yesterday · 42 min". Null when the meeting has neither. */
   meta: string | null;
-  status: MeetingSummary["status"];
+  /**
+   * Omitted by sheets that are not about the meeting as a whole — naming a voice
+   * happens on a meeting that has already finished processing, and a badge
+   * reading "Complete" beside "Speaker B" answers a question nobody asked.
+   */
+  status?: MeetingSummary["status"];
   /** True when a public share token exists right now. */
-  linkLive: boolean;
+  linkLive?: boolean;
   groups: MenuGroup[];
   /**
    * Fired once the exit animation has finished. The argument is the action the
@@ -448,7 +453,7 @@ function SheetContent({ title, meta, status, linkLive, groups, onClosed }: Sheet
                   {meta}
                 </Text>
               ) : null}
-              <StatusBadge status={status} />
+              {status ? <StatusBadge status={status} /> : null}
               {linkLive ? <LinkBadge /> : null}
             </View>
           </View>
@@ -495,6 +500,17 @@ function SheetContent({ title, meta, status, linkLive, groups, onClosed }: Sheet
  * the Modal's own dismissal has completed, which is the first moment the alert
  * can be put up safely.
  */
+export interface MeetingMenuSheetProps {
+  title: string;
+  meta: string | null;
+  /** Omit on a sheet that is not about the meeting's own state. */
+  status?: MeetingSummary["status"];
+  linkLive?: boolean;
+  groups: MenuGroup[];
+  /** Fired after the sheet has gone and the picked action has run. */
+  onDismissed: () => void;
+}
+
 export function MeetingMenuSheet({
   title,
   meta,
@@ -502,15 +518,7 @@ export function MeetingMenuSheet({
   linkLive,
   groups,
   onDismissed,
-}: {
-  title: string;
-  meta: string | null;
-  status: MeetingSummary["status"];
-  linkLive: boolean;
-  groups: MenuGroup[];
-  /** Fired after the sheet has gone and the picked action has run. */
-  onDismissed: () => void;
-}) {
+}: MeetingMenuSheetProps) {
   const [visible, setVisible] = useState(true);
   const picked = useRef<(() => void) | null>(null);
   const settled = useRef(false);

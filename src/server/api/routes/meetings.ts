@@ -19,17 +19,34 @@ import {
   MeetingPatchRequest,
   SpeakerNamesRequest,
   MeetingStatusResponse,
+  ConcatenableMime,
+  SegmentedRecordingRequest,
+  SegmentedRecordingResponse,
+  SegmentUploadUrlRequest,
+  SegmentUploadUrlResponse,
+  SegmentRegisterRequest,
+  SegmentRegisterResponse,
+  SegmentCompleteRequest,
+  SegmentCompleteResponse,
+  SegmentGapError,
+  SEGMENT_TARGET_SECONDS,
+  MAX_SEGMENT_BYTES,
 } from "../../../lib/schemas";
 import {
   buildAudioKey,
+  buildSegmentAudioKey,
   extensionFromMime,
   createPresignedUploadUrl,
   createSignedReadUrl,
   deleteAudioObject,
+  deleteAudioObjects,
+  headAudioObject,
+  readObjectPrefix,
 } from "../../services/r2";
 import { enqueueProcessingJob, reenqueueProcessingJob } from "../../services/queue";
 import { getSql } from "../../db";
 import type { MeetingRow } from "../../db/types";
+import type { NotableMoment } from "../../lib/moments";
 
 const app = new Hono<AppBindings>();
 
@@ -286,6 +303,366 @@ app.post("/from-live", zValidator("json", LiveUploadRequest), async (c) => {
   });
 
   return c.json(TranscriptUploadResponse.parse({ meeting_id: meetingId, status: "queued" }));
+});
+
+// ---------------------------------------------------------------------------
+// Segmented recording
+//
+// The client rotates its recorder into a fresh file every ~60s and uploads
+// each closed segment immediately, so a crash costs one segment instead of the
+// whole meeting. Four calls: open the recording, presign a segment, register
+// it once it lands, close the recording.
+//
+// The meeting row is created up front because segments need something to hang
+// off, but its audio_key stays NULL until the worker joins them. That is what
+// keeps every existing reader honest while a recording is in flight:
+// /:id/status reports uploaded:false, /:id/audio-url 404s instead of signing a
+// URL for an object that does not exist, and the retention sweep (which only
+// considers rows with an audio_key) leaves it alone.
+// ---------------------------------------------------------------------------
+
+/**
+ * Load a meeting for a segment operation, or 404.
+ *
+ * Every segment endpoint needs the same three things: proof the caller owns
+ * the meeting, the container the recording was opened with, and whether the
+ * join has already happened. Scoped by user_id AND workspace_id — there is no
+ * RLS, and these endpoints mint and return object keys.
+ */
+async function loadSegmentTarget(
+  meetingId: string,
+  userId: string,
+  workspaceId: string,
+): Promise<{ audio_key: string | null; audio_mime: string | null; language: string }> {
+  const sql = getSql();
+  const rows = await sql<
+    Array<{ audio_key: string | null; audio_mime: string | null; language: string }>
+  >`
+    SELECT audio_key, audio_mime, language
+    FROM meetings
+    WHERE id = ${meetingId} AND user_id = ${userId} AND workspace_id = ${workspaceId}
+  `;
+  const meeting = rows[0];
+  if (!meeting) throw new HTTPException(404, { message: "Meeting not found" });
+  return meeting;
+}
+
+/**
+ * Reject a meeting that cannot take (more) segments.
+ *
+ * Two distinct refusals. A non-concatenable container must never accumulate
+ * segments, because joining them would silently drop all but the first — see
+ * ConcatenableMime; failing at registration is the difference between a clear
+ * 400 during development and a production transcript that is quietly missing
+ * an hour. A meeting that already has an audio_key has been joined, and a
+ * segment arriving after that would be stored, paid for, and never read.
+ */
+function assertAcceptsSegments(meeting: {
+  audio_key: string | null;
+  audio_mime: string | null;
+}): ConcatenableMime {
+  if (meeting.audio_key) {
+    throw new HTTPException(409, {
+      message: "This recording has already been assembled and cannot take more segments",
+    });
+  }
+  const parsed = ConcatenableMime.safeParse(meeting.audio_mime);
+  if (!parsed.success) {
+    throw new HTTPException(400, {
+      message: `Segmented recording requires a byte-concatenable container (${ConcatenableMime.options.join(", ")}), not ${meeting.audio_mime ?? "an unset type"}`,
+    });
+  }
+  return parsed.data;
+}
+
+// POST /segmented — open a segmented recording
+app.post("/segmented", zValidator("json", SegmentedRecordingRequest), async (c) => {
+  const body = c.req.valid("json");
+  const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
+  const sql = getSql();
+
+  const meetingId = randomUUID();
+
+  // audio_key and audio_size stay NULL until the join. duration_sec is unknown
+  // until the recording stops, and status is 'queued' — the same state a
+  // single-file upload sits in between /upload-url and the PUT completing, so
+  // no client needs to learn a new status value to render this.
+  await sql`
+    INSERT INTO meetings (
+      id, user_id, workspace_id, title, audio_mime, language, tags, status, recorded_at
+    ) VALUES (
+      ${meetingId},
+      ${user.id},
+      ${workspaceId},
+      ${body.title ?? "Untitled recording"},
+      ${body.content_type},
+      ${body.language},
+      ${sql.array(body.tags)},
+      'queued',
+      ${sanitizeRecordedAt(body.recorded_at)}
+    )
+  `;
+
+  return c.json(
+    SegmentedRecordingResponse.parse({
+      meeting_id: meetingId,
+      status: "queued",
+      segment_target_seconds: SEGMENT_TARGET_SECONDS,
+      max_segment_bytes: MAX_SEGMENT_BYTES,
+    }),
+  );
+});
+
+// POST /:id/segments/upload-url — presign one segment
+app.post("/:id/segments/upload-url", zValidator("json", SegmentUploadUrlRequest), async (c) => {
+  const id = c.req.param("id");
+  const body = c.req.valid("json");
+  const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
+
+  const meeting = await loadSegmentTarget(id, user.id, workspaceId);
+  const mime = assertAcceptsSegments(meeting);
+
+  // Minted here, never accepted from the client. Unlike /from-live — which
+  // takes an audio_key and has to police it with assertOwnedAudioKey — there
+  // is no way for a caller to point this at another tenant's prefix.
+  const audioKey = buildSegmentAudioKey(user.id, id, body.index, extensionFromMime(mime));
+
+  // Signed WITH the content length, so R2 rejects a body of any other size.
+  // A truncated upload therefore fails at the bucket instead of registering
+  // as a short segment and clipping the meeting.
+  const { upload_url, expires_at } = await createPresignedUploadUrl(audioKey, mime, body.size);
+
+  return c.json(
+    SegmentUploadUrlResponse.parse({
+      index: body.index,
+      upload_url,
+      audio_key: audioKey,
+      expires_at,
+    }),
+  );
+});
+
+// POST /:id/segments — register a segment that finished uploading
+app.post("/:id/segments", zValidator("json", SegmentRegisterRequest), async (c) => {
+  const id = c.req.param("id");
+  const { index } = c.req.valid("json");
+  const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
+  const sql = getSql();
+
+  const meeting = await loadSegmentTarget(id, user.id, workspaceId);
+  const mime = assertAcceptsSegments(meeting);
+
+  const audioKey = buildSegmentAudioKey(user.id, id, index, extensionFromMime(mime));
+
+  /**
+   * Confirm the object with the bucket before recording that it exists.
+   *
+   * The client saying "segment 4 is uploaded" is a claim, not evidence; a PUT
+   * that failed on a flaky connection looks identical from up here. Taking the
+   * size from the HeadObject response rather than the request body makes the
+   * row a statement about R2 rather than about the client, which is what lets
+   * the join trust SUM(bytes) as its Content-Length.
+   */
+  const head = await headAudioObject(audioKey);
+  if (!head) {
+    throw new HTTPException(409, {
+      message: `Segment ${index} is not in storage — upload it before registering it`,
+    });
+  }
+
+  /**
+   * Look at the bytes, not just the label.
+   *
+   * Everything up to here has trusted a MIME the CLIENT declared: /segmented
+   * pinned it onto the meeting, and assertAcceptsSegments re-checks that same
+   * stored value. A client that declares audio/aac and uploads MPEG-4 passed
+   * every check — and that is the one mistake this system cannot survive
+   * quietly, because concatenated MPEG-4 comes back from AssemblyAI as
+   * `status: completed`, `error: null`, with a transcript containing only the
+   * first segment. The rest of the meeting is gone and nothing reports it.
+   *
+   * ADTS frames start with a 12-bit sync word: 0xFF followed by 0xF0-0xFF.
+   * MPEG-4 carries `ftyp` at offset 4. Checking here rather than at the join is
+   * deliberate — the client is still on the call and can be told which segment
+   * was wrong, whereas a failure at finalize arrives after the recording is
+   * over and there is nothing left to re-capture.
+   *
+   * Best-effort by design: a null prefix means the ranged read failed, not that
+   * the audio is bad, and the HeadObject above has already proven the object is
+   * there. Refusing to register a good segment because a GET blipped would lose
+   * exactly the audio this check exists to protect.
+   */
+  if (mime === "audio/aac") {
+    const prefix = await readObjectPrefix(audioKey);
+    if (prefix && prefix.length >= 2) {
+      const isAdts = prefix[0] === 0xff && (prefix[1] & 0xf0) === 0xf0;
+      if (!isAdts) {
+        const looksMp4 = prefix.length >= 8 && prefix.subarray(4, 8).toString("ascii") === "ftyp";
+        throw new HTTPException(422, {
+          message: looksMp4
+            ? `Segment ${index} is an MPEG-4 file declared as ADTS AAC. MPEG-4 segments cannot be joined — everything after the first one would be silently dropped. Record with ios.extension ".aac" / outputFormat "aac_adts".`
+            : `Segment ${index} is not ADTS AAC (starts 0x${prefix.subarray(0, 2).toString("hex")}). Segmented recording requires ADTS, which is the only container that concatenates losslessly.`,
+        });
+      }
+    }
+  }
+
+  // Upsert, not insert: a register retried after a timeout must not 409 on a
+  // segment that already landed, and re-uploading a segment legitimately
+  // changes its size.
+  await sql`
+    INSERT INTO meeting_segments (meeting_id, user_id, workspace_id, "index", audio_key, bytes)
+    VALUES (${id}, ${user.id}, ${workspaceId}, ${index}, ${audioKey}, ${head.bytes})
+    ON CONFLICT (meeting_id, "index") DO UPDATE SET
+      audio_key = EXCLUDED.audio_key,
+      bytes = EXCLUDED.bytes
+  `;
+
+  const [{ registered_count }] = await sql<[{ registered_count: number }]>`
+    SELECT COUNT(*)::int AS registered_count
+    FROM meeting_segments
+    WHERE meeting_id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
+  `;
+
+  return c.json(SegmentRegisterResponse.parse({ index, bytes: head.bytes, registered_count }));
+});
+
+// POST /:id/segments/complete — close the recording and queue it
+app.post("/:id/segments/complete", zValidator("json", SegmentCompleteRequest), async (c) => {
+  const id = c.req.param("id");
+  const body = c.req.valid("json");
+  const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
+  const sql = getSql();
+
+  const meeting = await loadSegmentTarget(id, user.id, workspaceId);
+
+  // Idempotent: a client that retried complete after the response was lost
+  // gets the same answer instead of a second job. enqueueProcessingJob dedupes
+  // on meeting id too, but answering here avoids re-running the gap check
+  // against a meeting whose segment rows have already been consumed.
+  if (meeting.audio_key) {
+    const [{ segment_count, total_bytes }] = await sql<
+      [{ segment_count: number; total_bytes: string }]
+    >`
+      SELECT COUNT(*)::int AS segment_count, COALESCE(SUM(bytes), 0)::bigint AS total_bytes
+      FROM meeting_segments
+      WHERE meeting_id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
+    `;
+    return c.json(
+      SegmentCompleteResponse.parse({
+        meeting_id: id,
+        status: "queued",
+        segment_count,
+        total_bytes: Number(total_bytes),
+      }),
+    );
+  }
+
+  const mime = assertAcceptsSegments(meeting);
+
+  // bytes is BIGINT and arrives as a string — see MeetingSegmentRow.bytes.
+  const segments = await sql<Array<{ index: number; bytes: string }>>`
+    SELECT "index", bytes
+    FROM meeting_segments
+    WHERE meeting_id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
+    ORDER BY "index" ASC
+  `;
+
+  if (segments.length === 0) {
+    throw new HTTPException(400, {
+      message: "No segments were registered for this recording",
+    });
+  }
+
+  /**
+   * The gap check.
+   *
+   * `total_segments` is what separates "the recording was six segments long"
+   * from "segments six and seven never made it". Without it, a meeting whose
+   * last two uploads failed looks contiguous and would be transcribed two
+   * minutes short with nothing to indicate anything was lost. When the client
+   * cannot supply it — recovering a recording whose own count died with the
+   * process — max(index)+1 is the best available answer and still catches
+   * every hole in the middle, just not a missing tail.
+   */
+  const expectedTotal = body.total_segments ?? segments[segments.length - 1].index + 1;
+  const present = new Set(segments.map((s) => s.index));
+  const missing: number[] = [];
+  for (let i = 0; i < expectedTotal; i++) {
+    if (!present.has(i)) missing.push(i);
+  }
+
+  /**
+   * A registered index at or beyond the declared total.
+   *
+   * Checking only for holes below `total_segments` would pass a recording that
+   * declared 3 segments but registered 0, 1, 2 and 5 — the set has no gap in
+   * the range examined, yet the join would splice in a stray segment 5 and the
+   * meeting would contain a minute of audio from somewhere the client did not
+   * think it sent. Not a gap the client can fix by re-uploading, so it does not
+   * get the recoverable error shape.
+   */
+  const unexpected = segments.filter((s) => s.index >= expectedTotal).map((s) => s.index);
+  if (unexpected.length > 0) {
+    throw new HTTPException(409, {
+      message: `Segment(s) ${unexpected.join(", ")} are outside the declared total of ${expectedTotal}`,
+    });
+  }
+
+  if (missing.length > 0) {
+    // A custom response, not a bare message: the client's recovery path is to
+    // re-upload precisely these indexes and call complete again, and it cannot
+    // do that from prose. errorHandler passes `res` through untouched.
+    throw new HTTPException(409, {
+      res: c.json(
+        SegmentGapError.parse({
+          error: "incomplete_segments",
+          message: `Missing segment(s) ${missing.join(", ")} of ${expectedTotal}. Re-upload them and call complete again.`,
+          missing,
+          expected_total: expectedTotal,
+        }),
+        409,
+      ),
+    });
+  }
+
+  const totalBytes = segments.reduce((sum, s) => sum + Number(s.bytes), 0);
+
+  // duration_sec is the client's wall-clock figure so the status endpoint can
+  // estimate progress before transcription runs; the worker overwrites it with
+  // AssemblyAI's measured duration.
+  if (body.duration_sec !== undefined) {
+    await sql`
+      UPDATE meetings SET duration_sec = ${body.duration_sec}
+      WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
+    `;
+  }
+
+  // The key the worker will write the joined object to. The worker derives it
+  // independently and ignores this field whenever segments exist, so it is
+  // belt-and-braces: it keeps the job payload meaningful for anything that
+  // inspects the queue, and it is the key a retry falls back to once the
+  // meeting has been joined and looks like any other single-file upload.
+  await enqueueProcessingJob({
+    meeting_id: id,
+    user_id: user.id,
+    audio_key: buildAudioKey(user.id, id, extensionFromMime(mime)),
+    language: meeting.language,
+    retry_count: 0,
+  });
+
+  return c.json(
+    SegmentCompleteResponse.parse({
+      meeting_id: id,
+      status: "queued",
+      segment_count: segments.length,
+      total_bytes: totalBytes,
+    }),
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -578,8 +955,11 @@ app.get("/:id", async (c) => {
       decisions: unknown;
       open_questions: unknown;
       chapters: unknown;
+      participants: unknown;
+      notable_moments: unknown;
     }>
-  >`SELECT executive, key_topics, decisions, open_questions, chapters
+  >`SELECT executive, key_topics, decisions, open_questions, chapters, participants,
+           notable_moments
     FROM summaries WHERE meeting_id = ${id}`;
 
   const transcript = transcriptRow ? buildTranscriptResponse(transcriptRow) : null;
@@ -589,12 +969,24 @@ app.get("/:id", async (c) => {
         key_topics: coerceJsonArray<string>(summaryRow.key_topics),
         decisions: coerceJsonArray<string>(summaryRow.decisions),
         open_questions: coerceJsonArray<string>(summaryRow.open_questions),
+        // Names the model heard someone introduce or be addressed by. The
+        // client offers these when putting real names to diarized voices — it
+        // is the one signal a transcript scan on the phone cannot reproduce,
+        // because the model heard the conversation and the regex only sees the
+        // words. Empty for rows analysed before migration 0017.
+        participants: coerceJsonArray<string>(summaryRow.participants),
         chapters: coerceJsonArray<{
           title: string;
           start_sec: number;
           end_sec: number;
           summary: string;
         }>(summaryRow.chapters),
+        // Moments the analyst flagged, each already checked against the
+        // transcript before it was stored — the quote travels with the claim so
+        // the reader can judge it rather than take our word for it. Empty for
+        // rows analysed before migration 0020, and for most meetings since,
+        // which is why the client skips the section rather than rendering it.
+        notable_moments: coerceJsonArray<NotableMoment>(summaryRow.notable_moments),
       }
     : null;
 
@@ -800,7 +1192,20 @@ app.patch("/:id", zValidator("json", MeetingPatchRequest), async (c) => {
 
   const setClause = sets.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc}, ${cur}`));
 
-  await sql`UPDATE meetings SET ${setClause} WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}`;
+  // RETURNING + a length check, so a PATCH against a meeting the caller does not
+  // own answers 404 rather than 200. The ownership scope in the WHERE already
+  // made the write safe — a cross-tenant id updated zero rows — but returning
+  // {ok:true} for it was a lie of a different kind: it told the client an edit
+  // succeeded when nothing changed, and it was the ONLY mutating meeting route
+  // that did so. DELETE /:id, POST /:id/share and PATCH /:id/speakers all
+  // 404 on a miss; this now matches them. Found by an authorized pen-test.
+  const updated = await sql<Array<{ id: string }>>`
+    UPDATE meetings SET ${setClause}
+    WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
+    RETURNING id
+  `;
+  if (updated.length === 0) throw new HTTPException(404, { message: "Meeting not found" });
+
   return c.json({ ok: true });
 });
 
@@ -861,6 +1266,24 @@ app.delete("/:id", async (c) => {
   if (row.audio_key) {
     await deleteAudioObject(row.audio_key).catch((e) => console.error("[r2-delete]", e));
   }
+
+  /**
+   * Segments too, before the rows go.
+   *
+   * A recording deleted mid-capture — or one whose join has not run yet — has
+   * all of its audio in segment objects and none of it under audio_key, so the
+   * delete above frees nothing. The rows are the only record of those keys and
+   * they cascade away with the meeting, so reading them here is the last
+   * chance: miss it and the user's audio stays in the bucket permanently,
+   * unreachable by them and by the retention sweep. Already-joined meetings
+   * hit this too and delete keys that are already gone, which is a no-op.
+   */
+  const segments = await sql<Array<{ audio_key: string }>>`
+    SELECT audio_key FROM meeting_segments
+    WHERE meeting_id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
+  `;
+  await deleteAudioObjects(segments.map((s) => s.audio_key));
+
   await sql`DELETE FROM meetings WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}`;
   return c.json({ ok: true });
 });
@@ -948,7 +1371,7 @@ app.post("/:id/retry", async (c) => {
   const sql = getSql();
 
   const rows = await sql<MeetingRow[]>`
-    SELECT id, user_id, audio_key, language, status, retry_count
+    SELECT id, user_id, audio_key, audio_mime, language, status, retry_count
     FROM meetings WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
   `;
   const meeting = rows[0];
@@ -959,7 +1382,28 @@ app.post("/:id/retry", async (c) => {
   if (meeting.retry_count >= 3) {
     throw new HTTPException(400, { message: "Maximum retries reached" });
   }
-  if (!meeting.audio_key) {
+
+  /**
+   * A segmented recording that failed BEFORE the join has no audio_key yet,
+   * but its audio is all present in segment objects — so the bare audio_key
+   * check would have refused to retry the one case most likely to need it (a
+   * transient R2 error partway through the join). Fall back to the key the
+   * join will write, which is what the worker resolves from the segment rows
+   * anyway. Only a meeting with neither is genuinely unrecoverable.
+   */
+  let retryAudioKey = meeting.audio_key;
+  if (!retryAudioKey) {
+    const [segmented] = await sql<[{ has_segments: boolean }]>`
+      SELECT EXISTS (
+        SELECT 1 FROM meeting_segments
+        WHERE meeting_id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
+      ) AS has_segments
+    `;
+    if (segmented.has_segments) {
+      retryAudioKey = buildAudioKey(user.id, id, extensionFromMime(meeting.audio_mime ?? ""));
+    }
+  }
+  if (!retryAudioKey) {
     throw new HTTPException(400, { message: "Audio file no longer available" });
   }
 
@@ -969,7 +1413,7 @@ app.post("/:id/retry", async (c) => {
   const queued = await reenqueueProcessingJob({
     meeting_id: meeting.id,
     user_id: meeting.user_id,
-    audio_key: meeting.audio_key,
+    audio_key: retryAudioKey,
     language: meeting.language,
     retry_count: meeting.retry_count + 1,
   });

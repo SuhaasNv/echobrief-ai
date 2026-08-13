@@ -67,9 +67,48 @@ export default function TranscriptionScreen() {
         />
       </Section>
 
+      {/*
+       * The footer changes with the switch rather than describing both states at
+       * once, because the two things a user needs to know are different in each.
+       * Off, the useful fact is what turning it on will and will not do. On, the
+       * useful fact is that the words are gone rather than hidden — AssemblyAI
+       * masks them as it transcribes, so there is no unfiltered copy anywhere,
+       * and everything built from the transcript inherits the asterisks.
+       *
+       * Both halves say it does not reach back. It genuinely does not: the
+       * setting is read when the audio is transcribed, so meetings that already
+       * have a transcript are untouched, and so is a meeting being retried after
+       * a later step failed. Letting someone believe this tidies up an old
+       * recording would be the same lie as a setting that does nothing.
+       */}
+      <Section
+        title="Profanity"
+        footer={
+          preferences.filterProfanity
+            ? "The transcriber replaces swearing with asterisks as it works, so the words are never stored — summaries, action items, and search see the masked text too. Meetings already transcribed keep the words they were transcribed with."
+            : "Transcripts record what was said, swearing included. Turning this on applies to recordings transcribed from here on — it does not go back and change meetings you already have."
+        }
+      >
+        <ToggleRow
+          icon="exclamationmark.bubble"
+          label="Filter profanity"
+          value={preferences.filterProfanity}
+          onValueChange={(next) => {
+            setPreference("filterProfanity", next);
+            // `mutate`, not `void mutateAsync` as the language rows above do.
+            // mutateAsync returns a promise that REJECTS on failure, and
+            // discarding it with `void` leaves that rejection unhandled — the
+            // hook's onError still shows its alert, but RN also logs an
+            // unhandled rejection for it. `mutate` routes the same failure to
+            // the same alert without the stray rejection.
+            sync.mutate({ filter_profanity: next });
+          }}
+        />
+      </Section>
+
       <Section
         title="Speakers"
-        footer="Names apply to the meeting you set them in. Telling one voice from another across different meetings needs stored voice prints, which EchoBrief does not keep — so the next recording starts from Speaker A again."
+        footer="Names apply to the meeting you set them in. Telling one voice from another across different meetings needs stored voice prints, which Puffin does not keep — so the next recording starts from Speaker A again."
       >
         <ToggleRow
           icon="person.2"
@@ -79,9 +118,17 @@ export default function TranscriptionScreen() {
         />
       </Section>
 
+      {/*
+       * This used to say the whole screen was stored on this iPhone and would
+       * apply "once transcription settings are wired through to the processing
+       * pipeline". Language and vocabulary were wired through in migration 0015
+       * and profanity filtering in 0019, so the sentence stopped being true and
+       * started understating the app. Speaker names are the one control here
+       * that really is device-local, and it is the one that still says so.
+       */}
       <Footnote>
-        These preferences are stored on this iPhone. They will apply to new recordings once
-        transcription settings are wired through to the processing pipeline.
+        Language, vocabulary, and profanity filtering are saved to your account and applied when a
+        recording is transcribed. Speaker names are kept on this iPhone.
       </Footnote>
     </SettingsScroll>
   );

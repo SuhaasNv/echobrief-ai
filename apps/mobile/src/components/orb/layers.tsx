@@ -126,8 +126,7 @@ export const Bloom = memo(function Bloom({
     // as loud as the input allows, so `base + wake + lift` is deliberately
     // written past full brightness — this is where it is made legal.
     opacity:
-      Math.min(1, base + wake * awake.value + lift * energy.value) *
-      (1 - settle.value * fade),
+      Math.min(1, base + wake * awake.value + lift * energy.value) * (1 - settle.value * fade),
     transform: [{ scale: 1 + breath.value * drift + energy.value * gain }],
   }));
 
@@ -244,11 +243,7 @@ export const Aperture = memo(function Aperture({
           // a 5.6s loop in it within about three cycles; the orbit term is
           // 23s and never lands in phase with it, so the iris keeps opening and
           // closing by a different amount every time.
-          scale:
-            1 +
-            breath.value * drift +
-            Math.sin(orbit.value * TAU) * dilate +
-            e * gain,
+          scale: 1 + breath.value * drift + Math.sin(orbit.value * TAU) * dilate + e * gain,
         },
       ],
     };
@@ -398,10 +393,8 @@ export const Mass = memo(function Mass({
     // whereas spreading the whole offset opens the constellation outward from
     // the centre, which is what reads as the orb coming apart into its colours.
     const spread = 1 + e * SPREAD;
-    const wanderX =
-      Math.cos(angle) * reachX + Math.cos(angle * 3 + offset * TAU) * reachX * 0.28;
-    const wanderY =
-      Math.sin(angle) * reachY + Math.sin(angle * 2 - offset * TAU) * reachY * 0.34;
+    const wanderX = Math.cos(angle) * reachX + Math.cos(angle * 3 + offset * TAU) * reachX * 0.28;
+    const wanderY = Math.sin(angle) * reachY + Math.sin(angle * 2 - offset * TAU) * reachY * 0.34;
     const x = (anchorX + wanderX) * spread;
     const y = (anchorY + wanderY) * spread;
 

@@ -1,4 +1,5 @@
 import { haptics } from "@/lib/haptics";
+import { useUpdatePreferences } from "@/lib/api/preferences";
 import {
   SUMMARY_LENGTHS,
   SUMMARY_STYLES,
@@ -22,6 +23,18 @@ import { Footnote, SettingsScroll } from "@/components/settings/screen";
  */
 export default function SummariesScreen() {
   const preferences = usePreferences();
+  /**
+   * Write through to the server on every change.
+   *
+   * These four used to be device-local, which was fine while nothing read them
+   * and wrong the moment the worker started: a choice that lives only on the
+   * phone cannot reach the pipeline that writes the summary. The device store
+   * still leads for RENDERING — every row reads it synchronously and none of
+   * them should show a spinner to draw a radio button — and this keeps the
+   * server in step. It surfaces its own failure, so a setting that did not save
+   * says so rather than silently reverting on the next launch.
+   */
+  const update = useUpdatePreferences();
 
   return (
     <SettingsScroll>
@@ -35,6 +48,7 @@ export default function SummariesScreen() {
             onPress={() => {
               haptics.select();
               setPreference("summaryStyle", choice.value);
+              update.mutate({ summary_style: choice.value });
             }}
           />
         ))}
@@ -50,6 +64,7 @@ export default function SummariesScreen() {
             onPress={() => {
               haptics.select();
               setPreference("summaryLength", choice.value);
+              update.mutate({ summary_length: choice.value });
             }}
           />
         ))}
@@ -68,6 +83,7 @@ export default function SummariesScreen() {
             onPress={() => {
               haptics.select();
               setPreference("tone", choice.value);
+              update.mutate({ summary_tone: choice.value });
             }}
           />
         ))}
@@ -85,13 +101,16 @@ export default function SummariesScreen() {
           icon="checkmark.circle"
           label="Detect action items"
           value={preferences.detectActionItems}
-          onValueChange={(next) => setPreference("detectActionItems", next)}
+          onValueChange={(next) => {
+            setPreference("detectActionItems", next);
+            update.mutate({ detect_action_items: next });
+          }}
         />
       </Section>
 
       <Footnote>
-        Stored on this iPhone. Summaries already produced keep the shape they were written in;
-        these settings apply to meetings processed from here on.
+        Stored on this iPhone. Summaries already produced keep the shape they were written in; these
+        settings apply to meetings processed from here on.
       </Footnote>
     </SettingsScroll>
   );

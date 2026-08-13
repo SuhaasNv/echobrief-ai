@@ -8,7 +8,7 @@ import { ApiError } from "@/lib/api/client";
 import { useLabels } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/chat")({
-  head: () => ({ meta: [{ title: "AI Chat — EchoBrief" }] }),
+  head: () => ({ meta: [{ title: "AI Chat — Puffin" }] }),
   component: ChatPage,
 });
 

@@ -104,8 +104,26 @@ export function UsageMeter({
         : 0
       : Math.min(1, Math.max(0, used / limit));
 
-  const atLimit = !unlimited && fraction >= 1;
-  const nearLimit = !unlimited && !atLimit && fraction >= 0.9;
+  /**
+   * A ceiling of one is a fact about the plan, not a warning.
+   *
+   * `Workspaces 1 of 1` is the DEFAULT state of every free account — everyone
+   * gets exactly one workspace and has one from signup — so the amber bar and
+   * "Limit reached for this period" fired on a brand-new account that had done
+   * nothing. On the Plan screen, directly beneath an upgrade prompt, that reads
+   * as a problem the user caused and a nudge manufactured to sell against it.
+   *
+   * It was also doubly wrong: the workspace limit is not periodic, so "for this
+   * period" described a reset that never comes, and `checkWorkspaceQuota()` has
+   * no production call site, so nothing enforces it either.
+   *
+   * A limit of one is therefore rendered plainly. Real consumption meters —
+   * minutes, questions — still warn, because those genuinely run out.
+   */
+  const isSingleSlot = !unlimited && limit === 1;
+
+  const atLimit = !unlimited && !isSingleSlot && fraction >= 1;
+  const nearLimit = !unlimited && !atLimit && !isSingleSlot && fraction >= 0.9;
 
   const displayed = useCountUp(used, !reduceMotion);
 
@@ -123,9 +141,7 @@ export function UsageMeter({
     transform: [{ scaleX: progress.value }],
   }));
 
-  const caption = unlimited
-    ? "Unlimited"
-    : `${displayed} of ${limit}${unit ? ` ${unit}` : ""}`;
+  const caption = unlimited ? "Unlimited" : `${displayed} of ${limit}${unit ? ` ${unit}` : ""}`;
 
   return (
     <View
@@ -152,10 +168,7 @@ export function UsageMeter({
 
       {!unlimited ? (
         <>
-          <View
-            className="overflow-hidden rounded-full bg-inset"
-            style={{ height: TRACK_HEIGHT }}
-          >
+          <View className="overflow-hidden rounded-full bg-inset" style={{ height: TRACK_HEIGHT }}>
             {/* Full width, scaled down to the true fraction. The track's own
                 radius clips the fill, so a meter at its limit fills the pill
                 edge to edge with no gap left at the end.
@@ -170,10 +183,7 @@ export function UsageMeter({
           </View>
 
           {atLimit || nearLimit ? (
-            <Text
-              className="text-[13px] text-label-secondary"
-              maxFontSizeMultiplier={1.8}
-            >
+            <Text className="text-[13px] text-label-secondary" maxFontSizeMultiplier={1.8}>
               {atLimit ? "Limit reached for this period." : "Close to this period's limit."}
             </Text>
           ) : null}

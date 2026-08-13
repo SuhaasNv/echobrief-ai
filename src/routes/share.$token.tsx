@@ -17,15 +17,15 @@ import { apiRequest } from "@/lib/api/client";
 export const Route = createFileRoute("/share/$token")({
   head: () => ({
     meta: [
-      { title: "Shared Meeting — EchoBrief" },
+      { title: "Shared Meeting — Puffin" },
       {
         name: "description",
         content: "View shared meeting summary, key topics, decisions, and action items.",
       },
-      { property: "og:title", content: "Shared Meeting — EchoBrief" },
+      { property: "og:title", content: "Shared Meeting — Puffin" },
       {
         property: "og:description",
-        content: "View shared meeting summary and insights on EchoBrief.",
+        content: "View shared meeting summary and insights on Puffin.",
       },
     ],
   }),
@@ -82,7 +82,7 @@ function SharePage() {
               to="/"
               className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Go to EchoBrief
+              Go to Puffin
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -104,13 +104,13 @@ function SharePage() {
               className="flex items-center gap-2 text-sm font-semibold text-foreground transition-colors hover:text-primary"
             >
               <Sparkles className="h-4 w-4" />
-              EchoBrief
+              Puffin
             </Link>
             <Link
               to="/signup"
               className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              Get EchoBrief
+              Get Puffin
             </Link>
           </div>
         </div>
@@ -313,7 +313,7 @@ function SharePage() {
           <p>
             Powered by{" "}
             <Link to="/" className="font-medium text-foreground hover:text-primary">
-              EchoBrief
+              Puffin
             </Link>
             {" · "}
             <Link to="/privacy" className="hover:text-foreground">

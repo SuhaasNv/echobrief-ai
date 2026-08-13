@@ -47,8 +47,25 @@ export interface FollowState {
 export interface FollowScroll {
   /** Spread onto the screen's ScrollView. */
   scrollProps: FollowScrollProps;
-  /** Bottom padding the content owes the player bar and the tab bar. */
+  /**
+   * Screen-space distance from the bottom of the screen to the top of the
+   * chrome. For anchored things and for judging whether a line is readable.
+   */
   bottomInset: number;
+  /**
+   * The same clearance expressed as contentContainer paddingBottom, for a scroll
+   * view running `contentInsetAdjustmentBehavior="automatic"`.
+   *
+   * `bottomInset` minus the tab bar's top edge, because UIKit has already inset
+   * the content by exactly that under "automatic" — the safe area is applied at
+   * both ends, not only under the large title. Passing `bottomInset` straight
+   * into the style, which is what the transcript did, paid the bar's 83pt twice
+   * and left the screen scrolling a bar-height past the last line of a
+   * transcript. The two numbers are the same distance measured in different
+   * spaces, which is why they are named and derived here rather than at the call
+   * site: they must not be allowed to disagree.
+   */
+  contentPadding: number;
   /** Ref callback for the transcript's outer container. */
   setContainer: (node: View | null) => void;
   /**
@@ -90,9 +107,8 @@ export function useFollowScroll({ hasPlayer }: { hasPlayer: boolean }): FollowSc
    * against the 128pt player) disagreed by 5pt in the direction that hides a
    * line under the transport.
    */
-  const bottomChrome =
-    useTabBarTopEdge() +
-    (hasPlayer ? PLAYER_TAB_BAR_GAP + PLAYER_BAR_HEIGHT + CONTENT_AIR : CONTENT_AIR);
+  const aboveBar = hasPlayer ? PLAYER_TAB_BAR_GAP + PLAYER_BAR_HEIGHT + CONTENT_AIR : CONTENT_AIR;
+  const bottomChrome = useTabBarTopEdge() + aboveBar;
 
   const publish = useCallback(
     (patch: Partial<FollowState>) => {
@@ -168,13 +184,13 @@ export function useFollowScroll({ hasPlayer }: { hasPlayer: boolean }): FollowSc
     () => ({
       scrollProps,
       bottomInset: bottomChrome,
+      contentPadding: aboveBar,
       setContainer: (node: View | null) => {
         containerRef.current = node;
       },
       reveal: (y: number, height: number, animated: boolean) =>
         scrollTo(y, height, animated, false),
-      force: (y: number, height: number, animated: boolean) =>
-        scrollTo(y, height, animated, true),
+      force: (y: number, height: number, animated: boolean) => scrollTo(y, height, animated, true),
       registerJump: (jump: (() => void) | null) => {
         jumpRef.current = jump;
         publish({ canJump: jump !== null });
@@ -194,7 +210,7 @@ export function useFollowScroll({ hasPlayer }: { hasPlayer: boolean }): FollowSc
         };
       },
     }),
-    [bottomChrome, listeners, publish, scrollProps, scrollTo],
+    [aboveBar, bottomChrome, listeners, publish, scrollProps, scrollTo],
   );
 }
 

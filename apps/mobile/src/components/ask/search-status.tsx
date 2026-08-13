@@ -87,10 +87,7 @@ export function SearchStatus({ meetingCount }: { meetingCount: number | null }) 
 
   return (
     <View className="gap-3 py-1" accessibilityLiveRegion="polite">
-      <Text
-        className="text-[15px] text-label-secondary"
-        style={{ fontVariant: ["tabular-nums"] }}
-      >
+      <Text className="text-[15px] text-label-secondary" style={{ fontVariant: ["tabular-nums"] }}>
         {label}
       </Text>
       <ScanTrack />

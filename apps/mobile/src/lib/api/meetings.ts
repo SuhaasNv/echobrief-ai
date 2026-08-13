@@ -87,8 +87,7 @@ export function useMeetings(search = "") {
           },
         }),
       ),
-    getNextPageParam: (last) =>
-      last.page * last.limit < last.total ? last.page + 1 : undefined,
+    getNextPageParam: (last) => (last.page * last.limit < last.total ? last.page + 1 : undefined),
     // Poll only while something is actually processing. The web app polls every
     // 5s; on cellular that is four times the battery for a list-level view, so
     // the list uses 15s and the detail screen keeps the tighter loop.
@@ -113,6 +112,46 @@ export function useMeetings(search = "") {
  * invalidated, because it is a single cheap request and it is the screen the
  * user is looking at.
  */
+/**
+ * Ask the server to process a failed meeting again.
+ *
+ * Exists because the audio usually survives the failure. The most common cause
+ * is transient — AssemblyAI refusing a download, an OpenAI 500 partway through
+ * analysis — and the recording is sitting in R2 the whole time. Before this the
+ * failure card said so and offered nothing, which is the worst combination:
+ * telling someone their data is fine while giving them no way to get it back.
+ *
+ * The server also covers the case this was written for: a SEGMENTED recording
+ * that failed before its parts were joined has no `audio_key` yet, and the
+ * retry route falls back to the segment objects rather than refusing.
+ *
+ * networkMode "always" so this fails out loud offline. A retry that parks in a
+ * queue looks identical to a retry that is running, and the user is already
+ * looking at a screen that says something went wrong.
+ *
+ * The status query is invalidated rather than written: the server decides
+ * whether the retry was accepted at all — it refuses past three attempts, and
+ * 409s when a worker already holds the lock — so guessing "queued" here would
+ * show a progress ring for a job that was never created.
+ */
+export function useRetryMeeting(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    networkMode: "always",
+    mutationFn: () => api.apiRequest(`/meetings/${id}/retry`, { method: "POST" }),
+    onSuccess: async () => {
+      haptics.tap();
+      // Prefix, not exact: the status poll lives at ["meeting", id, "status"]
+      // and the detail at ["meeting", id]. One non-exact invalidate catches
+      // both — and the status query is the one driving the progress ring the
+      // user is about to watch, so missing it would leave the screen insisting
+      // the meeting is still failed.
+      await queryClient.invalidateQueries({ queryKey: qk.meeting(id) });
+    },
+  });
+}
+
 export function useRenameMeeting(id: string) {
   const queryClient = useQueryClient();
 
@@ -207,11 +246,7 @@ export function useMeetingDeletePending(id: string): boolean {
  * window: nothing has happened yet, so there is nothing to roll back if the
  * user changes their mind or the app is killed.
  */
-export function scheduleMeetingDelete(
-  id: string,
-  title: string,
-  queryClient: QueryClient,
-): void {
+export function scheduleMeetingDelete(id: string, title: string, queryClient: QueryClient): void {
   if (pendingDeletes.has(id)) return;
 
   const timer = setTimeout(() => {
@@ -343,7 +378,9 @@ async function commitMeetingDelete(id: string, queryClient: QueryClient): Promis
       Alert.alert(
         "Could not delete that meeting",
         `"${title}" is still in your library. ${
-          error instanceof Error ? error.message : "Try again in a moment."
+          error instanceof Error
+            ? error.message
+            : "The request didn’t complete. Nothing changed — try again."
         }`,
       );
       return;

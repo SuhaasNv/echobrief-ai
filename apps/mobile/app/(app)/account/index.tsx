@@ -162,7 +162,7 @@ export default function AccountScreen() {
   const confirmSignOut = () => {
     haptics.medium();
     Alert.alert(
-      "Sign out of EchoBrief?",
+      "Sign out of Puffin?",
       "Recordings that haven't finished uploading will be removed from this iPhone.",
       [
         // Cancel first: iOS renders the leading button on the left, and every
@@ -196,17 +196,20 @@ export default function AccountScreen() {
       <IdentityCard />
 
       {/*
-        Exactly one coloured chip in this group, and it is violet on Summaries,
-        because a model writes them. Everything else is a grey chip on
-        --surface-3 with a --label-secondary glyph.
+        One tinted section, the rest grey. Capture — the rows that shape what a
+        recording becomes — carries the blue `tint` wash so it reads as one
+        group at a glance; Account and the trailing rows are neutral chips on
+        --surface-3.
 
-        This grid was seven saturated blue squares plus a green one and a violet
-        one — the iOS Settings rainbow, reproduced on a list of eleven rows that
-        are all about one product. It made the app's one semantic colour rule
-        unreadable: violet is supposed to mean "a model produced this", and it
-        cannot mean anything when it is sitting in a row of nine chips that are
-        each a different colour for no reason. Grey by default is what lets the
-        violet register.
+        An earlier version painted nine rows in the full iOS Settings rainbow
+        (blue, green, amber), which drowned the app's one semantic colour: violet
+        means "a model produced this", and it cannot register beside eight chips
+        that are each a different colour for grouping. The section tints were
+        then pared to green-on-Account and amber-on-Privacy, but those two hues
+        already mean "finished" and "at a limit" everywhere else in the app, so
+        using them for grouping was its own collision. Now only `tint` groups —
+        it carries no other meaning in settings — and green and amber are left to
+        the meters and scores that own them.
       */}
       <Section title="Capture">
         <Row
@@ -245,8 +248,8 @@ export default function AccountScreen() {
 
       <Section title="Account">
         <Row
-          icon="rectangle.stack"
-          iconTone="success"
+          icon="person.2"
+          iconTone="neutral"
           label="Workspace"
           value={activeWorkspace?.name}
           onPress={() => router.push("/(app)/account/workspaces")}
@@ -254,13 +257,13 @@ export default function AccountScreen() {
         />
         <Row
           icon="lock"
-          iconTone="success"
+          iconTone="neutral"
           label="Password"
           onPress={() => router.push("/(app)/account/password")}
         />
         <Row
           icon="creditcard"
-          iconTone="success"
+          iconTone="neutral"
           label="Plan"
           onPress={() => router.push("/(app)/account/plan")}
         />
@@ -272,7 +275,7 @@ export default function AccountScreen() {
       <Section>
         <Row
           icon="hand.raised"
-          iconTone="warning"
+          iconTone="neutral"
           label="Privacy"
           onPress={() => router.push("/(app)/account/privacy")}
         />

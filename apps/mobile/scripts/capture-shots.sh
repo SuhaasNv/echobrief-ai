@@ -4,72 +4,122 @@
 #
 # The app walks itself (see src/lib/shot-driver.tsx) because neither remote
 # control path works on this runtime: iOS 26 gates custom scheme URLs behind a
-# confirmation dialog, and idb's HID injection no-ops. So the harness is a
-# clock, not a driver.
+# confirmation dialog, and idb's HID injection no-ops.
 #
-# Timing must match SHOT_DWELL_MS. Deadlines are absolute rather than a
-# sleep-per-iteration, because screenshot capture costs ~0.5s and that drift
-# accumulates into a wrong screen by the end of a 12-route walk.
+# THIS HARNESS FOLLOWS THE APP. It used to be a clock — sleep a fixed dwell,
+# shoot, and name the file from a hardcoded list — and it drifted constantly:
+# boot time varies by ten seconds between runs, `simctl io screenshot` itself
+# stalls the simulator for a moment, and the two compound. One run came back
+# with 12 of 13 screenshots showing the wrong screen.
 #
-# Usage: ./capture-shots.sh <output-dir>
+# So the app is now the clock. The driver writes every route it reaches, with a
+# millisecond stamp, to shot-routes.txt inside its own container — an ordinary
+# directory on this host. This script polls that file, waits for the route to
+# stop changing, then shoots and NAMES THE FILE FROM THE ROUTE ITSELF.
+#
+# The filename can therefore no longer disagree with the image: it is derived
+# from the app's own report rather than from a list of what we hoped would
+# happen. A route that never opens produces a missing file, which is an obvious
+# gap, instead of shifting every subsequent name by one.
+#
+# Usage: ./capture-shots.sh <output-dir> [max-seconds]
 set -uo pipefail
 
-OUT="${1:?usage: capture-shots.sh <output-dir>}"
+OUT="${1:?usage: capture-shots.sh <output-dir> [max-seconds]}"
+MAX_SECONDS="${2:-180}"
 BUNDLE="com.suhaasnv.echobrief"
-DWELL=8          # seconds; must equal SHOT_DWELL_MS / 1000
-# Fire mid-window, not at its start. The driver pushes route k at roughly
-# mount + (k+1)*DWELL, so capturing at the boundary races the push and lands on
-# the PREVIOUS screen — which is exactly how the first run produced a set of
-# correctly-numbered, wrongly-named screenshots.
-SETTLE=4
-# Splash + font load + Keychain hydrate before the driver's first push. Raised
-# from 4: the app now also registers the notification background task and mounts
-# five error boundaries at boot, and the extra ~10s put every capture two dwells
-# ahead of the walk, so each screenshot carried the name of a screen two steps
-# later than the one in the image.
-LAUNCH=9
 
-# One entry per SHOT_ROUTES element, same order. Reordering that array renames
-# everything after the change, so the two files move together.
-NAMES=(
-  00-meetings-list
-  01-meeting-detail
-  02-back-to-list
-  03-record
-  04-ask
-  05-actions
-  06-account
-  07-account-profile
-  08-account-plan
-  09-account-password
-  10-account-workspaces
-  11-account-legal
-  12-account-delete
-)
+# How long a route must hold still before it is worth photographing. Covers the
+# push transition plus the entrance animations the screens run on mount.
+SETTLE=2.5
 
 mkdir -p "$OUT"
-rm -f "$OUT"/*.png "$OUT"/manifest.txt 2>/dev/null
+rm -f "$OUT"/*.png "$OUT"/manifest.txt "$OUT"/shot-routes.txt 2>/dev/null
 
 xcrun simctl terminate booted "$BUNDLE" >/dev/null 2>&1
 sleep 1
+
+# Everything the app reported BEFORE this instant is a previous run's trail and
+# must never be believed. The driver rewrites the file whole on its first
+# navigation, but until then the old contents are still on disk — and the first
+# version of this script read them, shot the Metro bundling splash, and named it
+# from a route the app would not reach for another 18 seconds. The filename was
+# derived from the app's own report, just not the report that was current when
+# the shutter fired, which is the only thing that makes the guarantee worth
+# anything.
+LAUNCH_MS=$(python3 -c 'import time; print(int(time.time()*1000))')
+
 xcrun simctl launch booted "$BUNDLE" >/dev/null 2>&1 || { echo "launch failed"; exit 1; }
 
-START=$(date +%s)
-for i in "${!NAMES[@]}"; do
-  # Screen i is on display during [LAUNCH + i*DWELL, LAUNCH + (i+1)*DWELL).
-  DEADLINE=$(( START + LAUNCH + i * DWELL + SETTLE ))
-  NOW=$(date +%s)
-  WAIT=$(( DEADLINE - NOW ))
-  if [ "$WAIT" -gt 0 ]; then sleep "$WAIT"; fi
+# The container path is only stable once the app has written the file at least
+# once, so it is resolved inside the loop rather than up front.
+find_trail() {
+  find ~/Library/Developer/CoreSimulator/Devices/*/data/Containers/Data/Application \
+    -name shot-routes.txt -newermt "-5 minutes" 2>/dev/null | head -1
+}
 
-  if xcrun simctl io booted screenshot --type=png "$OUT/${NAMES[$i]}.png" >/dev/null 2>&1; then
-    # Millisecond stamp, matched later against the app's own [shot-route] lines.
-    # The filename is a GUESS derived from the route list; this is the evidence.
-    echo "${NAMES[$i]} $(python3 -c 'import time; print(int(time.time()*1000))')" >> "$OUT/manifest.txt"
-    echo "  ${NAMES[$i]}"
-  else
-    echo "  FAILED ${NAMES[$i]}"
+# Route -> filename stem. Collapses the meeting id so a detail capture has a
+# stable name, and keeps a counter so revisiting a route (the walk pushes into a
+# meeting and pops back to the list) does not overwrite the first visit.
+stem_for() {
+  local route="$1"
+  case "$route" in
+    /meetings/*) echo "meeting-detail" ;;
+    /) echo "root" ;;
+    *) echo "${route#/}" | tr '/' '-' ;;
+  esac
+}
+
+echo "following the app's route trail (max ${MAX_SECONDS}s)…"
+START=$(date +%s)
+LAST_ROUTE=""
+STABLE_SINCE=0
+declare -a SEEN=()
+
+while [ $(( $(date +%s) - START )) -lt "$MAX_SECONDS" ]; do
+  TRAIL=$(find_trail)
+  if [ -z "$TRAIL" ]; then sleep 1; continue; fi
+
+  # Only entries this run wrote. An empty result means the app has not navigated
+  # yet — which is a reason to WAIT, never a reason to shoot.
+  ROUTE=$(awk -v since="$LAUNCH_MS" '$1 >= since { $1=""; sub(/^ /,""); print }' "$TRAIL" | tail -1)
+  [ -z "$ROUTE" ] && { sleep 0.5; continue; }
+
+  NOW=$(python3 -c 'import time; print(time.time())')
+
+  if [ "$ROUTE" != "$LAST_ROUTE" ]; then
+    LAST_ROUTE="$ROUTE"
+    STABLE_SINCE="$NOW"
+    sleep 0.4
+    continue
   fi
+
+  HELD=$(python3 -c "print($NOW - $STABLE_SINCE)")
+  if (( $(python3 -c "print(1 if $HELD >= $SETTLE else 0)") )); then
+    STEM=$(stem_for "$ROUTE")
+    # Already captured this route while it was continuously on screen? Skip,
+    # otherwise a route the walk sits on would be shot every loop.
+    ALREADY=0
+    for s in "${SEEN[@]:-}"; do [ "$s" = "$ROUTE" ] && ALREADY=1; done
+    if [ "$ALREADY" -eq 0 ]; then
+      IDX=$(printf "%02d" "${#SEEN[@]}")
+      if xcrun simctl io booted screenshot --type=png "$OUT/${IDX}-${STEM}.png" >/dev/null 2>&1; then
+        echo "${IDX}-${STEM} $(python3 -c 'import time; print(int(time.time()*1000))') ${ROUTE}" >> "$OUT/manifest.txt"
+        echo "  ${IDX}-${STEM}  <- ${ROUTE}"
+        SEEN+=("$ROUTE")
+      fi
+    fi
+    sleep 1
+    continue
+  fi
+
+  sleep 0.4
 done
 
-echo "Wrote $(ls -1 "$OUT"/*.png 2>/dev/null | wc -l | tr -d ' ') screenshots to $OUT"
+TRAIL=$(find_trail)
+[ -n "$TRAIL" ] && cp "$TRAIL" "$OUT/shot-routes.txt"
+
+COUNT=$(ls -1 "$OUT"/*.png 2>/dev/null | wc -l | tr -d ' ')
+echo "Wrote ${COUNT} screenshots to $OUT"
+echo "Names come from the app's own route trail, so a filename cannot disagree"
+echo "with its image. Routes the walk never reached are simply absent."

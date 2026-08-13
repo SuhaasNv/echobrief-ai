@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 
-import {
-  reconcilePendingMeetings,
-  suppressMeetingAnnouncement,
-} from "@/lib/notifications/notify";
+import { reconcilePendingMeetings, suppressMeetingAnnouncement } from "@/lib/notifications/notify";
 
 import { api } from "./client";
 import type { MeetingSummary } from "./meetings";
@@ -70,6 +67,30 @@ const STATUS_LABEL: Record<MeetingStatus, string> = {
 export function percentForStatus(status: MeetingStatus | undefined): number {
   return status ? STATUS_PERCENT[status] : STATUS_PERCENT.queued;
 }
+
+/**
+ * Percent for a meeting whose audio has not finished uploading.
+ *
+ * Occupies the 0–5 band BELOW `queued`, which is the first status the server can
+ * report. That band is free precisely because nothing server-side exists to
+ * describe until the audio lands, so borrowing it costs nothing and — the point
+ * — leaves the table above untouched, so the phone and the browser still agree
+ * about every status they both know about.
+ *
+ * The effect is that the ring climbs 0 → 100 exactly once. Before this, upload
+ * ran a full-screen indicator to 100% and then the meeting screen started again
+ * at zero, which made one continuous wait look like the first half had failed.
+ *
+ * Deliberately a small band. The upload is seconds and the pipeline is minutes,
+ * so giving the transfer a third of the ring would misrepresent the wait — the
+ * bar would leap to 33 and then appear to stall for two minutes.
+ */
+export function percentForUpload(ratio: number): number {
+  return Math.max(0, Math.min(1, ratio)) * STATUS_PERCENT.queued;
+}
+
+/** Stage label while the audio is still on its way up. */
+export const UPLOAD_LABEL = "Uploading audio";
 
 export function labelForStatus(status: MeetingStatus | undefined): string {
   return status ? STATUS_LABEL[status] : "Processing";

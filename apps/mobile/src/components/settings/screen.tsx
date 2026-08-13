@@ -9,8 +9,9 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { useOnline } from "@/lib/api/errors";
-import { useTabBarInset } from "@/lib/layout";
+import { SCROLL_TAB_BAR_AIR } from "@/lib/layout";
 import { SPRING } from "@/lib/motion";
+import { useColorToken } from "@/lib/tokens";
 
 /**
  * The scroll surface every settings screen sits on.
@@ -19,9 +20,10 @@ import { SPRING } from "@/lib/motion";
  *
  * First, the tab bar. Content sits BEHIND the native UITabBar — that is how the
  * Liquid Glass material reads through to what is under it — so every scroll
- * surface owes itself bottom clearance. Forgetting it has shipped four times
- * here, and it is invisible in any screenshot that is not scrolled to the
- * bottom. Centralising it means a new settings screen cannot get it wrong.
+ * surface owes itself bottom clearance. Getting the amount wrong has shipped
+ * four times here, in both directions, and neither direction is visible in a
+ * screenshot that is not scrolled to the bottom. Centralising it means a new
+ * settings screen cannot get it wrong.
  *
  * Second, entrance. Groups arrive staggered rather than all at once, which
  * gives a long list a reading order instead of a single flat pop. The stagger
@@ -48,10 +50,11 @@ export function SettingsScroll({
   /** Awaited, with the spinner held for its duration. Omit on local-only screens. */
   onRefresh?: () => Promise<unknown>;
 }) {
-  const tabBarInset = useTabBarInset();
   const reduceMotion = useReducedMotion();
   const online = useOnline();
   const [refreshing, setRefreshing] = useState(false);
+  // UIRefreshControl takes a tint prop; nothing about it is reachable by class.
+  const spinner = useColorToken("--label-secondary");
 
   // A pull can outlive the screen: the user refreshes, then swipes back before
   // the request settles.
@@ -82,13 +85,18 @@ export function SettingsScroll({
     <ScrollView
       className="flex-1 bg-background"
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={{ paddingTop: topPadding, paddingBottom: tabBarInset, gap }}
+      // Air, not clearance. "automatic" above already insets this content by the
+      // safe area at BOTH ends, and on a tab screen the bottom of that safe area
+      // IS the tab bar's top edge — so the `useTabBarInset()` that used to sit
+      // here paid the bar's 83pt a second time and left every settings screen
+      // scrolling a full bar past its own last row. See SCROLL_TAB_BAR_AIR.
+      contentContainerStyle={{ paddingTop: topPadding, paddingBottom: SCROLL_TAB_BAR_AIR, gap }}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
       refreshControl={
         onRefresh ? (
-          // The default spinner grey is near-invisible on #06070A.
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#9CA1A9" />
+          // The default spinner grey is near-invisible on the canvas colour.
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={spinner} />
         ) : undefined
       }
     >
@@ -96,9 +104,7 @@ export function SettingsScroll({
         child == null || child === false ? null : (
           <Animated.View
             entering={
-              reduceMotion
-                ? undefined
-                : FadeInDown.duration(300).delay(Math.min(index * 45, 270))
+              reduceMotion ? undefined : FadeInDown.duration(300).delay(Math.min(index * 45, 270))
             }
           >
             {child}
@@ -113,7 +119,7 @@ export function SettingsScroll({
 export function Footnote({ children }: { children: string }) {
   return (
     <Text
-      className="px-5 text-[13px] leading-[19px] text-label-tertiary"
+      className="px-4 text-[13px] leading-[19px] text-label-tertiary"
       maxFontSizeMultiplier={1.8}
     >
       {children}

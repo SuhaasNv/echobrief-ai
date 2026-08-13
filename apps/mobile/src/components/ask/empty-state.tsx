@@ -118,8 +118,8 @@ export function AskEmptyState({ meetingCount, onPick, onGoRecord }: AskEmptyStat
       >
         <Eyebrow>Nothing to search yet</Eyebrow>
         <Text className="text-[17px] leading-[25px] text-label-secondary">
-          Ask works across meetings you have already captured. Record one and it becomes
-          searchable as soon as it finishes processing.
+          Ask works across meetings you have already captured. Record one and it becomes searchable
+          as soon as it finishes processing.
         </Text>
         <Pressable
           onPress={() => {
@@ -141,8 +141,8 @@ export function AskEmptyState({ meetingCount, onPick, onGoRecord }: AskEmptyStat
     <View className="gap-5 pt-1">
       <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(300)}>
         <Text className="text-[17px] leading-[25px] text-label-secondary">
-          Ask one question and get one answer, drawn from your own transcripts, with the
-          moments it came from.
+          Ask one question and get one answer, drawn from your own transcripts, with the moments it
+          came from.
         </Text>
       </Animated.View>
 

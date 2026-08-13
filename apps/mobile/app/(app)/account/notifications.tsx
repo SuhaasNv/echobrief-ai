@@ -27,7 +27,7 @@ export default function NotificationsScreen() {
         title="While you're away"
         footer={
           meetingReady.requiresSystemSettings
-            ? "Notifications are turned off for EchoBrief in iOS Settings, so this switch cannot turn them back on from here."
+            ? "Notifications are turned off for Puffin in iOS Settings, so this switch cannot turn them back on from here."
             : "Processing takes a couple of minutes, so this is the one worth leaving on."
         }
       >

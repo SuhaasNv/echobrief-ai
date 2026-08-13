@@ -25,7 +25,7 @@ interface SignupResponse {
 }
 
 export const Route = createFileRoute("/signup")({
-  head: () => ({ meta: [{ title: "Create account — EchoBrief" }] }),
+  head: () => ({ meta: [{ title: "Create account — Puffin" }] }),
   component: SignupPage,
 });
 
@@ -117,7 +117,7 @@ function SignupPage() {
         // Best-effort. Fall through to AppShell's own fetching.
       }
 
-      toast.success("Welcome to EchoBrief");
+      toast.success("Welcome to Puffin");
       navigate({ to: "/app" });
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Sign-up failed";

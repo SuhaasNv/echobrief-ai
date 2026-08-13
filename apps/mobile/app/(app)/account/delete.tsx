@@ -8,8 +8,9 @@ import { describeActionFailure, describeError, useOnline } from "@/lib/api/error
 import { clearSession } from "@/lib/api/token-store";
 import { haptics } from "@/lib/haptics";
 import { ErrorState } from "@/components/error-state";
-import { CheckGlyph, Section, TextFieldRow, SETTINGS_HEX } from "@/components/settings/rows";
+import { CheckGlyph, Section, TextFieldRow } from "@/components/settings/rows";
 import { Footnote, SettingsScroll } from "@/components/settings/screen";
+import { useColorToken } from "@/lib/tokens";
 
 /**
  * Account deletion.
@@ -39,6 +40,9 @@ export default function DeleteAccountScreen() {
   const del = useDeleteAccount();
   const queryClient = useQueryClient();
   const [confirm, setConfirm] = useState("");
+  // The spinner sits on the filled red button, so it takes the canvas colour
+  // for the same reason the label does — see the note above.
+  const onDanger = useColorToken("--background");
 
   const onRefresh = useCallback(() => query.refetch(), [query]);
 
@@ -115,7 +119,7 @@ export default function DeleteAccountScreen() {
   return (
     <SettingsScroll onRefresh={onRefresh}>
       <Text
-        className="px-5 text-[15px] leading-[22px] text-label-secondary"
+        className="px-4 text-[15px] leading-[22px] text-label-secondary"
         maxFontSizeMultiplier={1.8}
       >
         Deleting your account removes every meeting, recording, transcript, summary, and action
@@ -126,7 +130,12 @@ export default function DeleteAccountScreen() {
         <TextFieldRow
           value={confirm}
           onChangeText={setConfirm}
-          placeholder={email}
+          // NOT the address itself. The placeholder printed the exact string
+          // the field is checked against, one line above a hint that printed it
+          // again — so the speed bump could be cleared by copying what the box
+          // was already showing, and an empty field looked filled at a glance.
+          // The hint below still says which address to type.
+          placeholder="Email address"
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
@@ -135,19 +144,21 @@ export default function DeleteAccountScreen() {
         />
 
         <View className="flex-row items-center gap-2.5 px-4 py-3" style={{ minHeight: 44 }}>
-          <View className="w-[15px] items-center">
-            {matches ? <CheckGlyph color={SETTINGS_HEX.tint} /> : null}
-          </View>
           <Text
             className={`flex-1 text-[13px] ${matches ? "text-label-secondary" : "text-label-tertiary"}`}
             numberOfLines={2}
             maxFontSizeMultiplier={1.8}
             accessibilityLiveRegion="polite"
           >
-            {matches
-              ? "Email matches. Deletion is unlocked."
-              : `Type ${email} to unlock deletion.`}
+            {matches ? "Email matches. Deletion is unlocked." : `Type ${email} to unlock deletion.`}
           </Text>
+          {/* Trailing, not leading. A 15pt glyph column in front of this
+              line pushed its text to 16 + 15 + 10 = 41pt while the field
+              above starts at 16pt — a 25pt step that aligned to nothing on
+              the screen. Moving it after the text restores the shared left
+              edge and still reserves its width, so the checkmark appearing
+              does not shift the sentence. */}
+          <View className="w-[15px] items-center">{matches ? <CheckGlyph /> : null}</View>
         </View>
       </Section>
 
@@ -157,16 +168,33 @@ export default function DeleteAccountScreen() {
           disabled={!matches || del.isPending}
           accessibilityRole="button"
           accessibilityState={{ disabled: !matches, busy: del.isPending }}
+          /**
+           * Locked is still visibly DESTRUCTIVE, not merely disabled.
+           *
+           * The filled red on the armed state was already right. The locked
+           * state was the problem: `border-edge` + `bg-fill` + a secondary label
+           * is byte-identical to the disabled "Change password" button, so the
+           * one irreversible control in the app looked exactly like its most
+           * routine one until the moment you had already typed your address.
+           * People sort buttons by colour before they read them.
+           *
+           * A danger-tinted border and label instead of a fill: it reads as red
+           * at a glance while staying unmistakably inactive, and it does not
+           * dare you to press it. /40 on the border and /60 on the label keep
+           * both below the armed state's weight — this is the quieter half of a
+           * pair, and matching its intensity would make locked and armed hard to
+           * tell apart, which is its own failure.
+           */
           className={`min-h-[52px] items-center justify-center rounded-full ${
-            matches ? "bg-danger active:opacity-80" : "border border-edge bg-fill"
+            matches ? "bg-danger active:opacity-80" : "border border-danger/40 bg-fill"
           }`}
         >
           {del.isPending ? (
-            <ActivityIndicator color={SETTINGS_HEX.background} />
+            <ActivityIndicator color={onDanger} />
           ) : (
             <Text
               className={`text-[17px] font-semibold ${
-                matches ? "text-background" : "text-label-secondary"
+                matches ? "text-background" : "text-danger/60"
               }`}
             >
               Delete account

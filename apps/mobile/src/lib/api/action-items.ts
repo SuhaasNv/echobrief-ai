@@ -115,7 +115,7 @@ export function useMeetingActionItems(meetingId: string) {
  *
  * The rollback has to SAY something. On its own it is indistinguishable from
  * the app undoing the user's work: the tick draws, then clears itself a moment
- * later with no explanation, and the obvious reading is that EchoBrief lost the
+ * later with no explanation, and the obvious reading is that Puffin lost the
  * change on purpose. The alert names the cause and points at the retry, which
  * is the checkbox itself: PATCHing an explicit completed value is idempotent,
  * so pressing it again is always safe.
@@ -179,7 +179,7 @@ export function useToggleActionItem() {
       haptics.error();
       Alert.alert(
         variables.completed ? "That item is not checked off" : "That item is still checked off",
-        `${describeActionFailure(error, { online: onlineManager.isOnline() })} EchoBrief put it back the way it was. Tapping it again retries.`,
+        `${describeActionFailure(error, { online: onlineManager.isOnline() })} Puffin put it back the way it was. Tapping it again retries.`,
       );
     },
 
@@ -236,7 +236,7 @@ export function useDeleteActionItem() {
       haptics.error();
       Alert.alert(
         "That item is still here",
-        `${describeActionFailure(error, { online: onlineManager.isOnline() })} EchoBrief put it back. Swiping again retries.`,
+        `${describeActionFailure(error, { online: onlineManager.isOnline() })} Puffin put it back. Swiping again retries.`,
       );
     },
 

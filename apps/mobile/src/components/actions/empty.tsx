@@ -22,11 +22,11 @@ export type EmptyKind = "all-clear" | "never-any" | "none-done";
 const COPY: Record<EmptyKind, { title: string; body: string }> = {
   "all-clear": {
     title: "You're all clear.",
-    body: "Every commitment EchoBrief heard has been checked off.",
+    body: "Every commitment Puffin heard has been checked off.",
   },
   "never-any": {
     title: "No action items yet.",
-    body: "When someone commits to something in a meeting, EchoBrief pulls it out with the owner, the deadline, and the moment it was said.",
+    body: "When someone commits to something in a meeting, Puffin pulls it out with the owner, the deadline, and the moment it was said.",
   },
   "none-done": {
     title: "Nothing checked off yet.",

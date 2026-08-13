@@ -97,11 +97,32 @@ export function StatHeader({
   const complete = meetings.filter((m) => m.status === "complete");
   const processing = meetings.filter((m) => isProcessing(m.status)).length;
 
-  const totalMinutes = Math.round(complete.reduce((sum, m) => sum + (m.duration_sec ?? 0), 0) / 60);
+  const totalSeconds = complete.reduce((sum, m) => sum + (m.duration_sec ?? 0), 0);
+  const totalMinutes = Math.round(totalSeconds / 60);
   const tasks = complete.reduce((sum, m) => sum + (m.action_item_count ?? 0), 0);
 
-  const durationValue = totalMinutes >= 60 ? (totalMinutes / 60).toFixed(1) : String(totalMinutes);
-  const durationUnit = totalMinutes >= 60 ? "hrs" : "min";
+  /**
+   * Seconds below a minute, so a new library is not reported as empty.
+   *
+   * This rounded to whole minutes at every scale, so a first recording of 40
+   * seconds rendered as "RECORDED 0 min" — the account's entire contents shown
+   * as nothing, 130pt above a card that correctly said "under a minute" about
+   * the same recording. Every user's first session hit it, and a stat tile that
+   * reads zero when the thing it counts exists undermines the two tiles beside
+   * it.
+   *
+   * Three bands rather than two: seconds under a minute, minutes under an hour,
+   * hours above. The unit is a separate string because the Tile renders it in a
+   * lighter weight beside the figure.
+   */
+  const durationValue =
+    totalSeconds > 0 && totalSeconds < 60
+      ? String(totalSeconds)
+      : totalMinutes >= 60
+        ? (totalMinutes / 60).toFixed(1)
+        : String(totalMinutes);
+  const durationUnit =
+    totalSeconds > 0 && totalSeconds < 60 ? "sec" : totalMinutes >= 60 ? "hrs" : "min";
 
   // Counts what the library holds, not what happens to be paged in — the tile
   // is a claim about the account, and it visibly climbing as you scroll would
@@ -117,7 +138,11 @@ export function StatHeader({
         {/* Top highlight spans the whole group so it reads as one object. */}
         <View className="absolute inset-x-0 top-0 z-10 h-px bg-highlight" pointerEvents="none" />
         <Tile label="Captured" value={String(captured)} />
-        <Tile label="Recorded" value={durationValue} unit={durationUnit} tone="text-speaker-d" />
+        {/* No tone. --speaker-d is #E6AC3D, the same amber as --warning, and
+            amber means "at limit" everywhere else in this app — the Plan
+            screen's usage bar. On a duration with no threshold it read as a
+            warning about a recording cap that does not exist. */}
+        <Tile label="Recorded" value={durationValue} unit={durationUnit} />
         <Tile label="Tasks" value={String(tasks)} tone="text-tint" />
       </View>
 

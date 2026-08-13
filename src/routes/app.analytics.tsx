@@ -18,7 +18,7 @@ import { useMeetings, useActionItems } from "@/lib/api/hooks";
 import { useActiveWorkspaceKind } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/analytics")({
-  head: () => ({ meta: [{ title: "Analytics — EchoBrief" }] }),
+  head: () => ({ meta: [{ title: "Analytics — Puffin" }] }),
   component: AnalyticsGate,
 });
 

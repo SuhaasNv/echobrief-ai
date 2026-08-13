@@ -8,23 +8,10 @@ import {
   type FocusEvent,
   type TextInputProps,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import { TIMING } from "@/lib/motion";
-
-/**
- * Dark tertiary label. app.json pins userInterfaceStyle to "dark", so this is
- * the only appearance that ships; if that ever becomes "automatic" it has to
- * move to a token read.
- */
-// Mirrors --label-tertiary, raised from #6E727A (4.03:1, below AA at this
-// size). A hardcoded hex cannot follow a CSS token, so this has to move by
-// hand whenever that token does.
-const PLACEHOLDER = "#787C85";
+import { useColorToken } from "@/lib/tokens";
 
 /**
  * A grouped field list, the way an iOS form is actually built.
@@ -86,6 +73,9 @@ export function AuthField({
   ...rest
 }: AuthFieldProps) {
   const [reveal, setReveal] = useState(false);
+  // placeholderTextColor is a prop, not a style, so it is one of the few
+  // colours on this screen that cannot come from the field's className.
+  const placeholder = useColorToken("--label-tertiary");
   const focus = useSharedValue(0);
 
   const focusStyle = useAnimatedStyle(() => ({ opacity: focus.value }));
@@ -114,7 +104,7 @@ export function AuthField({
           keyboardAppearance="dark"
           ref={inputRef}
           className="min-h-[52px] flex-1 px-4 py-3.5 text-[17px] text-label"
-          placeholderTextColor={PLACEHOLDER}
+          placeholderTextColor={placeholder}
           accessibilityLabel={label}
           onFocus={handleFocus}
           onBlur={handleBlur}

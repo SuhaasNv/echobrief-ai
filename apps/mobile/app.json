@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "EchoBrief",
+    "name": "Puffin",
     "slug": "echobrief",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,7 +19,7 @@
       "infoPlist": {
         "UIUserInterfaceStyle": "Dark",
         "NSSupportsLiveActivities": true,
-        "NSPhotoLibraryUsageDescription": "EchoBrief opens your photo library only when you choose a profile picture. The picture you pick stays on this iPhone and is never uploaded.",
+        "NSPhotoLibraryUsageDescription": "Puffin opens your photo library only when you choose a profile picture. The picture you pick stays on this iPhone and is never uploaded.",
         "UIBackgroundModes": ["audio", "processing"],
         "BGTaskSchedulerPermittedIdentifiers": ["com.expo.modules.backgroundtask.processing"]
       }
@@ -51,13 +51,14 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "EchoBrief uses the microphone to record the meetings you choose to capture. Recording starts only when you press Record and stops when you press Stop.",
+          "microphonePermission": "Puffin uses the microphone to record the meetings you choose to capture. Recording starts only when you press Record and stops when you press Stop.",
           "enableBackgroundRecording": true
         }
       ],
       "@bacons/apple-targets",
       "./src/lib/live-activity/with-recording-intents.js",
-      "./src/lib/notifications/no-push-entitlement.js"
+      "./src/lib/notifications/no-push-entitlement.js",
+      "expo-web-browser"
     ]
   }
 }

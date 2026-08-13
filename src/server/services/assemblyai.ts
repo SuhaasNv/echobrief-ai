@@ -186,6 +186,22 @@ export interface TranscriptionOptions {
    * to. An empty list sends nothing.
    */
   wordBoost?: string[];
+  /**
+   * Mask profanity in the returned transcript.
+   *
+   * Required rather than optional, unlike `wordBoost`. Defaulting it would make
+   * "the caller decided not to filter" and "the caller forgot this parameter
+   * exists" the same code, and a censorship setting that silently defaults off
+   * because a call site was added without it is exactly the failure this whole
+   * feature is meant not to be. There is one caller; making it say so costs a
+   * line.
+   *
+   * This is the vendor's `filter_profanity`, not a word list of ours, because a
+   * list we maintain would be wrong in both directions AND could only mask on
+   * the way out — the unfiltered words would still be in `raw_text`, in the
+   * chunks, and in the export.
+   */
+  filterProfanity: boolean;
 }
 
 /**
@@ -232,6 +248,14 @@ export async function transcribeAudioUrl(
     punctuate: true,
     format_text: true,
     ...languageParams,
+    // Sent on every request, including as `false`, where `word_boost` below is
+    // omitted when it has nothing to say. The difference is that an empty boost
+    // list and an absent one mean the same thing, while a request captured in a
+    // log with no `filter_profanity` at all cannot be told apart from one made
+    // by a build that did not support the setting. When the question is "did the
+    // user's choice reach the vendor", the parameter has to be visible in the
+    // answer.
+    filter_profanity: opts.filterProfanity,
     // Omitted entirely when empty rather than sent as []. `boost_param` is left
     // unset too: the default weighting nudges the decoder, while "high" pushes
     // it hard enough to start hearing a boosted term in words that only rhyme

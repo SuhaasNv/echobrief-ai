@@ -1,18 +1,8 @@
 import type { ReactNode } from "react";
-import {
-  KeyboardAvoidingView,
-  ScrollView,
-  Text,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { KeyboardAvoidingView, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  AuthBackdrop,
-  useAuthPanelStart,
-  type AuthHeroVariant,
-} from "@/components/auth-backdrop";
+import { AuthBackdrop, useAuthPanelStart, type AuthHeroVariant } from "@/components/auth-backdrop";
 
 /**
  * The shell both auth screens are built on.

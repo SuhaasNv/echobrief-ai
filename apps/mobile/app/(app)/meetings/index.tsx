@@ -5,7 +5,8 @@ import { router, Stack } from "expo-router";
 import { describeError, useOnline } from "@/lib/api/errors";
 import { useMeetings, type MeetingSummary } from "@/lib/api/meetings";
 import { haptics } from "@/lib/haptics";
-import { useTabBarInset } from "@/lib/layout";
+import { SCROLL_TAB_BAR_AIR } from "@/lib/layout";
+import { useColorTokens } from "@/lib/tokens";
 import { ErrorState, StaleNotice } from "@/components/error-state";
 import { ListEndCap } from "@/components/meetings/end-cap";
 import { LibraryEmpty, NoResults } from "@/components/meetings/empty-state";
@@ -83,8 +84,16 @@ function SectionHeader({ title, count, first }: { title: string; count: number; 
     that a finished word resolves before the finger leaves the keyboard. */
 const SEARCH_DEBOUNCE_MS = 250;
 
+/**
+ * Every colour UISearchBar and UIRefreshControl need, resolved.
+ *
+ * Both are native controls handed to UIKit through options objects, so none of
+ * this is reachable by a className.
+ */
+const TOKENS = ["--label", "--label-secondary", "--tint"] as const;
+
 export default function MeetingsScreen() {
-  const tabBarInset = useTabBarInset();
+  const [label, secondary, tint] = useColorTokens(TOKENS);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
 
@@ -218,19 +227,19 @@ export default function MeetingsScreen() {
             // measures well under AA and reads as an empty field with no hint
             // at all.
             //
-            // Placeholder and glyph are label-secondary (#9CA1A9), not
-            // label-tertiary (#6E727A). Against the field's own dark fill
-            // (#1C1F25 in our ramp, and iOS composites its tertiary system fill
-            // over #06070A to roughly the same value) that is 6.4:1, and 5.4:1
-            // even against a considerably lighter #2C2C2E field. The previous
+            // Placeholder and glyph are --label-secondary, not
+            // --label-tertiary. Against the field's own dark fill (#1C1F25 in
+            // our ramp, and iOS composites its tertiary system fill over the
+            // canvas to roughly the same value) that is 6.4:1, and 5.4:1 even
+            // against a considerably lighter #2C2C2E field. The previous
             // tertiary grey managed 2.6:1.
             //
             // The container stays dark on purpose: lightening the field to fix
             // a text problem would put a grey slab in the navigation bar.
-            textColor: "#F4F5F7",
-            hintTextColor: "#9CA1A9",
-            headerIconColor: "#9CA1A9",
-            tintColor: "#4C99F8",
+            textColor: label,
+            hintTextColor: secondary,
+            headerIconColor: secondary,
+            tintColor: tint,
             onChangeText: (e) => setSearchInput(e.nativeEvent.text),
             onClose: () => setSearchInput(""),
           },
@@ -285,7 +294,12 @@ export default function MeetingsScreen() {
         // window below it. The container came out one header taller than the
         // window, which is a screenful of dead scroll under an empty list. Same
         // trap the Ask screen documents at the top of its own contentContainer.
-        contentContainerStyle={{ paddingTop: 8, paddingBottom: tabBarInset }}
+        //
+        // The bottom padding is AIR ONLY for the same reason. That inset UIKit
+        // applies is not top-only: it also clears the tab bar, so the
+        // `useTabBarInset()` that used to sit here spent the bar's 83pt twice
+        // and left the list scrolling a bar past its own end cap.
+        contentContainerStyle={{ paddingTop: 8, paddingBottom: SCROLL_TAB_BAR_AIR }}
         keyboardDismissMode="on-drag"
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
@@ -306,8 +320,8 @@ export default function MeetingsScreen() {
           <RefreshControl
             refreshing={isManualRefresh}
             onRefresh={onRefresh}
-            // The default spinner grey is near-invisible on #06070A.
-            tintColor="#9CA1A9"
+            // The default spinner grey is near-invisible on the canvas.
+            tintColor={secondary}
           />
         }
       />

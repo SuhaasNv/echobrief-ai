@@ -211,7 +211,7 @@ export const MeetingRow = memo(function MeetingRow({
     meeting.action_item_count ? pluralize(meeting.action_item_count, "task") : null,
   ].filter(Boolean) as string[];
 
-  const title = displayTitle(meeting.title);
+  const title = displayTitle(meeting.title, meeting.recorded_at ?? meeting.created_at);
   const status = statusLabel(meeting.status);
   const tags = meeting.tags ?? [];
   const readout = meta.length > 0 || status !== null || tags.length > 0;

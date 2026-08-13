@@ -13,27 +13,48 @@ import { completedLabel, type ActionItem } from "@/lib/api/action-items";
 import { formatClock } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
+import { useColorToken } from "@/lib/tokens";
 import { CheckRing } from "./check-ring";
 import { dueState } from "./due";
 
-/** Dark-ramp tint, for SVG. See the note in check-ring. */
-const TINT = "#4C99F8";
+/**
+ * Width of the leading glyph column, shared by both rows of the card.
+ *
+ * Equal to CheckRing's SIZE. The check ring and the play triangle sit in
+ * separate rows at the same 16pt gutter, so they used to share a LEFT EDGE
+ * while their centres sat 8.5pt apart — the ring is 26pt wide and the triangle
+ * is 9. Two glyphs stacked vertically read as a column, and a column that is
+ * flush on one side and centred on neither looks like a mistake, which is
+ * exactly how it was reported.
+ *
+ * Giving the triangle the ring's width fixes the text too: with a matching
+ * 12pt gap after it, both rows' text now begins at 16 + 26 + 12 = 54pt instead
+ * of 54 and 33.
+ */
+const GLYPH_COLUMN = 26;
 
 /** Play triangle — "jump to this moment", not "open this document". */
 function PlayGlyph() {
+  // SVG fill is not styled by className. See the note in check-ring.
+  const tint = useColorToken("--tint");
+
   return (
-    <Svg width={9} height={11} viewBox="0 0 9 11">
-      <Path d="M0.8 0.9 L8 5.5 L0.8 10.1 Z" fill={TINT} />
-    </Svg>
+    <View style={{ width: GLYPH_COLUMN }} className="items-center">
+      <Svg width={9} height={11} viewBox="0 0 9 11">
+        <Path d="M0.8 0.9 L8 5.5 L0.8 10.1 Z" fill={tint} />
+      </Svg>
+    </View>
   );
 }
 
 function Chevron() {
+  const tertiary = useColorToken("--label-tertiary");
+
   return (
     <Svg width={7} height={12} viewBox="0 0 7 12">
       <Path
         d="M1 1 L6 6 L1 11"
-        stroke="#787C85"
+        stroke={tertiary}
         strokeWidth={1.8}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -191,7 +212,8 @@ export const ActionRow = memo(function ActionRow({
         accessibilityRole="button"
         accessibilityLabel={[sourceTitle, clock ? `at ${clock}` : null].filter(Boolean).join(", ")}
         accessibilityHint="Opens the meeting this came from"
-        className="flex-row items-center gap-2 border-t border-edge bg-inset px-4 py-2.5 active:bg-elevated"
+        // gap-3, matching the body row above, so the two text columns line up.
+        className="flex-row items-center gap-3 border-t border-edge bg-inset px-4 py-2.5 active:bg-elevated"
       >
         <PlayGlyph />
         <Text

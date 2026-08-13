@@ -33,8 +33,13 @@
  */
 module.exports = {
   type: "widget",
+  // Xcode target / product name. An identifier — renaming it churns the
+  // pbxproj and the .appex path for nothing.
   name: "EchoBriefActivity",
-  displayName: "EchoBrief Recording",
+  // CFBundleDisplayName. USER-VISIBLE: Settings -> Face ID & Passcode -> Live
+  // Activities lists the extension by this name, so it says Puffin. Safe to
+  // change; it is not part of the App ID.
+  displayName: "Puffin Recording",
   // Leading dot appends to the app's identifier -> com.suhaasnv.echobrief.activity.
   // A free team may only register 10 App IDs per 7 days and this burns one, so
   // treat it as permanent: renaming it costs another slot every time.

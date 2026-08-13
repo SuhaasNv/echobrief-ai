@@ -28,7 +28,7 @@ const { IOSConfig } = require("expo/config-plugins");
  * job. Putting the file in `targets/live-activity/_shared/` emits:
  *
  *     PBXFileSystemSynchronizedBuildFileExceptionSet {
- *       target = EchoBrief;                              // the app
+ *       target = Puffin;                              // the app
  *       membershipExceptions = ( _shared/RecordingIntents.swift );
  *     }
  *

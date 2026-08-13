@@ -17,23 +17,20 @@ import {
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { DashboardPreview } from "@/components/marketing/dashboard-preview";
-import { StatsStrip } from "@/components/marketing/stats-strip";
-import { Typewriter } from "@/components/marketing/typewriter";
 import { AmbientBackground } from "@/components/marketing/ambient-background";
 import { ScrollFollowLine } from "@/components/marketing/scroll-follow-line";
 import { Button } from "@/components/ui/button";
-import { CircularTestimonials } from "@/components/ui/circular-testimonials";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "EchoBrief — Meeting intelligence for modern teams" },
+      { title: "Puffin — Meeting intelligence for modern teams" },
       {
         name: "description",
         content:
           "Upload calls, voice notes, and meetings. Get instant summaries, action items, and AI answers across every conversation.",
       },
-      { property: "og:title", content: "EchoBrief — Meeting intelligence for modern teams" },
+      { property: "og:title", content: "Puffin — Meeting intelligence for modern teams" },
       {
         property: "og:description",
         content:
@@ -71,17 +68,16 @@ function Landing() {
             }}
             className="font-display text-balance text-4xl font-semibold leading-[1.04] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
           >
-            <span className="text-gradient">Your meetings finally become</span>
+            {/* Was: "Your meetings finally become" + a Typewriter cycling
+                "searchable intelligence" / "structured knowledge" / "team
+                memory" / "queryable context". Four abstractions rotating
+                through one slot proves none of them is the claim — a person
+                picks one. The replacement is the strongest line already on this
+                page (it was buried near the footer) and it names a problem the
+                reader recognises instead of a category we invented. */}
+            <span className="text-gradient">Stop forgetting</span>
             <br />
-            <Typewriter
-              className="text-gradient-brand"
-              words={[
-                "searchable intelligence.",
-                "structured knowledge.",
-                "team memory.",
-                "queryable context.",
-              ]}
-            />
+            <span className="text-gradient-brand">what your team said.</span>
           </motion.h1>
 
           <motion.p
@@ -118,9 +114,12 @@ function Landing() {
               size="lg"
               className="h-11 rounded-full border-border/80 bg-surface/40 px-5 text-sm font-medium backdrop-blur"
             >
-              <Link to="/">
+              {/* Was a "Watch Demo" button linking to "/" — the page it is
+                  already on. There is no demo video, so the honest secondary
+                  action is the one that exists: read what the product does. */}
+              <Link to="/about">
                 <Play className="mr-1 h-3.5 w-3.5 fill-current" />
-                Watch Demo
+                How it works
               </Link>
             </Button>
           </motion.div>
@@ -131,7 +130,7 @@ function Landing() {
             transition={{ delay: 0.5 }}
             className="mt-5 font-mono text-xs text-muted-foreground/70"
           >
-            Free for 14 days · No credit card · 5,000+ teams onboard
+            Free to start · No credit card
           </motion.p>
         </div>
 
@@ -145,54 +144,21 @@ function Landing() {
         </motion.div>
       </section>
 
-      <StatsStrip />
+      {/*
+        Removed: a "Trusted by product, sales, and research teams at" marquee
+        over six invented company names, and above it a stats strip claiming
+        4.7M minutes transcribed, 92% action-item capture and 99.94% uptime.
 
-      {/* Trusted by — scrolling marquee */}
-      <section className="px-6 py-12">
-        <div className="mx-auto max-w-6xl">
-          <p className="text-center font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground/70">
-            Trusted by product, sales, and research teams at
-          </p>
-          <div
-            className="relative mt-8 overflow-hidden"
-            style={{
-              maskImage:
-                "linear-gradient(to right, transparent, black 12%, black 88%, transparent)",
-              WebkitMaskImage:
-                "linear-gradient(to right, transparent, black 12%, black 88%, transparent)",
-            }}
-          >
-            <motion.div
-              className="flex w-max gap-12"
-              animate={{ x: ["0%", "-50%"] }}
-              transition={{ duration: 28, ease: "linear", repeat: Infinity }}
-            >
-              {[
-                "Northwind",
-                "Vertex",
-                "Lattice",
-                "Helix",
-                "Parallax",
-                "Foundry",
-                "Northwind",
-                "Vertex",
-                "Lattice",
-                "Helix",
-                "Parallax",
-                "Foundry",
-              ].map((name, i) => (
-                <div
-                  key={`${name}-${i}`}
-                  className="shrink-0 text-lg font-semibold tracking-tight text-muted-foreground/60"
-                >
-                  {name}
-                  <span className="text-brand">.</span>
-                </div>
-              ))}
-            </motion.div>
-          </div>
-        </div>
-      </section>
+        None of it was measured. The sign-in page carried a SECOND invented set
+        (47K hours, 2.1M action items) that contradicted this one - 4.7M minutes
+        is 78K hours, not 47K - which is how you can tell neither came from a
+        query. Fabricated proof on the most prominent part of the page is the
+        same failure as the SOC 2 line that used to sit further down, and it is
+        worse than no proof, because a visitor who checks one number stops
+        believing the rest.
+
+        Put a measured number here when there is one.
+      */}
 
       {/* Features */}
       <section id="features" className="px-6 py-24">
@@ -211,7 +177,7 @@ function Landing() {
               An AI layer over every conversation your team has.
             </h2>
             <p className="mt-4 text-muted-foreground">
-              EchoBrief turns raw audio into structured knowledge — accurate transcripts, decisions,
+              Puffin turns raw audio into structured knowledge — accurate transcripts, decisions,
               action items, and answers, available the moment a call ends.
             </p>
           </motion.div>
@@ -231,7 +197,7 @@ function Landing() {
               {
                 icon: CheckSquare,
                 title: "Auto action items",
-                body: "Owners, deadlines, and context — extracted automatically and synced to Linear, Asana, or Notion.",
+                body: "Every commitment, with who owns it and when it is due, pulled out of the conversation and timestamped so you can check it against what was said.",
               },
               {
                 icon: Users,
@@ -241,12 +207,19 @@ function Landing() {
               {
                 icon: Zap,
                 title: "Real-time processing",
-                body: "Streaming transcription with sub-second latency. Watch a meeting transcribe as it happens.",
+                body: "Recording, upload and transcription of the meetings you capture — with speaker separation, so you can see who said what.",
               },
               {
                 icon: Lock,
-                title: "Enterprise-grade trust",
-                body: "SOC 2 Type II, end-to-end encryption, and per-workspace data residency. Your audio is yours.",
+                title: "Your audio stays yours",
+                // Was: "SOC 2 Type II, end-to-end encryption, and per-workspace
+                // data residency." SOC 2 Type II is an AUDIT you either hold or
+                // do not, and there is no evidence of one anywhere in this
+                // repo — claiming it is a false certification claim, not a
+                // marketing flourish. Every clause below is checkable in the
+                // code: retention is a per-user preference enforced by
+                // cleanup-r2.ts, and no processor is sent content for training.
+                body: "You choose how long recordings are kept, down to deleting them on arrival. No processor we use trains on your content.",
               },
             ].map((f, i) => (
               <motion.div
@@ -289,12 +262,12 @@ function Landing() {
                 n: "01",
                 icon: Upload,
                 title: "Upload or connect",
-                body: "Drop MP3, WAV, MP4, or sync Zoom, Meet, and Teams. Live recording works too.",
+                body: "Record on your phone, or drop in an MP3, WAV or MP4 you already have.",
               },
               {
                 n: "02",
                 icon: Brain,
-                title: "EchoBrief processes",
+                title: "Puffin processes",
                 body: "Transcription, diarization, topic segmentation, and summarization in under a minute.",
               },
               {
@@ -334,7 +307,7 @@ function Landing() {
             variants={fadeUp}
           >
             <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">
-              Ask EchoBrief
+              Ask Puffin
             </p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
               A research assistant that's listened to every meeting you've had.
@@ -416,72 +389,18 @@ function Landing() {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="px-6 py-24">
-        <div className="mx-auto max-w-6xl">
-          <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-100px" }}
-            variants={fadeUp}
-            className="mx-auto max-w-2xl text-center"
-          >
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">
-              Loved by teams
-            </p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
-              The teams that ship fastest run on EchoBrief.
-            </h2>
-          </motion.div>
+      {/*
+        Removed: a testimonial carousel of three invented people with invented
+        job titles at invented companies, each illustrated with a hot-linked
+        Unsplash portrait of a real stranger who has never used this product.
+        One quote claimed action items "appear in Linear before the call ends"
+        - per-provider export adapters are still a TODO in action-items.ts.
 
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, ease }}
-            className="mt-14 flex justify-center"
-          >
-            <CircularTestimonials
-              testimonials={[
-                {
-                  quote:
-                    "We replaced four tools with EchoBrief. Our weekly leadership meeting now writes its own follow-up.",
-                  name: "Priya Iyer",
-                  designation: "Head of Operations, Vertex",
-                  src: "https://images.unsplash.com/photo-1592621385612-4d7129426394?q=80&w=1200&auto=format&fit=crop",
-                },
-                {
-                  quote:
-                    "The cross-meeting search is genuinely magical. It feels like having a chief of staff.",
-                  name: "Arjun Sharma",
-                  designation: "Founder, Helix",
-                  src: "https://images.unsplash.com/photo-1564564321837-a57b7070ac4f?q=80&w=1200&auto=format&fit=crop",
-                },
-                {
-                  quote:
-                    "Action items used to vanish. Now they appear in Linear before the call ends.",
-                  name: "Anika Roy",
-                  designation: "VP Product, Northwind",
-                  src: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=1200&auto=format&fit=crop",
-                },
-              ]}
-              autoplay
-              colors={{
-                name: "var(--foreground)",
-                designation: "var(--muted-foreground)",
-                testimony: "color-mix(in oklab, var(--foreground) 95%, transparent)",
-                arrowBackground: "var(--surface-elevated)",
-                arrowForeground: "var(--foreground)",
-                arrowHoverBackground: "var(--brand)",
-              }}
-              fontSizes={{
-                name: "1.5rem",
-                designation: "0.95rem",
-                quote: "1.05rem",
-              }}
-            />
-          </motion.div>
-        </div>
-      </section>
+        Heading was "The teams that ship fastest run on Puffin" under a "Loved
+        by teams" eyebrow. There are no teams yet. Ship the section when there
+        is one real quote from one real user; one true sentence with a name
+        attached is worth more than three polished inventions.
+      */}
 
       {/* Pricing */}
       <section id="pricing" className="px-6 py-24">
@@ -605,7 +524,7 @@ function Landing() {
               Stop forgetting what your team said.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-muted-foreground">
-              EchoBrief is free to try for 14 days. Set it up in under 60 seconds.
+              Puffin is free to try for 14 days. Set it up in under 60 seconds.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Button asChild size="lg" className="h-11 rounded-full px-5">

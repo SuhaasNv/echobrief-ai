@@ -129,7 +129,6 @@ export interface Preferences {
   // --- Recording defaults --------------------------------------------------
   audioQuality: AudioQuality;
   autoStartOnCalendar: boolean;
-  keepAudioAfterProcessing: boolean;
   /** Days to keep audio. 0 keeps it until it is deleted by hand. */
   retentionDays: RetentionWindow;
 
@@ -139,6 +138,13 @@ export interface Preferences {
   /** Proper nouns the model should not mangle. */
   vocabulary: string[];
   rememberSpeakerNames: boolean;
+  /**
+   * Ask the transcriber to mask profanity. Off by default and deliberately so:
+   * the masking is done by AssemblyAI as it transcribes, so the words are gone
+   * rather than hidden, and a meeting recorder's job is to record. See
+   * migration 0019.
+   */
+  filterProfanity: boolean;
 
   // --- AI output -----------------------------------------------------------
   summaryStyle: SummaryStyle;
@@ -154,8 +160,19 @@ export interface Preferences {
   notifyActionItemsDue: boolean;
 
   // --- Privacy -------------------------------------------------------------
+  //
+  // `allowModelTraining` used to live here. It was written to the Keychain and
+  // read by NOTHING — zero references across src/server, packages/shared and
+  // migrations — while its switch promised that off meant recordings are "never
+  // used to train models". A privacy control with no enforcement behind it, and
+  // it contradicted the Legal screen's flat guarantee. The screen now states the
+  // truth instead; see account/privacy.tsx. Removed rather than left inert so
+  // nothing can start reading a value nobody ever really set.
+  //
+  // `keepAudioAfterProcessing` went the same way: defined, defaulted, parsed,
+  // and never rendered or read. Retention is governed by `retentionDays`, which
+  // the worker actually honours.
   /** Opt-in, never opt-out, and the copy says exactly what it covers. */
-  allowModelTraining: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -165,12 +182,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
   audioQuality: "balanced",
   autoStartOnCalendar: false,
-  keepAudioAfterProcessing: true,
   retentionDays: 90,
 
   language: null,
   vocabulary: [],
   rememberSpeakerNames: true,
+  filterProfanity: false,
 
   summaryStyle: "executive",
   summaryLength: "standard",
@@ -179,8 +196,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
   notifyWeeklyDigest: false,
   notifyActionItemsDue: true,
-
-  allowModelTraining: false,
 };
 
 let state: Preferences = DEFAULT_PREFERENCES;
@@ -236,12 +251,12 @@ function parse(raw: string): Preferences {
 
     audioQuality: oneOf(source.audioQuality, AUDIO_QUALITIES, d.audioQuality),
     autoStartOnCalendar: bool(source.autoStartOnCalendar, d.autoStartOnCalendar),
-    keepAudioAfterProcessing: bool(source.keepAudioAfterProcessing, d.keepAudioAfterProcessing),
     retentionDays: oneOf(source.retentionDays, RETENTION_WINDOWS, d.retentionDays),
 
     language: nullableText(source.language),
     vocabulary: terms(source.vocabulary),
     rememberSpeakerNames: bool(source.rememberSpeakerNames, d.rememberSpeakerNames),
+    filterProfanity: bool(source.filterProfanity, d.filterProfanity),
 
     summaryStyle: oneOf(source.summaryStyle, SUMMARY_STYLES, d.summaryStyle),
     summaryLength: oneOf(source.summaryLength, SUMMARY_LENGTHS, d.summaryLength),
@@ -250,8 +265,6 @@ function parse(raw: string): Preferences {
 
     notifyWeeklyDigest: bool(source.notifyWeeklyDigest, d.notifyWeeklyDigest),
     notifyActionItemsDue: bool(source.notifyActionItemsDue, d.notifyActionItemsDue),
-
-    allowModelTraining: bool(source.allowModelTraining, d.allowModelTraining),
   };
 }
 

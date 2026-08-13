@@ -10,6 +10,7 @@ import Svg, { Path } from "react-native-svg";
 import { pluralize } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
+import { useColorToken } from "@/lib/tokens";
 
 /**
  * The end of the library.
@@ -26,17 +27,13 @@ import { SPRING } from "@/lib/motion";
  * pays nothing for it.
  */
 
-const HEX_LABEL_TERTIARY = "#787C85"; // mirrors --label-tertiary; #6E727A was 4.03:1
-
 function PlusGlyph() {
+  // SVG stroke is outside className resolution, so the token is read here.
+  const tertiary = useColorToken("--label-tertiary");
+
   return (
     <Svg width={15} height={15} viewBox="0 0 16 16">
-      <Path
-        d="M8 3.2v9.6M3.2 8h9.6"
-        stroke={HEX_LABEL_TERTIARY}
-        strokeWidth={1.7}
-        strokeLinecap="round"
-      />
+      <Path d="M8 3.2v9.6M3.2 8h9.6" stroke={tertiary} strokeWidth={1.7} strokeLinecap="round" />
     </Svg>
   );
 }

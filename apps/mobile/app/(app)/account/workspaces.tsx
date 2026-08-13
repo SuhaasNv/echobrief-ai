@@ -25,6 +25,25 @@ import { Footnote, SettingsScroll } from "@/components/settings/screen";
  * honest in a way that switching-and-hanging is not: nothing about the new
  * workspace can be shown until something is fetched.
  */
+/**
+ * Human words for the stored enum.
+ *
+ * `workspaces.kind` is CHECK-constrained to 'student' | 'professional' and was
+ * rendered straight to screen, so the row read "Personal" over a lowercase
+ * "professional" — raw column data in the UI. The fallback returns the value
+ * unchanged rather than a placeholder: if a third kind is ever added, showing
+ * the unfamiliar word is more useful than showing nothing while somebody
+ * notices this function exists.
+ */
+function describeKind(kind: string | undefined): string {
+  const known: Record<string, string> = {
+    student: "Study workspace",
+    professional: "Work workspace",
+  };
+  if (!kind) return "";
+  return known[kind] ?? kind;
+}
+
 export default function WorkspacesScreen() {
   const online = useOnline();
   const query = useWorkspaces();
@@ -75,7 +94,7 @@ export default function WorkspacesScreen() {
       haptics.warning();
       Alert.alert(
         "Switching needs a connection",
-        "EchoBrief has to load the other workspace's meetings and action items before it can show them, and it cannot do that offline.",
+        "Puffin has to load the other workspace's meetings and action items before it can show them, and it cannot do that offline.",
       );
       return;
     }
@@ -101,7 +120,7 @@ export default function WorkspacesScreen() {
             <Row
               key={workspace.id}
               label={workspace.name}
-              detail={workspace.kind}
+              detail={describeKind(workspace.kind)}
               selected={workspace.id === selectedId}
               onPress={() => select(workspace.id)}
               hint="Switches to this workspace"
@@ -110,8 +129,8 @@ export default function WorkspacesScreen() {
         </Section>
       ) : (
         <Footnote>
-          No workspaces came back for this account. Everything you record is going to your
-          personal space.
+          No workspaces came back for this account. Everything you record is going to your personal
+          space.
         </Footnote>
       )}
 

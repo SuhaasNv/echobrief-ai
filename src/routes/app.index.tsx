@@ -17,7 +17,7 @@ import { formatDate, formatDuration, getTodayFormatted } from "@/lib/date-utils"
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 
 export const Route = createFileRoute("/app/")({
-  head: () => ({ meta: [{ title: "Dashboard — EchoBrief" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — Puffin" }] }),
   component: Dashboard,
 });
 
@@ -319,7 +319,7 @@ function Dashboard() {
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           <div>
-            <p className="text-sm font-medium">Ask EchoBrief about your meetings</p>
+            <p className="text-sm font-medium">Ask Puffin about your meetings</p>
             <p className="text-xs text-muted-foreground">
               "What did we decide about pricing this quarter?"
             </p>

@@ -12,8 +12,9 @@ import {
 } from "@/lib/api/action-items";
 import { describeError, useOnline } from "@/lib/api/errors";
 import { haptics } from "@/lib/haptics";
-import { useTabBarInset } from "@/lib/layout";
+import { SCROLL_TAB_BAR_AIR } from "@/lib/layout";
 import { SPRING } from "@/lib/motion";
+import { useColorToken } from "@/lib/tokens";
 import { ErrorState, StaleNotice } from "@/components/error-state";
 import { ActionRow } from "@/components/actions/action-row";
 import { SwipeToDelete } from "@/components/meeting/swipe-to-delete";
@@ -152,9 +153,10 @@ function Segmented({
 }
 
 export default function ActionsScreen() {
-  const tabBarInset = useTabBarInset();
   const reduceMotion = useReducedMotion();
   const online = useOnline();
+  // UIRefreshControl's default spinner grey is near-invisible on the canvas.
+  const spinner = useColorToken("--label-secondary");
   const { data, isLoading, isError, isPaused, isFetching, error, refetch } = useActionItems();
   const toggle = useToggleActionItem();
   const remove = useDeleteActionItem();
@@ -360,12 +362,17 @@ export default function ActionsScreen() {
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{
-          // Content sits behind the native tab bar; this clearance is ours.
-          paddingBottom: tabBarInset,
+          // Content sits behind the native tab bar, but the clearance is NOT
+          // ours: "automatic" above insets this content by the safe area at both
+          // ends, and on a tab screen the bottom of that safe area is already the
+          // bar's top edge. `useTabBarInset()` here added the same 83pt again, so
+          // the list kept scrolling a bar-height past its last item. Only the air
+          // between that item and the bar belongs in this style.
+          paddingBottom: SCROLL_TAB_BAR_AIR,
           gap: 20,
         }}
         refreshControl={
-          <RefreshControl refreshing={manualRefresh} onRefresh={onRefresh} tintColor="#9CA1A9" />
+          <RefreshControl refreshing={manualRefresh} onRefresh={onRefresh} tintColor={spinner} />
         }
       >
         {/* The control stays put in every state, which is the whole point of

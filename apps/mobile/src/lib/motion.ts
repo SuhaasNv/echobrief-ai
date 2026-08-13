@@ -103,6 +103,33 @@ export const TIMING = {
    * peaks get rounded off into an average. At 80ms it never caught a syllable.
    */
   meter: { duration: 50, easing: Easing.linear } satisfies WithTimingConfig,
+  /**
+   * The progress ring travelling between two PIPELINE STAGES.
+   *
+   * `progress` above is 300ms, which is right for a usage meter settling on
+   * entry and wrong here. The stages are 5 → 30 → 60 → 85 → 100, so every move
+   * is a 15-30 point jump; at 300ms the odometer columns blur through it too
+   * fast to read, and the screen then sits still for the ~30s until the next
+   * stage. Stall, glitch, stall.
+   *
+   * Eases out, never in: the move must begin the instant the poll reports a new
+   * stage, or it reads as network lag rather than as motion.
+   */
+  ringSweep: { duration: 850, easing: Easing.out(Easing.cubic) } satisfies WithTimingConfig,
+  /**
+   * The same ring driven by an UPLOAD, where progress is continuous.
+   *
+   * `onProgress` fires per chunk, many times a second on a fast connection.
+   * Under `ringSweep` each callback restarts an 850ms ease toward a target that
+   * has already moved, so the ring permanently trails the real transfer and then
+   * lurches to 100 at the end. Same low-pass failure as `meter` above: an attack
+   * longer than the sampling period turns the indicator into an average of the
+   * signal it is supposed to track.
+   *
+   * 180ms keeps up, and is still long enough that a burst of chunk callbacks
+   * reads as one continuous fill rather than a stutter.
+   */
+  uploadSweep: { duration: 180, easing: Easing.out(Easing.quad) } satisfies WithTimingConfig,
 } as const;
 
 /** Press feedback scale. Cards and buttons only — never full-width list rows. */

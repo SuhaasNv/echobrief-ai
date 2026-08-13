@@ -17,7 +17,7 @@
  * our client ID — which is what stops a token minted for a *different* app
  * from being replayed here.
  *
- * The resulting EchoBrief JWT is handed to the browser in the URL *fragment*,
+ * The resulting Puffin JWT is handed to the browser in the URL *fragment*,
  * not the query string. Fragments are never sent to the server, so the token
  * stays out of access logs, Referer headers, and Railway's HTTP logs.
  */
@@ -71,9 +71,50 @@ function redirectUriFor(reqUrl: string, headers: Headers): string {
   return `${apiOrigin(reqUrl, headers)}/api/v1/auth/google/callback`;
 }
 
-/** Send the browser back to the frontend's callback page with an error code. */
-function failTo(appUrl: string, code: string): Response {
-  return Response.redirect(`${appUrl}/auth/callback#error=${encodeURIComponent(code)}`, 302);
+/**
+ * Where a native client may be sent when the round trip finishes.
+ *
+ * An exact-match allowlist, and it has to stay one. This value ends up in a
+ * `Response.redirect` carrying a freshly minted session JWT in the fragment, so
+ * anything reachable here is a credential-stealing open redirect. A prefix or
+ * origin check is not sufficient — `echobrief://auth/callback.evil` passes a
+ * `startsWith` — and the set of legitimate destinations is exactly one string,
+ * so it is compared as one.
+ *
+ * `echobrief` is the scheme declared in apps/mobile/app.json; the client builds
+ * the same URL from that manifest rather than hardcoding it, so the two agree
+ * by construction and a scheme rename breaks loudly at sign-in rather than
+ * silently redirecting somewhere unclaimed.
+ *
+ * The web app is NOT in this list: it does not send `redirect_uri` at all and
+ * keeps falling through to APP_URL, exactly as before.
+ */
+const NATIVE_RETURN_URIS: readonly string[] = ["echobrief://auth/callback"];
+
+/**
+ * Resolve the caller's requested return target, or null for the web default.
+ *
+ * Called only when ISSUING the state, never when consuming it — the resolved
+ * value is then carried inside the signed state, so the callback trusts a
+ * string it signed itself rather than one arriving on the query string.
+ */
+function nativeReturnUri(requested: string | undefined): string | null {
+  if (!requested) return null;
+  return NATIVE_RETURN_URIS.includes(requested) ? requested : null;
+}
+
+/**
+ * Send the browser back to the caller's callback with an error code.
+ *
+ * `returnTo` is either the web app's page or an allowlisted native URL that was
+ * validated when the state was signed. A native caller has to receive its
+ * failures on its own scheme too: an error delivered to the https page is a
+ * dead end that leaves ASWebAuthenticationSession hanging until the user
+ * cancels, which reads as the app freezing rather than as sign-in failing.
+ */
+function failTo(returnTo: string, code: string): Response {
+  const separator = returnTo.startsWith("echobrief://") ? "" : "/auth/callback";
+  return Response.redirect(`${returnTo}${separator}#error=${encodeURIComponent(code)}`, 302);
 }
 
 googleAuth.get("/google", async (c) => {
@@ -99,7 +140,16 @@ googleAuth.get("/google", async (c) => {
   // A random nonce makes each state single-use in practice: it is echoed back
   // in the ID token and compared below.
   const nonce = crypto.randomUUID();
-  const state = await new SignJWT({ nonce, purpose: "google_oauth", account_type: accountType })
+  // Allowlisted HERE, at issue time, and then carried inside the signature. The
+  // callback never reads a redirect target off the query string, so tampering
+  // mid-flight would have to forge a JWT signed with AUTH_SECRET.
+  const returnTo = nativeReturnUri(c.req.query("redirect_uri"));
+  const state = await new SignJWT({
+    nonce,
+    purpose: "google_oauth",
+    account_type: accountType,
+    ...(returnTo ? { return_to: returnTo } : {}),
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(STATE_TTL)
@@ -120,35 +170,92 @@ googleAuth.get("/google", async (c) => {
   return c.redirect(`${GOOGLE_AUTH_URL}?${params.toString()}`);
 });
 
+/**
+ * Best-effort read of the return target out of an unconsumed state.
+ *
+ * Separate from the main verification below, which also establishes the nonce
+ * and account type and must reject anything invalid. This one only answers
+ * "where should the answer be delivered", and any doubt resolves to the web
+ * app — a failure to verify here must never widen the set of destinations.
+ */
+async function resolveReturnTarget(
+  state: string | undefined,
+  authSecret: string,
+  appUrl: string,
+): Promise<string> {
+  if (!state) return appUrl;
+  try {
+    const secret = new TextEncoder().encode(authSecret);
+    const { payload } = await jwtVerify(state, secret, { algorithms: ["HS256"] });
+    if (payload.purpose !== "google_oauth" || typeof payload.return_to !== "string") return appUrl;
+    return nativeReturnUri(payload.return_to) ?? appUrl;
+  } catch {
+    return appUrl;
+  }
+}
+
 googleAuth.get("/google/callback", async (c) => {
   const env = getEnv();
   const appUrl = env.APP_URL;
-
-  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-    return failTo(appUrl, "google_sso_unconfigured");
-  }
 
   const code = c.req.query("code");
   const state = c.req.query("state");
   const oauthError = c.req.query("error");
 
+  /**
+   * Resolve the caller BEFORE handling failures.
+   *
+   * Cancelling on the consent screen is the single most common way this route
+   * ends, and Google returns our `state` with it. Without reading that here, a
+   * native cancel would 302 to the web app's https page — which
+   * ASWebAuthenticationSession cannot intercept, so the sheet would sit there
+   * until the user cancelled a second time. Two cancels to cancel reads as the
+   * app being broken.
+   *
+   * Verified, not parsed: this goes through the same signature check as the
+   * main path, and falls back to the web app on anything it cannot verify.
+   */
+  const returnTarget = await resolveReturnTarget(state, env.AUTH_SECRET, appUrl);
+
+  // Config check after the target is known, so a misconfigured server still
+  // answers a native caller on its own scheme instead of stranding the auth
+  // sheet on a page it cannot read.
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+    return failTo(returnTarget, "google_sso_unconfigured");
+  }
+
   // User pressed "Cancel" on the consent screen, or Google rejected the app.
-  if (oauthError) return failTo(appUrl, oauthError);
-  if (!code || !state) return failTo(appUrl, "missing_code");
+  if (oauthError) return failTo(returnTarget, oauthError);
+  if (!code || !state) return failTo(returnTarget, "missing_code");
 
   // --- CSRF: the state must be one we signed, and not yet expired ----------
   let nonce: string;
   let accountType: "student" | "professional";
+  /**
+   * Where this particular sign-in came from.
+   *
+   * Starts as the web app and is only replaced by a value read OUT OF THE
+   * VERIFIED STATE below — never off the query string. Declared before the try
+   * so a state that fails verification still fails to the web page rather than
+   * to a target an attacker chose.
+   */
+  let returnTo = returnTarget;
   try {
     const secret = new TextEncoder().encode(env.AUTH_SECRET);
     const { payload } = await jwtVerify(state, secret, { algorithms: ["HS256"] });
     if (payload.purpose !== "google_oauth" || typeof payload.nonce !== "string") {
-      return failTo(appUrl, "invalid_state");
+      return failTo(returnTo, "invalid_state");
     }
     nonce = payload.nonce;
     accountType = payload.account_type === "student" ? "student" : "professional";
+    // Re-checked against the allowlist even though we signed it: a target that
+    // was valid when the state was minted must still be valid now, and this
+    // costs one array lookup to make the allowlist the single source of truth.
+    if (typeof payload.return_to === "string") {
+      returnTo = nativeReturnUri(payload.return_to) ?? appUrl;
+    }
   } catch {
-    return failTo(appUrl, "invalid_state");
+    return failTo(returnTo, "invalid_state");
   }
 
   // --- Exchange the authorization code for an ID token --------------------
@@ -168,12 +275,12 @@ googleAuth.get("/google/callback", async (c) => {
     const body = (await res.json()) as GoogleTokenResponse;
     if (!res.ok || !body.id_token) {
       console.error("[google-sso] token exchange failed", body.error, body.error_description);
-      return failTo(appUrl, "token_exchange_failed");
+      return failTo(returnTo, "token_exchange_failed");
     }
     idToken = body.id_token;
   } catch (err) {
     console.error("[google-sso] token exchange error", err);
-    return failTo(appUrl, "token_exchange_failed");
+    return failTo(returnTo, "token_exchange_failed");
   }
 
   // --- Verify the ID token and pull the identity out ----------------------
@@ -187,15 +294,15 @@ googleAuth.get("/google/callback", async (c) => {
       issuer: GOOGLE_ISSUERS,
     });
 
-    if (payload.nonce !== nonce) return failTo(appUrl, "invalid_nonce");
+    if (payload.nonce !== nonce) return failTo(returnTo, "invalid_nonce");
 
     // email_verified is the linchpin of the account-linking rule below. Without
     // it, anyone able to set an arbitrary unverified email at an IdP could take
-    // over an existing EchoBrief account by signing in with a matching address.
-    if (payload.email_verified !== true) return failTo(appUrl, "email_unverified");
+    // over an existing Puffin account by signing in with a matching address.
+    if (payload.email_verified !== true) return failTo(returnTo, "email_unverified");
 
     if (typeof payload.sub !== "string" || typeof payload.email !== "string") {
-      return failTo(appUrl, "invalid_id_token");
+      return failTo(returnTo, "invalid_id_token");
     }
 
     googleId = payload.sub;
@@ -204,10 +311,10 @@ googleAuth.get("/google/callback", async (c) => {
     avatarUrl = typeof payload.picture === "string" ? payload.picture : null;
   } catch (err) {
     console.error("[google-sso] id_token verification failed", err);
-    return failTo(appUrl, "invalid_id_token");
+    return failTo(returnTo, "invalid_id_token");
   }
 
-  // --- Resolve to an EchoBrief user ---------------------------------------
+  // --- Resolve to an Puffin user ---------------------------------------
   const sql = getSql();
   let user: UserRow | undefined;
 
@@ -269,7 +376,7 @@ googleAuth.get("/google/callback", async (c) => {
     }
   } catch (err) {
     console.error("[google-sso] user resolution failed", err);
-    return failTo(appUrl, "server_error");
+    return failTo(returnTo, "server_error");
   }
 
   // --- Issue our own JWT, exactly as password login does ------------------
@@ -282,7 +389,12 @@ googleAuth.get("/google/callback", async (c) => {
     .sign(secret);
 
   // Fragment, not query — see the file header.
-  return c.redirect(`${appUrl}/auth/callback#token=${encodeURIComponent(token)}`);
+  // Fragment, not query: fragments are never sent to a server, so the session
+  // token stays out of access logs and Referer headers. On the native path this
+  // is `echobrief://auth/callback#token=…`, which ASWebAuthenticationSession
+  // hands straight back to the app.
+  const separator = returnTo.startsWith("echobrief://") ? "" : "/auth/callback";
+  return c.redirect(`${returnTo}${separator}#token=${encodeURIComponent(token)}`);
 });
 
 export default googleAuth;

@@ -6,7 +6,7 @@ import {
   setPreference,
   usePreferences,
 } from "@/components/settings/preferences";
-import { Row, Section, ToggleRow } from "@/components/settings/rows";
+import { Row, Section, ToggleRow, ValueRow } from "@/components/settings/rows";
 import { Footnote, SettingsScroll } from "@/components/settings/screen";
 
 /**
@@ -24,22 +24,36 @@ export default function RecordingScreen() {
 
   return (
     <SettingsScroll>
+      {/*
+        A STATEMENT, not a picker — for now.
+
+        This was three options (Efficient / Balanced / High) with specific
+        technical promises: "smallest files, fastest upload on cellular", "best
+        for noisy rooms and far-field mics", under a footer about trading quality
+        against upload size. `preferences.audioQuality` was read in exactly one
+        place — to draw the checkmark. RECORDING_OPTIONS in lib/audio/use-recorder
+        is a module-level constant with audioQuality HIGH, sampleRate 44100 and
+        64 kbps hardcoded, and there is no audio_quality field on the server. A
+        user on a metered plan who picked "Efficient" to save data saved nothing.
+
+        Making it real is not a copy change. The dual-slot recorder hands BOTH
+        slots the same frozen options object precisely so useAudioRecorder cannot
+        rebuild a recorder mid-meeting, which is what protects the measured seam
+        continuity (1.509s captured per 1.500s window, never under). Making the
+        options vary per preference reopens that, and losing audio at every
+        rotation is a far worse outcome than a fixed bitrate.
+
+        So it says what it actually records. Same move as the retention picker
+        below, which was a lying control, became an honest statement, and became
+        a real picker once the worker read it. If per-recording quality ships,
+        this becomes a picker again — with a column, an API field, and a recorder
+        that reads it.
+      */}
       <Section
         title="Audio quality"
-        footer="Higher quality captures more of a difficult room, at the cost of a larger upload."
+        footer="One setting, chosen for speech: high enough to transcribe a room accurately, small enough to upload on cellular. About 28 MB an hour."
       >
-        {AUDIO_QUALITIES.map((choice) => (
-          <Row
-            key={choice.value}
-            label={choice.label}
-            detail={choice.detail}
-            selected={preferences.audioQuality === choice.value}
-            onPress={() => {
-              haptics.select();
-              setPreference("audioQuality", choice.value);
-            }}
-          />
-        ))}
+        <ValueRow label="Format" value="AAC, 44.1 kHz" />
       </Section>
 
       <Section

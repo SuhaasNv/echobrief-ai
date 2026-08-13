@@ -101,14 +101,49 @@ export function sanitizeTranscript(text: string, options: SanitizeOptions = {}):
 }
 
 /**
+ * Characters that render as something other than themselves.
+ *
+ * `Cc` is C0/C1 controls, `Cf` is format characters — which is where the
+ * dangerous ones live: the bidi overrides U+202A–202E and isolates U+2066–2069
+ * reverse the visual order of everything after them, and the zero-width family
+ * (U+200B–200D, U+FEFF) is invisible entirely.
+ *
+ * This matters because a title reaches the PUBLIC share page, which any
+ * unauthenticated visitor can open and which carries Puffin branding. React
+ * escapes HTML, so there is no XSS here — but React does not touch bidi, so a
+ * title containing U+202E renders as text the author chose in an order the
+ * stored string does not have. Spoofing a legitimate-looking heading on a page
+ * that looks official is the whole attack.
+ *
+ * Zero-width characters have a duller second cost: they defeat the ILIKE search
+ * on the meetings list, so a title carrying one silently stops being findable.
+ */
+const INVISIBLE_CHARS = /[\p{Cc}\p{Cf}]/gu;
+
+/**
  * Sanitize meeting/lecture titles.
- * Titles appear in prompts and UI, so must be safe.
+ *
+ * Titles reach prompts, the meetings list, and the public share page.
+ *
+ * NOTE ON WHAT WAS REMOVED. This used to run `/<\/?[^>]+(>|$)/g` to strip HTML —
+ * the exact regex the `sanitizeTranscript` docblock above argues against, for
+ * the exact reason given there: it swallows the span between a `<` and a `>` in
+ * ordinary text. "Revenue <50k but >100 units" was being STORED as "Revenue 100
+ * units". That pass was removed from transcripts and missed here, and it runs on
+ * the write path — including on AI-generated titles in the worker — so the
+ * damage was permanent rather than display-only.
+ *
+ * Dropping it costs nothing in safety: every surface that renders a title does
+ * so through JSX text interpolation, which HTML-escapes. The share page was
+ * audited specifically for this and has no `dangerouslySetInnerHTML` on any
+ * user-derived value. Angle brackets in a title are a display concern that React
+ * already handles, not a sanitization concern.
+ *
+ * What replaces it is the thing that was actually missing: characters that lie
+ * about what they are.
  */
 export function sanitizeTitle(title: string): string {
-  return title
-    .replace(/<\/?[^>]+(>|$)/g, "") // Strip HTML
-    .slice(0, MAX_LENGTHS.title) // Limit length
-    .trim();
+  return title.replace(INVISIBLE_CHARS, "").slice(0, MAX_LENGTHS.title).trim();
 }
 
 /**

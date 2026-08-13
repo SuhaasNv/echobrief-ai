@@ -12,14 +12,11 @@ import {
   removeVocabularyTerm,
   usePreferences,
 } from "@/components/settings/preferences";
-import {
-  AppearingRow,
-  ROW_MIN_HEIGHT,
-  Row,
-  Section,
-  SETTINGS_HEX,
-} from "@/components/settings/rows";
+import { AppearingRow, ROW_MIN_HEIGHT, Row, Section } from "@/components/settings/rows";
 import { Footnote, SettingsScroll } from "@/components/settings/screen";
+import { useColorTokens } from "@/lib/tokens";
+
+const TOKENS = ["--label-tertiary", "--danger"] as const;
 
 /**
  * Custom vocabulary.
@@ -33,6 +30,9 @@ export default function VocabularyScreen() {
   const preferences = usePreferences();
   const sync = useUpdatePreferences();
   const [draft, setDraft] = useState("");
+  // A TextInput placeholder and an expo-image tint are both props, not styles,
+  // so neither can be reached by a className.
+  const [tertiary, danger] = useColorTokens(TOKENS);
   const [notice, setNotice] = useState<string | null>(null);
 
   const terms = preferences.vocabulary;
@@ -83,8 +83,8 @@ export default function VocabularyScreen() {
               setDraft(next);
               if (notice) setNotice(null);
             }}
-            placeholder="EchoBrief, Nakamura, ARR"
-            placeholderTextColor={SETTINGS_HEX.tertiary}
+            placeholder="Puffin, Nakamura, ARR"
+            placeholderTextColor={tertiary}
             autoCapitalize="words"
             autoCorrect={false}
             returnKeyType="done"
@@ -113,7 +113,7 @@ export default function VocabularyScreen() {
 
       {notice ? (
         <Text
-          className="px-5 text-[13px] leading-[18px] text-warning"
+          className="px-4 text-[13px] leading-[18px] text-warning"
           maxFontSizeMultiplier={1.8}
           accessibilityLiveRegion="polite"
         >
@@ -144,7 +144,7 @@ export default function VocabularyScreen() {
                   >
                     <Image
                       source="sf:minus.circle.fill"
-                      tintColor={SETTINGS_HEX.danger}
+                      tintColor={danger}
                       style={{ width: 20, height: 20 }}
                       contentFit="contain"
                     />

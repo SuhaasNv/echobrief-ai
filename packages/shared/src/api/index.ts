@@ -6,11 +6,6 @@
  * collide with the one the web client already exports.
  */
 
-export {
-  API_PATH_PREFIX,
-  ApiError,
-  createApiClient,
-  normalizeApiBaseUrl,
-} from "./client";
+export { API_PATH_PREFIX, ApiError, createApiClient, normalizeApiBaseUrl } from "./client";
 
 export type { ApiClient, ApiClientConfig, RequestOptions, TokenStore } from "./client";

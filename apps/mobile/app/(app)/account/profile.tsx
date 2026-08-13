@@ -21,6 +21,7 @@ import {
   ValueRow,
 } from "@/components/settings/rows";
 import { Footnote, SettingsScroll } from "@/components/settings/screen";
+import { useColorToken } from "@/lib/tokens";
 
 /**
  * Profile.
@@ -37,6 +38,8 @@ export default function ProfileScreen() {
   const update = useUpdateProfile();
   const preferences = usePreferences();
   const avatar = useAvatarPicker(preferences.avatarUri);
+  // Dark text on the near-white primary button, spinner included.
+  const onPrimary = useColorToken("--background");
 
   const account = query.data;
 
@@ -137,8 +140,8 @@ export default function ProfileScreen() {
       </View>
 
       <Footnote>
-        Your picture is stored on this iPhone only. EchoBrief has no avatar upload yet, so it is
-        never sent to your account or shared with your workspace.
+        Your picture is stored on this iPhone only. Puffin has no avatar upload yet, so it is never
+        sent to your account or shared with your workspace.
       </Footnote>
 
       <Section title="Name" footer="Shown on shared meetings and in your workspace.">
@@ -159,7 +162,12 @@ export default function ProfileScreen() {
         <ValueRow label="Address" value={account.email} />
       </Section>
 
-      <Section title="Role" footer="Stored on this device. Used to tune summaries for your job.">
+      {/* "Used to tune summaries for your job" was false: preferences.role is read
+          in exactly one place — account/index.tsx, to draw a grey subtitle. It is
+          not in PreferencesPatch, not in UpdatePreferencesRequest, and appears
+          nowhere in src/server/lib/prompts.ts. It never reaches a prompt. The
+          footer now claims only what the field does. */}
+      <Section title="Role" footer="Stored on this iPhone, and shown on your account screen.">
         <TextFieldRow
           value={role}
           onChangeText={(next) => {
@@ -178,7 +186,12 @@ export default function ProfileScreen() {
       <CollapsibleSection
         title="Time zone"
         summary={timezoneLabel(activeZone)}
-        footer="Due dates and weekly digests are worked out in this zone."
+        // Both halves were false. preferences.timezone is read only inside this
+        // screen, to render its own selection; there is no timezone column, due
+        // dates are not formatted against it, and the weekly digest does not
+        // exist. Dates render in the phone's own zone, which is what a user
+        // expects anyway.
+        footer="Stored on this iPhone. Dates in the app follow your phone's own time zone."
       >
         <Row
           label="Use device time zone"
@@ -238,7 +251,7 @@ export default function ProfileScreen() {
           }`}
         >
           {update.isPending ? (
-            <ActivityIndicator color="#06070A" />
+            <ActivityIndicator color={onPrimary} />
           ) : (
             <Text
               className={`text-[17px] font-semibold ${

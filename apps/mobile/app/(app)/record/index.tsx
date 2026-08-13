@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
-  ActivityIndicator,
   Alert,
   Linking,
   Pressable,
@@ -23,10 +22,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { useQueryClient } from "@tanstack/react-query";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
-import { File } from "expo-file-system";
 
 import { useRecorder } from "@/lib/audio/use-recorder";
-import { uploadRecording } from "@/lib/audio/upload";
+import { createRecording, adoptSegment } from "@/lib/audio/segment-store";
+import { setRecordingActive } from "@/lib/audio/recovery";
+import {
+  DEFAULT_TARGET_SECONDS,
+  discardRecording,
+  startSession,
+  type UploadSession,
+} from "@/lib/audio/segment-upload";
+import { qk } from "@/lib/api/meetings";
 import { ensureNotificationPermission } from "@/lib/notifications";
 import {
   endRecordingActivity,
@@ -36,6 +42,7 @@ import {
   type RecordingControl,
 } from "@/lib/live-activity";
 import { formatClock, isPlaceholderTitle } from "@/lib/format";
+import { useColorToken } from "@/lib/tokens";
 import { RecordOrb, type OrbPhase } from "@/components/record-orb";
 
 /** Tagged so the release targets this screen's lock and not someone else's. */
@@ -126,10 +133,6 @@ const ORB_MIN = 168;
 const CHROME_H =
   EYEBROW_H + HEADER_GAP + TITLE_H + GROUP_GAP + TIMER_H + CTA_GAP + CONTROLS_H + BREATHING;
 
-/** --label-tertiary, dark ramp. app.json pins userInterfaceStyle to "dark", the
- *  same constraint components/player/glyphs already carries. */
-const GLYPH_DIM = "#787C85";
-
 /**
  * The edit affordance.
  *
@@ -137,13 +140,18 @@ const GLYPH_DIM = "#787C85";
  * rendered "Thu, Aug 13 at 3:47 AM" as what looks exactly like a date stamp.
  * Nobody taps a date stamp. The field around it does most of the work now; this
  * removes the last of the doubt about whether the text is yours to change.
+ *
+ * SVG fill is not styled by className, so the tint is read rather than
+ * defaulted in the parameter list — a token read is a hook.
  */
-function PencilGlyph({ size = 15, color = GLYPH_DIM }: { size?: number; color?: string }) {
+function PencilGlyph({ size = 15, color }: { size?: number; color?: string }) {
+  const tertiary = useColorToken("--label-tertiary");
+
   return (
     <Svg width={size} height={size} viewBox="0 0 16 16">
       <Path
         d="M12.1 1.6l2.3 2.3-1.7 1.7-2.3-2.3zM9.6 4.1l2.3 2.3-6.6 6.6-3.1.8.8-3.1z"
-        fill={color}
+        fill={color ?? tertiary}
       />
     </Svg>
   );
@@ -186,14 +194,104 @@ function RecordingDot({ live }: { live: boolean }) {
   return <Animated.View className="h-2 w-2 rounded-full bg-danger" style={style} />;
 }
 
+/**
+ * Directory name for a recording, decided before anything else happens.
+ *
+ * Local to this device and never sent anywhere, so it does not need to be a
+ * real UUID — it needs to be unique among the handful of recordings that can
+ * exist on one phone at once, and it needs to be available synchronously, with
+ * no native module and no round trip, because capture must not wait for it.
+ */
+function newLocalId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export default function RecordScreen() {
-  const recorder = useRecorder();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(defaultTitle);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const startedAt = useRef<Date | null>(null);
+  // placeholderTextColor is a prop rather than a style, so it is outside
+  // className resolution and has to arrive already resolved.
+  const placeholder = useColorToken("--label-tertiary");
+
+  /**
+   * The recording in progress, and the thing uploading it.
+   *
+   * Refs rather than state because neither is rendered and both are read from
+   * callbacks that must not go stale — `onSegment` in particular is captured by
+   * the rotation path, which runs while the microphone is live.
+   *
+   * The session is deliberately NOT owned by this screen's lifecycle. It lives
+   * at module scope in segment-upload, because the user ends a meeting and
+   * navigates away immediately and the upload has to outlive this component.
+   */
+  const localIdRef = useRef<string | null>(null);
+  const sessionRef = useRef<UploadSession | null>(null);
+
+  /**
+   * A segment has closed. File it under its index, then hand it to the uploader.
+   *
+   * The move is what makes the segment durable and unambiguous — until it lands
+   * the file is a `recording-<uuid>.aac` with nothing to say which meeting or
+   * which position it belongs to. Only after it is filed is the uploader told,
+   * so a crash between the two leaves a file that the recovery sweep can still
+   * place, never an index pointing at nothing.
+   */
+  const filedRef = useRef<Promise<void>>(Promise.resolve());
+
+  const onSegment = useCallback(({ index, uri }: { index: number; uri: string }) => {
+    const localId = localIdRef.current;
+    if (!localId) return;
+
+    // Chained, and the chain is awaited before finalize.
+    //
+    // Filing is asynchronous and `onSegment` is called from the rotation path,
+    // which cannot block on it — the microphone is live. But the LAST segment is
+    // filed at the same instant the user ends the meeting, so without this the
+    // finalize could ask the server to close a recording whose final segment had
+    // not been enqueued yet. The server would correctly report it missing, and
+    // the recovery round would go looking for a file that was still being moved.
+    filedRef.current = filedRef.current.then(async () => {
+      try {
+        const stored = await adoptSegment(localId, index, uri);
+        if (!stored) return;
+        sessionRef.current?.enqueue(index);
+      } catch {
+        // The segment stays where it is and this index goes unregistered.
+        // Finalize reports it as missing, which is the recovery path — failing
+        // the whole recording over one segment would be worse.
+      }
+    });
+  }, []);
+
+  /**
+   * Rotation cadence, read live rather than captured.
+   *
+   * POST /meetings/segmented echoes the server's own `segment_target_seconds`,
+   * and it usually answers a beat AFTER capture has started — capture must not
+   * wait on the network. So the first segment uses the default and every
+   * rotation after it asks again.
+   */
+  const getTargetSeconds = useCallback(
+    () => sessionRef.current?.targetSeconds ?? DEFAULT_TARGET_SECONDS,
+    [],
+  );
+
+  const recorder = useRecorder({ onSegment, getTargetSeconds });
+
+  /**
+   * Pick up anything a previous run left behind.
+   *
+   * Disabled while this screen is itself recording, so the sweep can never
+   * collide with the session currently writing segments.
+   */
+  const idle = recorder.state === "idle" || recorder.state === "denied";
+  // Publish capture state so the layout's sweep cannot fire while this screen is
+  // writing segments — it would hand a second uploader the same indexes.
+  useEffect(() => {
+    setRecordingActive(!idle);
+    return () => setRecordingActive(false);
+  }, [idle]);
 
   const recording = recorder.state === "recording";
   const paused = recorder.state === "paused";
@@ -311,11 +409,51 @@ export default function RecordScreen() {
     AccessibilityInfo.announceForAccessibility(message);
   }, []);
 
+  /**
+   * Start capturing, and open the meeting in parallel.
+   *
+   * The order matters. The directory and the manifest are created first and
+   * synchronously, so the very first segment has somewhere durable to land;
+   * `startSession` then fires POST /meetings/segmented WITHOUT being awaited,
+   * and `recorder.start()` follows immediately. A recording made with no signal
+   * still captures — the segments queue on disk and the meeting is opened when
+   * the network comes back.
+   */
   const onStart = useCallback(async () => {
-    await recorder.start();
-    startedAt.current = new Date();
+    const localId = newLocalId();
+    const chosen = title.trim() || defaultTitle();
+
+    try {
+      const manifest = createRecording({
+        localId,
+        title: chosen,
+        recordedAt: new Date(),
+        targetSeconds: DEFAULT_TARGET_SECONDS,
+      });
+      localIdRef.current = localId;
+      sessionRef.current = startSession(manifest);
+    } catch {
+      Alert.alert("Could not start", "There is no room on this iPhone to store the recording.");
+      return;
+    }
+
+    try {
+      await recorder.start();
+    } catch (error) {
+      // Nothing was captured, so leave nothing behind — including the meeting
+      // row the session may already have opened.
+      void discardRecording(localId);
+      localIdRef.current = null;
+      sessionRef.current = null;
+      Alert.alert(
+        "Could not start",
+        error instanceof Error ? error.message : "The microphone is not available.",
+      );
+      return;
+    }
+
     announce("Recording started");
-  }, [recorder, announce]);
+  }, [recorder, announce, title]);
 
   /**
    * Abandon a recording without transcribing it.
@@ -342,16 +480,23 @@ export default function RecordScreen() {
           style: "destructive",
           onPress: () => {
             void (async () => {
-              const uri = await recorder.stop();
-              if (uri) {
-                try {
-                  new File(uri).delete();
-                } catch {
-                  // Already gone, or the container moved between launches.
-                  // Nothing recoverable to do, and failing loudly here would
-                  // only alarm someone who asked us to throw the file away.
-                }
+              await recorder.stop();
+              // Before deleting the directory, or a file move still in flight
+              // would recreate it a moment after it was thrown away.
+              await filedRef.current;
+
+              // Every segment, not just the last one, plus the meeting row the
+              // session opened when recording started. A discarded recording
+              // that left a row behind would put a permanent empty meeting in
+              // the library — and segments left on disk are exactly the thing
+              // the user just said should not exist.
+              const localId = localIdRef.current;
+              localIdRef.current = null;
+              sessionRef.current = null;
+              if (localId) {
+                await discardRecording(localId).catch(() => undefined);
               }
+
               recorder.reset();
               setTitle(defaultTitle());
               announce("Recording discarded");
@@ -362,16 +507,42 @@ export default function RecordScreen() {
     );
   }, [recorder, announce]);
 
+  /**
+   * End the meeting.
+   *
+   * There is no upload screen. The user goes straight to the meeting and the
+   * upload finishes behind them, which is honest rather than cosmetic: by the
+   * time they press this, every segment but the last has already been uploaded
+   * and confirmed, so there genuinely is almost nothing left to send.
+   *
+   * The one thing that IS awaited is the meeting id, because there is nowhere
+   * to navigate without it — and it has usually been sitting in the session
+   * since the moment recording started.
+   */
   const onStop = useCallback(async () => {
-    const uri = await recorder.stop();
+    const session = sessionRef.current;
+    const localId = localIdRef.current;
+    const { totalSegments, durationSec } = await recorder.stop();
     announce("Recording stopped");
 
-    if (!uri) {
+    // Every segment, including the one that just closed, is now filed under its
+    // index and handed to the uploader. See filedRef.
+    await filedRef.current;
+
+    if (!session || !localId || totalSegments === 0) {
       Alert.alert("Nothing recorded", "That recording was empty.");
+      if (localId) await discardRecording(localId).catch(() => undefined);
+      localIdRef.current = null;
+      sessionRef.current = null;
       return;
     }
-    if (recorder.duration < 2) {
+
+    if (durationSec < 2) {
       Alert.alert("Too short", "That recording is too short to transcribe.");
+      await discardRecording(localId).catch(() => undefined);
+      localIdRef.current = null;
+      sessionRef.current = null;
+      recorder.reset();
       return;
     }
 
@@ -379,37 +550,44 @@ export default function RecordScreen() {
     // meeting and is about to wait several minutes for it to process, so
     // "we'll tell you when it's ready" is an offer rather than an interruption.
     //
-    // Asked BEFORE the upload starts, because permission has to exist before
-    // they leave the app, and leaving immediately is exactly what we want them
-    // to feel free to do. A no-op once the answer is settled either way, and it
-    // never blocks the upload: whatever they choose, the recording still goes.
+    // Asked BEFORE they leave, because permission has to exist before the app
+    // goes to the background, and leaving immediately is exactly what we want
+    // them to feel free to do. A no-op once the answer is settled either way,
+    // and it never blocks the upload: whatever they choose, the recording goes.
     await ensureNotificationPermission();
 
-    setUploading(true);
+    let meetingId: string;
     try {
-      const { meetingId } = await uploadRecording(
-        uri,
-        {
-          title: title.trim() || defaultTitle(),
-          durationSec: recorder.duration,
-          recordedAt: startedAt.current ?? new Date(),
-        },
-        { onProgress: setProgress },
-      );
-
-      await queryClient.invalidateQueries({ queryKey: ["meetings"] });
-      setTitle(defaultTitle());
-      router.push(`/(app)/meetings/${meetingId}`);
-    } catch (error) {
+      meetingId = await session.open();
+    } catch {
+      // No meeting row, so nowhere to send the user and nothing for a progress
+      // ring to attach to. The audio is safe on disk and the recovery sweep
+      // will offer it on the next launch, so this is the one failure that still
+      // belongs on THIS screen — the user has not gone anywhere yet.
       Alert.alert(
-        "Upload failed",
-        error instanceof Error ? error.message : "Your recording is still on this iPhone.",
+        "Could not reach Puffin",
+        "Your recording is saved on this iPhone. It will be uploaded the next time you open the app with a connection.",
       );
-    } finally {
-      setUploading(false);
-      setProgress(0);
+      localIdRef.current = null;
+      sessionRef.current = null;
+      recorder.reset();
+      setTitle(defaultTitle());
+      return;
     }
-  }, [recorder, title, queryClient, announce]);
+
+    // Not awaited. This is the whole point: the finalize, the last segment and
+    // any gap recovery all happen behind the user, reporting to the progress
+    // store the meeting screen is already watching.
+    void session.finish({ totalSegments, durationSec });
+
+    localIdRef.current = null;
+    sessionRef.current = null;
+    recorder.reset();
+    setTitle(defaultTitle());
+
+    await queryClient.invalidateQueries({ queryKey: qk.allMeetings });
+    router.push(`/(app)/meetings/${meetingId}`);
+  }, [recorder, queryClient, announce]);
 
   // Live Activity — the Dynamic Island and Lock Screen pill.
   //
@@ -482,21 +660,13 @@ export default function RecordScreen() {
     );
   }
 
-  if (uploading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-background px-8">
-        <ActivityIndicator />
-        <Text className="mt-4 text-[17px] font-semibold text-label">Uploading</Text>
-        <Text
-          className="mt-1 text-[15px] text-label-secondary"
-          style={{ fontVariant: ["tabular-nums"] }}
-        >
-          {Math.round(progress * 100)}%
-        </Text>
-      </View>
-    );
-  }
-
+  // There is deliberately no "Uploading 87%" state here any more.
+  //
+  // A recording used to meet a progress indicator twice: a full-screen one on
+  // this tab that ran to 100 and vanished, and then the meeting screen's own
+  // ring starting again at zero. One continuous wait in two visual languages,
+  // the second of which read as the first having failed. The meeting screen now
+  // owns the whole wait, and this screen's job ends when the recorder stops.
   return (
     // Canvas token, not true black. #06070A carries a deliberate blue cast (the
     // blue channel sits above the red), so a pure-black screen reads as a
@@ -516,7 +686,15 @@ export default function RecordScreen() {
     // what is genuinely left over rather than from a fraction of the viewport,
     // which is what stops the slack reappearing on a taller phone.
     <View
-      className="flex-1 bg-background px-6"
+      /*
+        px-4, not px-6. This screen was the only one in the app at a 24pt
+        gutter — every card, field and button everywhere else lands on 16pt —
+        so the content column visibly stepped inward the moment you swiped from
+        Meetings to Record. An 8pt discontinuity is small enough that nobody
+        names it and large enough that the two tabs stop feeling like one app.
+        The px-6 on the button below is INTERNAL pill padding and is unrelated.
+      */
+      className="flex-1 bg-background px-4"
       style={{ paddingTop: topPad, paddingBottom: bottomPad }}
     >
       <View className="items-center" style={{ gap: HEADER_GAP }}>
@@ -566,11 +744,9 @@ export default function RecordScreen() {
             value={title}
             onChangeText={setTitle}
             placeholder="Untitled meeting"
-            // Mirrors --label-tertiary on the dark ramp. react-native-svg and
-            // placeholderTextColor are both outside className resolution, so
-            // this hex cannot follow the token and has to be kept in step by
-            // hand. Measured 4.65:1 on --surface, which is the fill behind it.
-            placeholderTextColor={GLYPH_DIM}
+            // --label-tertiary, measured at 4.65:1 on --surface, which is the
+            // fill behind it.
+            placeholderTextColor={placeholder}
             editable={!active}
             accessibilityLabel="Meeting title"
             accessibilityHint="Names this recording"
@@ -628,8 +804,25 @@ export default function RecordScreen() {
             disabled={recorder.state === "requesting"}
             accessibilityRole="button"
             accessibilityLabel="Start recording"
-            className="min-h-[64px] items-center justify-center rounded-full bg-label active:opacity-80"
+            /**
+             * Red, with a record dot. It was a near-white pill.
+             *
+             * Recording is red on every camera, every voice recorder and every
+             * phone ever made, and this is the app's single most important
+             * action — so a white pill read as a form's Submit, not as "begin
+             * capturing this room". It was also the ONLY inverted button in the
+             * app, so it had no siblings to be understood against.
+             *
+             * The dot is not decoration: it is the same mark the Live Activity
+             * and the RECORDING label use, so the control you press and the
+             * indicator you then watch on the Lock Screen are visibly the same
+             * idea. Red already means destructive on Delete account — that is
+             * not a collision, it is the same underlying meaning both places:
+             * this one matters, look at it.
+             */
+            className="min-h-[64px] flex-row items-center justify-center gap-2.5 rounded-full bg-danger active:opacity-80"
           >
+            <View className="h-3 w-3 rounded-full bg-background" />
             <Text className="text-[17px] font-semibold text-background" maxFontSizeMultiplier={1.4}>
               Start recording
             </Text>
@@ -665,10 +858,24 @@ export default function RecordScreen() {
           </Animated.View>
         )}
 
-        {/* Discard sits below the primary pair rather than beside them. It is a
-            real escape hatch, so it must be reachable without a hunt, but it
-            destroys work, so it must never sit under a thumb travelling toward
-            Pause. Text-only weight is the whole point: findable, not inviting. */}
+        {/* One 44pt slot below the primary control, holding a different thing in
+            each state. It is the seat CONTROLS_H has always reserved for
+            Discard, so nothing above it moves and the orb is not charged a point
+            for the second occupant.
+
+            Recording: Discard. A real escape hatch, so it must be reachable
+            without a hunt, but it destroys work, so it must never sit under a
+            thumb travelling toward Pause. Text-only weight is the whole point:
+            findable, not inviting.
+
+            Idle: upload an existing file. This is the app's SECOND way to make a
+            meeting, and the screen has to say so somewhere — the recorder is
+            where a meeting gets created, and a file you already have is the
+            other way of creating one. Deliberately not a second pill: two
+            near-white buttons stacked would make the user choose between two
+            primaries on a screen whose entire job is to be pressed once. Tint,
+            because this navigates, and blue is navigation everywhere in this
+            app. */}
         {active ? (
           <Animated.View entering={FadeIn.duration(180)}>
             <Pressable
@@ -686,7 +893,31 @@ export default function RecordScreen() {
               </Text>
             </Pressable>
           </Animated.View>
-        ) : null}
+        ) : (
+          // No entrance animation, unlike Discard. Discard appears in response
+          // to a press; this is simply the resting state of the screen, and
+          // fading it in on every mount would animate something that was
+          // already there.
+          <Pressable
+            // No haptic, like every other control on this screen: lib/haptics.ts
+            // documents why the Taptic Engine is off limits here. The screen
+            // pushing is the feedback.
+            onPress={() => router.push("/(app)/record/import")}
+            accessibilityRole="button"
+            accessibilityLabel="Upload a file"
+            accessibilityHint="Choose an audio file on this iPhone or in iCloud Drive and add it as a meeting"
+            className="min-h-[44px] items-center justify-center active:opacity-60"
+          >
+            {/* --tint-label, not --tint. They are the same value under the
+                forced dark appearance this app ships, but the two exist so that
+                accent TEXT can be darkened independently of accent chrome the
+                day a light theme lands — and this is text on the canvas. Same
+                token the auth screens use for their inline actions. */}
+            <Text className="text-[15px] font-medium text-tint-label" maxFontSizeMultiplier={1.6}>
+              Upload a file
+            </Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );

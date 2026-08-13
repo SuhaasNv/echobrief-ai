@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 
 import { formatClock } from "@/lib/format";
+import { describeError, useOnline } from "@/lib/api/errors";
+import { ErrorState } from "@/components/error-state";
 
 import { Eyebrow } from "./eyebrow";
 import { PillButton } from "./question";
@@ -77,6 +79,28 @@ function nextPeriodStart(now: Date): string {
 }
 
 export function AskFailureCard({ error, onRetry }: { error: string; onRetry: () => void }) {
+  const online = useOnline();
+
+  /**
+   * Offline is handled BEFORE classification, because it is the one failure a
+   * retry genuinely cannot fix and the whole app already has a component that
+   * says so correctly.
+   *
+   * Ask was the one feature that never adopted the errors.ts contract every
+   * other screen runs on: offline here fell through to the generic "Search
+   * failed" card with a live "Try again" pill — the exact "retry that cannot
+   * succeed" this file's own header condemns. describeError knows to withhold
+   * the retry when the network is down, so ErrorState draws no button; the user
+   * is told to reconnect, not to keep tapping.
+   *
+   * Computed here but branched on AFTER the hooks below, so the hook order stays
+   * fixed — an early return above useMemo/useState/useEffect would break the
+   * rules of hooks the first time the network dropped.
+   */
+  const offlineCopy = !online
+    ? describeError(new Error(error), { online, subject: "an answer" })
+    : null;
+
   const failure = useMemo(() => classify(error), [error]);
 
   // Seconds left on a per-minute limit. Zero for every other kind, which is
@@ -103,6 +127,13 @@ export function AskFailureCard({ error, onRetry }: { error: string; onRetry: () 
     }, 1000);
     return () => clearInterval(id);
   }, [error, kind, seconds]);
+
+  // Offline wins over any classification: the message might match the quota or
+  // throttle regex by coincidence, but if the network is down none of those
+  // cards' advice applies.
+  if (offlineCopy) {
+    return <ErrorState title={offlineCopy.title} body={offlineCopy.body} />;
+  }
 
   if (failure.kind === "quota") {
     return (

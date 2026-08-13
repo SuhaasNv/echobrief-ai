@@ -32,7 +32,7 @@ const TURN_GAP = 20;
 /** The same speaker continuing; a paragraph break, not a new block. */
 const LINE_GAP = 8;
 
-interface Row extends Omit<SegmentRowProps, "active" | "onSeek" | "onMeasure"> {
+interface Row extends Omit<SegmentRowProps, "active" | "onSeek" | "onMeasure" | "onNameSpeaker"> {
   key: string;
   /** Where this line starts in the recording. Drives seek and highlight. */
   startSec: number;
@@ -48,12 +48,26 @@ function buildRows(transcript: NonNullable<MeetingDetail["transcript"]>): Row[] 
 
   // Resolve identity once. Doing this per row would be O(segments × speakers)
   // and would hand every row a fresh value on each poll.
-  const identity = new Map<string, { label: string; className: string }>();
+  //
+  // Indexed by BOTH id and label, for the reason components/ribbon spells out at
+  // length: `speakers[].id` is the bare diarization tag ("A"), while a segment's
+  // `speaker` carries the resolved display label ("Speaker A", or "Priya" once
+  // someone has named the voice). Keying on the id alone missed on every segment
+  // of every meeting, so `resolved` was always undefined — the label still drew,
+  // because it falls back to `segment.speaker`, but the COLOUR fell through to
+  // text-label-secondary and every speaker in every transcript rendered grey.
+  //
+  // Both keys rather than normalising one into the other, because the label is
+  // now user-editable and only a map that answers to both survives a rename.
+  const identity = new Map<string, { id: string; label: string; className: string }>();
   speakers.forEach((speaker, i) => {
-    identity.set(speaker.id, {
+    const entry = {
+      id: speaker.id,
       label: speaker.label,
       className: SPEAKER_CLASSES[i % SPEAKER_CLASSES.length] ?? "text-label-secondary",
-    });
+    };
+    identity.set(speaker.id, entry);
+    if (speaker.label) identity.set(speaker.label, entry);
   });
 
   // h:mm:ss only when the meeting actually runs past an hour; otherwise the
@@ -82,6 +96,9 @@ function buildRows(transcript: NonNullable<MeetingDetail["transcript"]>): Row[] 
       time: startsTurn ? formatClock(segment.start_sec) : null,
       label: startsTurn ? (resolved?.label ?? segment.speaker ?? "Speaker") : null,
       labelClass: resolved?.className ?? "text-label-secondary",
+      // Only on a turn's first line, because that is the only line that draws a
+      // name to tap. An unattributed segment carries no id and stays inert.
+      speakerId: startsTurn ? (resolved?.id ?? null) : null,
       text,
       gutter,
       spacing: rows.length === 0 ? 0 : startsTurn ? TURN_GAP : LINE_GAP,
@@ -157,9 +174,15 @@ export interface TranscriptViewProps {
   playback?: PlaybackController;
   /** The screen's scroll surface. Auto-scroll is a no-op without it. */
   follow?: FollowScroll;
+  /**
+   * Open the naming sheet for a voice. Must be stable across renders — every
+   * turn's name is a button, and a fresh identity would re-render all of them on
+   * each five second poll.
+   */
+  onNameSpeaker?: (speakerId: string) => void;
 }
 
-export function TranscriptView({ meeting, playback, follow }: TranscriptViewProps) {
+export function TranscriptView({ meeting, playback, follow, onNameSpeaker }: TranscriptViewProps) {
   const transcript = meeting.transcript;
   const reduceMotion = useReducedMotion();
 
@@ -271,6 +294,7 @@ export function TranscriptView({ meeting, playback, follow }: TranscriptViewProp
           active={row.index === activeIndex}
           onSeek={seekable ? onSeek : undefined}
           onMeasure={follow ? onMeasure : undefined}
+          onNameSpeaker={onNameSpeaker}
         />
       ))}
     </View>

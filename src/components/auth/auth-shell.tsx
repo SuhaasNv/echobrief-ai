@@ -14,23 +14,21 @@ import {
 import { Logo } from "@/components/logo";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 
-const QUOTES = [
-  {
-    body: '"EchoBrief turned a 47-minute call into 3 decisions and 7 action items — before I even closed my laptop."',
-    name: "Sarah Lin",
-    role: "Head of Ops · Vertex",
-  },
-  {
-    body: '"I asked it what we decided about the API three weeks ago. It gave me the exact 14-second clip and a one-line answer."',
-    name: "Dev Patel",
-    role: "Staff Engineer · Linear",
-  },
-  {
-    body: '"We replaced our notes channel with this. Half the meetings on my calendar disappeared inside a month."',
-    name: "Alex Romero",
-    role: "Co-founder · Foundry",
-  },
-];
+/**
+ * No testimonials until someone actually says something.
+ *
+ * What was here: three invented quotes with invented authors, one of them
+ * attributed to "Staff Engineer · Linear" — a real, identifiable company that
+ * has said nothing about this product. Putting words in a named company's
+ * mouth is not placeholder copy, it is a false endorsement, and it sat directly
+ * above a "4.9 / 5 on G2" rating that no one has ever left.
+ *
+ * The honest substitute is not a better fake quote. It is the product's own
+ * claim, which is checkable: this is what the app does with a recording.
+ */
+const PROMISE = {
+  body: "Record a meeting. Get the decisions, the open questions, and who owes what — with the timestamp each one came from, so you can check it.",
+};
 
 export function AuthShell({
   title,
@@ -102,16 +100,7 @@ const fadeUp = {
 };
 
 function RightPanel() {
-  const [idx, setIdx] = useState(0);
   const reduceMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (reduceMotion) return;
-    const id = window.setInterval(() => setIdx((i) => (i + 1) % QUOTES.length), 6500);
-    return () => window.clearInterval(id);
-  }, [reduceMotion]);
-
-  const quote = QUOTES[idx];
 
   return (
     <div className="relative hidden overflow-hidden border-l border-border/60 bg-surface lg:block">
@@ -143,41 +132,13 @@ function RightPanel() {
 
       <div className="relative flex h-full flex-col justify-between gap-8 p-12">
         {/* Top: rotating quote card */}
+        {/* Labelled "What you get", not "From a customer". The old header made
+            a sourcing claim the content could not support. */}
         <div className="glass relative max-w-sm rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-              From a customer
-            </p>
-            <div className="flex gap-1">
-              {QUOTES.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setIdx(i)}
-                  aria-label={`Show quote ${i + 1}`}
-                  className={`h-1 rounded-full transition-all ${
-                    i === idx ? "w-5 bg-brand" : "w-1.5 bg-muted-foreground/40"
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="mt-3 min-h-[120px]">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <p className="text-sm leading-relaxed">{quote.body}</p>
-                <p className="mt-4 text-xs text-muted-foreground">
-                  {quote.name} · {quote.role}
-                </p>
-              </motion.div>
-            </AnimatePresence>
-          </div>
+          <p className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+            What you get
+          </p>
+          <p className="mt-3 text-sm leading-relaxed">{PROMISE.body}</p>
         </div>
 
         {/* Middle: product preview + feature pills */}
@@ -190,11 +151,14 @@ function RightPanel() {
         <div className="space-y-5">
           <StatStrip />
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground/70">
-              5,000+ teams · 4.9 / 5 on G2
-            </p>
-            <p className="mt-3 max-w-md text-2xl font-semibold tracking-tight text-gradient">
-              Where every conversation becomes structured intelligence.
+            {/* "5,000+ teams · 4.9 / 5 on G2" removed: no such rating exists
+                and nobody counted those teams. The tagline that followed it —
+                "Where every conversation becomes structured intelligence" — was
+                the fourth variation of one sentence that also appears in the
+                page title, the meta description and labels.ts. Replaced with
+                the plainest true thing the product does. */}
+            <p className="max-w-md text-2xl font-semibold tracking-tight">
+              Stop forgetting what your team said.
             </p>
           </div>
         </div>

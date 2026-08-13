@@ -19,16 +19,9 @@ import {
 import { formatClock } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
+import { useColorTokens } from "@/lib/tokens";
 
-import {
-  ChevronDownGlyph,
-  GLYPH,
-  GLYPH_DIM,
-  PauseGlyph,
-  PlayGlyph,
-  SkipBackGlyph,
-  SkipForwardGlyph,
-} from "./glyphs";
+import { ChevronDownGlyph, PauseGlyph, PlayGlyph, SkipBackGlyph, SkipForwardGlyph } from "./glyphs";
 import { useFollowState, type FollowScroll } from "./follow-scroll";
 import {
   PLAYER_BAR_HEIGHT,
@@ -203,11 +196,17 @@ export interface PlayerBarProps {
   follow: FollowScroll;
 }
 
+const TOKENS = ["--label", "--label-quaternary"] as const;
+
 export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
   const state = usePlaybackState(playback);
   const followState = useFollowState(follow);
   const reduceMotion = useReducedMotion();
   const [expanded, setExpanded] = useState(false);
+  // Transport colour for the two states this bar sets by hand: the skip pair
+  // greys out with no audio to skip through, and the spinner replaces the play
+  // glyph, so both need the value the glyphs would otherwise read themselves.
+  const [glyph, glyphDim] = useColorTokens(TOKENS);
   // Sits ON the tab bar. Six points of seam, measured from the bar's real top
   // edge rather than from an inset that counted it twice — see
   // PLAYER_TAB_BAR_GAP and useTabBarTopEdge.
@@ -292,7 +291,7 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
               label={`Skip back ${SKIP_BACK_SEC} seconds`}
               disabled={total <= 0}
             >
-              <SkipBackGlyph seconds={SKIP_BACK_SEC} color={total > 0 ? GLYPH : GLYPH_DIM} />
+              <SkipBackGlyph seconds={SKIP_BACK_SEC} color={total > 0 ? glyph : glyphDim} />
             </TransportButton>
 
             <TransportButton
@@ -300,7 +299,7 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
               label={`Skip forward ${SKIP_FORWARD_SEC} seconds`}
               disabled={total <= 0}
             >
-              <SkipForwardGlyph seconds={SKIP_FORWARD_SEC} color={total > 0 ? GLYPH : GLYPH_DIM} />
+              <SkipForwardGlyph seconds={SKIP_FORWARD_SEC} color={total > 0 ? glyph : glyphDim} />
             </TransportButton>
           </Animated.View>
         ) : null}
@@ -324,7 +323,7 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
                   // Replaces the glyph rather than sitting beside it: the
                   // control has one job at a time, and a spinner next to a play
                   // triangle reads as two states at once.
-                  <ActivityIndicator color={GLYPH} accessibilityLabel="Loading audio" />
+                  <ActivityIndicator color={glyph} accessibilityLabel="Loading audio" />
                 ) : state.playing ? (
                   <PauseGlyph size={24} />
                 ) : (

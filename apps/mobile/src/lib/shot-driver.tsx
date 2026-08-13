@@ -1,9 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { router, usePathname } from "expo-router";
 import { File, Paths } from "expo-file-system";
 
 import { qk, type MeetingListResponse } from "@/lib/api/meetings";
+import { api } from "@/lib/api/client";
+import { adoptSession } from "@/lib/api/auth";
+import { tokenStore } from "@/lib/api/token-store";
 
 /**
  * Screenshot driver for the design-review loop. Inert unless explicitly enabled.
@@ -89,9 +92,71 @@ const TAB_ROOTS = new Set([
 /** Every route the walk has actually reached, oldest first. */
 const ROUTE_TRAIL: string[] = [];
 
+/**
+ * The pathname a given route should produce, for the arrival check below.
+ *
+ * The two sentinels are excluded: FIRST_MEETING's pathname carries an id that is
+ * only known at runtime, and GO_BACK's depends on what was pushed. Both are
+ * single-shot and neither is worth re-asserting — retrying a `back()` that
+ * already happened would walk the stack backwards.
+ */
+function expectedPathname(route: string): string | null {
+  if (route === FIRST_MEETING || route === GO_BACK) return null;
+  return route.replace("/(app)", "");
+}
+
+/**
+ * Harness credentials, for SHOT_MODE only.
+ *
+ * The walk visits routes that all live behind auth, so on a signed-out
+ * simulator it reaches /sign-in and stops — which is exactly what happened, and
+ * it is why the meeting detail screen has never appeared in a capture set. Two
+ * design reviews graded an incomplete set as a result.
+ *
+ * EXPO_PUBLIC_* is inlined by Metro at BUILD time, so these are absent from any
+ * bundle that does not set them, and the whole block below is dead code behind
+ * SHOT_MODE in a normal build. The account they name is a throwaway seeded for
+ * screenshots — never a real user's.
+ */
+const SHOT_EMAIL = process.env.EXPO_PUBLIC_SHOT_EMAIL;
+const SHOT_PASSWORD = process.env.EXPO_PUBLIC_SHOT_PASSWORD;
+
+/**
+ * Sign the harness in, once, if it is not already.
+ *
+ * Deliberately NOT a silent no-op on failure: a capture set taken while signed
+ * out is a set of sign-in screens, and the whole point of the route trail is
+ * that a bad run announces itself rather than being graded.
+ */
+async function ensureShotSession(): Promise<void> {
+  if (!SHOT_MODE || !SHOT_EMAIL || !SHOT_PASSWORD) return;
+  if (tokenStore.getToken()) return;
+
+  try {
+    const res = await api.apiRequest<{ token: string }>("/auth/login", {
+      method: "POST",
+      body: { email: SHOT_EMAIL, password: SHOT_PASSWORD },
+    });
+    await adoptSession(res.token);
+    router.replace("/(app)/meetings");
+  } catch (error) {
+    console.warn("[shot-driver] harness sign-in failed:", error);
+  }
+}
+
 export function ShotDriver() {
   const queryClient = useQueryClient();
   const pathname = usePathname();
+
+  /**
+   * Latest pathname, readable from inside the walk without restarting it.
+   *
+   * The step loop cannot depend on `pathname` directly: that would re-run the
+   * effect on every navigation, which tears down the pending timer and restarts
+   * the walk from index 0.
+   */
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
 
   /**
    * Ground truth for the capture set.
@@ -129,6 +194,15 @@ export function ShotDriver() {
     }
   }, [pathname]);
 
+  /**
+   * Authenticate before walking. The walk's routes are all behind auth, so on a
+   * signed-out device every capture would be the sign-in screen.
+   */
+  useEffect(() => {
+    if (!SHOT_MODE) return;
+    void ensureShotSession();
+  }, []);
+
   useEffect(() => {
     if (!SHOT_MODE) return;
 
@@ -137,9 +211,7 @@ export function ShotDriver() {
     // walk starts, otherwise route 0 is captured mid-stagger.
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    const step = () => {
-      const route = SHOT_ROUTES[index];
-      if (!route) return;
+    const go = (route: string) => {
       try {
         if (route === GO_BACK) {
           // Guarded, because the step before this one is FIRST_MEETING, which
@@ -186,6 +258,48 @@ export function ShotDriver() {
         // screens are still worth capturing, and a gap in the output is a much
         // clearer signal than a harness that hangs.
       }
+    };
+
+    const step = () => {
+      const route = SHOT_ROUTES[index];
+      if (!route) return;
+      go(route);
+
+      /**
+       * Re-assert the route if the first attempt did not land.
+       *
+       * A `navigate` onto a tab root is not always honoured — capture runs have
+       * produced trails where the driver issued one navigation and the app
+       * reported five unrelated tab changes around it, and runs where a step
+       * simply did not move. Either way the screenshot then shows the previous
+       * screen under the next screen's name.
+       *
+       * The retry fires at a third of the dwell, so a successful re-assert still
+       * leaves ~5s for the screen to settle before the harness shoots at 4s...
+       * which it does not, quite: a route recovered on the retry is captured
+       * mid-transition. That is deliberate. A slightly soft screenshot that is
+       * genuinely the right screen beats a crisp one that is the wrong screen,
+       * and verify-shots.py can only tell the two apart because the trail says
+       * which route was on screen.
+       *
+       * Once, not in a loop. If two attempts will not land it, the route is
+       * broken rather than racy, and the verifier reporting an honest gap is the
+       * correct outcome.
+       */
+      const expected = expectedPathname(route);
+      if (expected !== null) {
+        timers.push(
+          setTimeout(() => {
+            if (pathnameRef.current !== expected) {
+              console.warn(
+                `[shot-driver] ${route} did not land (on ${pathnameRef.current}); re-asserting`,
+              );
+              go(route);
+            }
+          }, SHOT_DWELL_MS / 3),
+        );
+      }
+
       index += 1;
       if (index < SHOT_ROUTES.length) {
         timers.push(setTimeout(step, SHOT_DWELL_MS));

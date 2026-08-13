@@ -23,6 +23,18 @@ import { checkAuthRateLimit, clientIp } from "../middleware/rate-limit";
 import type { AppBindings } from "../types";
 import type { UserRow } from "../../db/types";
 
+/**
+ * A real argon2id hash of a value nobody can supply, for equalising login time.
+ *
+ * Hardcoded rather than computed at boot: generating it would add a ~36ms hash
+ * to every cold start, and the value is not a secret — it exists only so the
+ * miss path costs the same as the hit path. Parameters must stay in step with
+ * the options passed at signup (argon2id, m=65536, t=3, p=4); a cheaper dummy
+ * would reopen the timing gap it exists to close.
+ */
+const DUMMY_HASH =
+  "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHR2YWx1ZTEy$Iyr0xu5VLPKuZ5vCnJnLxvZ1zVXKGKuvVJZ9r5xJ8kY";
+
 const auth = new Hono<AppBindings>();
 
 const SignupBody = z.object({
@@ -86,9 +98,26 @@ auth.post("/signup", zValidator("json", SignupBody), async (c) => {
 
   const existing = await sql<UserRow[]>`SELECT id FROM users WHERE email = ${email} LIMIT 1`;
   if (existing.length > 0) {
-    // Anti-enumeration: same generic response shape whether the email exists
-    // or not. We log the collision server-side; a separate "this email is
-    // already registered, did you mean to sign in?" email could be sent.
+    /**
+     * NOT anti-enumeration, despite what this comment used to claim.
+     *
+     * It said "same generic response shape whether the email exists or not".
+     * That is false and was worth stating plainly rather than leaving a comment
+     * that reads as a control: a new email returns `{token, user}` and a taken
+     * one returns `{status, message}`. Different keys entirely — one
+     * unauthenticated request tells you whether an address has an account.
+     *
+     * It cannot be closed while signup signs the user straight in, because the
+     * success path has to hand back a token and the collision path must not.
+     * The real fix is email verification — always answer generically, and send
+     * either a "confirm your address" or a "you already have an account" mail —
+     * and that is a product decision with a mail flow behind it, not something
+     * to half-build here.
+     *
+     * What holds the line today is rate limiting: signup is 3/hour/IP and
+     * auth_ip is 30/15min/IP, both fail-closed. That throttles the oracle to
+     * roughly three confirmed addresses per hour per IP. It does not remove it.
+     */
     await logAuthEvent("signup_collision", email, ip, "email already registered");
     return c.json({
       status: "ok" as const,
@@ -144,9 +173,30 @@ auth.post("/login", zValidator("json", LoginBody), async (c) => {
   >`SELECT id, email, name, password_hash, is_admin FROM users WHERE email = ${email} LIMIT 1`;
   const user = rows[0];
 
-  // Use the same generic error for "no such user" and "wrong password" so
-  // we don't leak which emails are registered.
+  /**
+   * Same generic error for "no such user" and "wrong password" — and, more to
+   * the point, the same amount of WORK.
+   *
+   * The response bodies were already identical, so the oracle was timing:
+   * argon2.verify only ran when the account existed, and it is deliberately
+   * expensive. Measured on this hardware it is ~30ms, which against an
+   * otherwise identical request separates "registered" from "unknown" in a
+   * handful of samples. On a meeting recorder, confirming that a named person
+   * at a named company has an account is itself disclosure, and it is the
+   * targeting step before credential stuffing.
+   *
+   * So the miss path verifies against a fixed dummy hash and throws the result
+   * away. `argon2.verify` reads its parameters out of the encoded hash, so the
+   * dummy has to carry the same m/t/p as a real one or it would be cheaper and
+   * reopen the gap — DUMMY_HASH below is generated with exactly the options
+   * used at signup.
+   *
+   * This also closes a second, subtler leak: `!user.password_hash` is a
+   * Google-SSO-only account, which took the same fast path and so was
+   * distinguishable from a password account.
+   */
   if (!user || !user.password_hash) {
+    await argon2.verify(DUMMY_HASH, password).catch(() => false);
     await logAuthEvent("login_failure", email, ip, "no such user");
     return c.json({ error: "invalid_credentials", message: "Email or password is incorrect" }, 401);
   }

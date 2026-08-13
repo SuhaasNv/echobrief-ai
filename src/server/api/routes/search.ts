@@ -1,9 +1,22 @@
 /**
- * /api/v1/search — cross-meeting semantic Q&A (RAG).
+ * /api/v1/search — cross-meeting semantic Q&A (RAG), and the one place a
+ * natural-language instruction turns into something the app does.
  *
  * Embeds the query, runs cosine-similarity search via the
  * `match_transcript_chunks` SQL function (pgvector), then streams a grounded
  * answer with citation metadata in a response header.
+ *
+ * A turn can also be an INSTRUCTION rather than a question. In that case the
+ * body is empty and an `x-ask-action` header carries a plan — see
+ * lib/ask-actions.ts for why routing and target resolution are split, and
+ * services/ask-actions.ts for where the confirmation boundary is drawn.
+ *
+ * NOTHING IS MUTATED HERE. The endpoint answers or it plans; the writes stay in
+ * PATCH /action-items/:id, PATCH /meetings/:id and DELETE /meetings/:id, which
+ * the client calls as ordinary, separately-authorized requests. That keeps one
+ * code path per mutation, keeps the mobile caches correct (those routes already
+ * have hooks that invalidate properly), and means no database row has ever
+ * changed as a side effect of a language model call.
  */
 
 import { Hono } from "hono";
@@ -12,7 +25,8 @@ import { zValidator } from "@hono/zod-validator";
 import { stream } from "hono/streaming";
 import { SearchRequest } from "../../../lib/schemas";
 import { embedQuery } from "../../services/openai";
-import { streamGroundedAnswer } from "../../services/llm";
+import { classifyAskIntent, streamGroundedAnswer } from "../../services/llm";
+import { planAskAction } from "../../services/ask-actions";
 import { PROMPTS } from "../../lib/prompts";
 import { getSql } from "../../db";
 import type { MatchedChunkRow } from "../../db/types";
@@ -21,13 +35,75 @@ import { logAIQuery } from "../../services/usage-tracker";
 
 const app = new Hono<AppBindings>();
 
+/**
+ * How many earlier turns the intent router is shown.
+ *
+ * USER turns only — see askIntentUser. Four is enough for "and the other one
+ * too" to have somewhere to look without turning a classification prompt into a
+ * transcript of the session.
+ */
+const INTENT_CONTEXT_TURNS = 4;
+
 app.post("/", zValidator("json", SearchRequest), async (c) => {
   const { query, history, limit } = c.req.valid("json");
   const user = c.get("user");
   const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
-  const embedding = await embedQuery(query);
+  /**
+   * Routing and retrieval start together.
+   *
+   * Sequencing them would put a whole model round trip in front of every
+   * ordinary question, which this screen cannot afford: its entire design rests
+   * on citations landing in a header a second before the first answer token, and
+   * a classifier in front of the embedding call would eat that lead. Run in
+   * parallel, the common case (a question) pays nothing, and the rare case (an
+   * instruction) throws away one embedding and one index scan — a fraction of a
+   * cent and no user-visible time at all.
+   */
+  const intentPromise = classifyAskIntent({
+    question: query,
+    priorQuestions: history
+      .filter((turn) => turn.role === "user")
+      .slice(-INTENT_CONTEXT_TURNS)
+      .map((turn) => turn.content),
+  });
+
+  const embeddingPromise = embedQuery(query);
+  /**
+   * An instruction turn returns without ever awaiting the embedding, so this
+   * promise can reject with nobody listening — which in Node is a process-level
+   * unhandled rejection, not a failed request. Attaching a sink marks it
+   * handled without consuming it: the `await` below still sees the original
+   * rejection and still turns it into a 500.
+   */
+  embeddingPromise.catch(() => undefined);
+
+  const intent = await intentPromise;
+  if (intent.intent !== "answer") {
+    const plan = await planAskAction({ intent, userId: user.id, workspaceId });
+
+    if (plan) {
+      // An instruction spent a model call like any other turn.
+      await logAIQuery(user.id, workspaceId);
+
+      /**
+       * Empty body, everything in the header.
+       *
+       * The alternative was a sentence in the body describing the action, and
+       * it was rejected: on the action path there should be no free text on the
+       * user's screen at all. The card is composed by the client out of typed
+       * fields, so a model cannot author the words next to a Delete button.
+       */
+      c.header("content-type", "text/plain; charset=utf-8");
+      c.header("cache-control", "no-cache");
+      c.header("x-citations", encodeURIComponent(JSON.stringify([])));
+      c.header("x-ask-action", encodeURIComponent(JSON.stringify(plan)));
+      return c.body("");
+    }
+  }
+
+  const embedding = await embeddingPromise;
 
   // pgvector accepts a vector literal in `'[1.0,2.0,...]'` format. postgres.js
   // doesn't have first-class vector encoding; we stringify ourselves.

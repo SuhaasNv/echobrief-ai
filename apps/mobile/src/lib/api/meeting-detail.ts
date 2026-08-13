@@ -27,12 +27,41 @@ export interface MeetingScore {
   explanation: string;
 }
 
+/**
+ * The kinds of moment the analyst may flag. Mirrors MOMENT_KINDS in
+ * src/server/lib/moments.ts — add one there and the enum in ANALYSIS_SCHEMA
+ * before adding it here, or the chip renders with no label.
+ *
+ * Every one of these is an ACT someone performed in words, never a state they
+ * were in. There is deliberately no "frustrated", "excited" or "bored": the
+ * pipeline reads a transcript and has never heard the audio, so a feeling would
+ * be a guess printed next to a real colleague's name.
+ */
+export type MomentKind = "disagreement" | "hesitation" | "enthusiasm" | "alignment" | "concern";
+
+export interface NotableMoment {
+  kind: MomentKind;
+  description: string;
+  /** The speaker's own words. Verified server-side to appear in the transcript. */
+  quote: string;
+  /** The diarization label the quote was found under, e.g. "Speaker A". */
+  speaker: string | null;
+  timestamp_sec: number | null;
+}
+
 export interface MeetingSummaryBlock {
   executive: string | null;
   key_topics: string[];
   decisions: string[];
   open_questions: string[];
   chapters: { title: string; start_sec: number; end_sec: number; summary: string }[];
+  /**
+   * Optional because a response cached by an older build of this app has no
+   * such key, and react-query will hand that cached object straight to the
+   * summary pane on launch. The server always sends the field now — `[]` for
+   * summaries written before migration 0020, and for most meetings since.
+   */
+  notable_moments?: NotableMoment[];
 }
 
 export interface MeetingDetail {

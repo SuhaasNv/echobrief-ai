@@ -1,6 +1,8 @@
 import { Text, View } from "react-native";
 import Svg, { Path, Polygon } from "react-native-svg";
 
+import { useColorToken } from "@/lib/tokens";
+
 /**
  * Transport glyphs.
  *
@@ -13,30 +15,32 @@ import Svg, { Path, Polygon } from "react-native-svg";
  * arc. That also keeps it on the system face, where it inherits Dynamic Type
  * and renders the digits at the right optical size instead of as scaled paths.
  *
- * Strokes take a hex directly because react-native-svg is not styled by
- * className. Safe only because app.json pins userInterfaceStyle to "dark" - the
- * same constraint lib/screen-options and swipe-to-delete already carry.
+ * Strokes take a colour value rather than a class name, because
+ * react-native-svg is not styled by className. Each glyph therefore reads
+ * --label itself when the caller does not override it; a token read is a hook,
+ * so it cannot be a parameter default.
  */
 
-/** --label, dark ramp. */
-export const GLYPH = "#F4F5F7";
-/** --label-quaternary, dark ramp. Disabled transport. */
-export const GLYPH_DIM = "#4A4E56";
+export function PlayGlyph({ size = 30, color }: { size?: number; color?: string }) {
+  const label = useColorToken("--label");
+  const glyph = color ?? label;
 
-export function PlayGlyph({ size = 30, color = GLYPH }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 30 30">
       {/* Optically centred, not geometrically: a triangle centred on the box
           reads as sitting left of centre inside a round button. */}
-      <Polygon points="10.5,6 24,15 10.5,24" fill={color} />
+      <Polygon points="10.5,6 24,15 10.5,24" fill={glyph} />
     </Svg>
   );
 }
 
-export function PauseGlyph({ size = 30, color = GLYPH }: { size?: number; color?: string }) {
+export function PauseGlyph({ size = 30, color }: { size?: number; color?: string }) {
+  const label = useColorToken("--label");
+  const glyph = color ?? label;
+
   return (
     <Svg width={size} height={size} viewBox="0 0 30 30">
-      <Path d="M9.5 6h3.6v18H9.5zM16.9 6h3.6v18h-3.6z" fill={color} />
+      <Path d="M9.5 6h3.6v18H9.5zM16.9 6h3.6v18h-3.6z" fill={glyph} />
     </Svg>
   );
 }
@@ -54,7 +58,10 @@ interface SkipGlyphProps {
  * has somewhere to sit; without the gap the head reads as a smudge on a closed
  * ring at 26pt.
  */
-function SkipGlyph({ seconds, size = 26, color = GLYPH, back }: SkipGlyphProps & { back: boolean }) {
+function SkipGlyph({ seconds, size = 26, color, back }: SkipGlyphProps & { back: boolean }) {
+  const label = useColorToken("--label");
+  const glyph = color ?? label;
+
   return (
     <View style={{ width: size, height: size }} className="items-center justify-center">
       <Svg width={size} height={size} viewBox="0 0 26 26" style={{ position: "absolute" }}>
@@ -64,23 +71,21 @@ function SkipGlyph({ seconds, size = 26, color = GLYPH, back }: SkipGlyphProps &
             // solve puts each arc's centre at a corner of the 0 0 26 26 viewBox,
             // so most of the 270 degrees sits at negative coordinates and gets
             // clipped, leaving two stubs that looked like stray punctuation.
-            back
-              ? "M13 4.4 A 8.6 8.6 0 1 1 4.4 13"
-              : "M13 4.4 A 8.6 8.6 0 1 0 21.6 13"
+            back ? "M13 4.4 A 8.6 8.6 0 1 1 4.4 13" : "M13 4.4 A 8.6 8.6 0 1 0 21.6 13"
           }
-          stroke={color}
+          stroke={glyph}
           strokeWidth={1.7}
           strokeLinecap="round"
           fill="none"
         />
         <Polygon
           points={back ? "13.6,1.4 13.6,7.4 9.4,4.4" : "12.4,1.4 12.4,7.4 16.6,4.4"}
-          fill={color}
+          fill={glyph}
         />
       </Svg>
       <Text
         className="text-[9px] font-semibold"
-        style={{ color, fontVariant: ["tabular-nums"], marginTop: 2 }}
+        style={{ color: glyph, fontVariant: ["tabular-nums"], marginTop: 2 }}
         // Locked: the numeral is inside a 26pt ring it cannot grow out of. The
         // control's meaning is carried by its accessibilityLabel, which does
         // scale.
@@ -101,12 +106,15 @@ export function SkipForwardGlyph(props: SkipGlyphProps) {
 }
 
 /** Downward chevron for the return-to-current affordance. */
-export function ChevronDownGlyph({ size = 13, color = GLYPH }: { size?: number; color?: string }) {
+export function ChevronDownGlyph({ size = 13, color }: { size?: number; color?: string }) {
+  const label = useColorToken("--label");
+  const glyph = color ?? label;
+
   return (
     <Svg width={size} height={size} viewBox="0 0 13 13">
       <Path
         d="M2.6 4.6 6.5 8.6 10.4 4.6"
-        stroke={color}
+        stroke={glyph}
         strokeWidth={1.8}
         strokeLinecap="round"
         strokeLinejoin="round"

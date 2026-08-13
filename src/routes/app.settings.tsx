@@ -39,7 +39,7 @@ import { useSubscription } from "@/lib/api/use-subscription";
 import { UpgradeModal } from "@/components/upgrade-modal";
 
 export const Route = createFileRoute("/app/settings")({
-  head: () => ({ meta: [{ title: "Settings — EchoBrief" }] }),
+  head: () => ({ meta: [{ title: "Settings — Puffin" }] }),
   component: SettingsPage,
 });
 
@@ -526,7 +526,7 @@ function ProfileSection({
 
   return (
     <section className="rounded-xl border border-border/70 bg-surface p-6">
-      <SectionHeader icon={User} title="Profile" subtitle="How you show up in EchoBrief." />
+      <SectionHeader icon={User} title="Profile" subtitle="How you show up in Puffin." />
 
       <div className="mt-6 space-y-6">
         <AvatarUpload

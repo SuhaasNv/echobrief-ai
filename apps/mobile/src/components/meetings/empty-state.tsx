@@ -61,8 +61,7 @@ export function LibraryEmpty() {
           className="text-[15px] leading-[21px] text-label-secondary"
           maxFontSizeMultiplier={1.8}
         >
-          EchoBrief listens once and gives you three things back, usually within a couple of
-          minutes.
+          Puffin listens once and gives you three things back, usually within a couple of minutes.
         </Text>
       </View>
 

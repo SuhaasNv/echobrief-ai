@@ -20,19 +20,56 @@ import { Card } from "@/components/card";
  * extracted speculatively.
  */
 
-/** Uppercase micro-eyebrow — the most portable piece of the web app's identity. */
+/**
+ * CARD TITLE. 15pt semibold, sentence case.
+ *
+ * This was an 11pt uppercase micro-eyebrow, and so was RowLabel below it — one
+ * component doing both jobs. Measured off a render, "MEETING SCORE" (a card
+ * title) and "PARTICIPATION" (a row label INSIDE that card) both came out at
+ * 8.3pt cap height. Two hierarchy ranks, one type style: you could not tell
+ * which was which without reading the words and inferring rank from meaning.
+ *
+ * That was also the app's biggest typographic gap. The scale ran 12 / ~17 / ~20
+ * / 56pt with nothing between 20 and 56, and 12pt carried three different jobs.
+ * Promoting card titles fills the hole and gives the densest screen a readable
+ * skeleton — you can now skim the stack by its headings.
+ *
+ * Sentence case, not uppercase: at 15pt, uppercase with letterspacing reads as a
+ * label rather than a heading, and these ARE headings. The uppercase treatment
+ * stays where it belongs — on RowLabel, one rank down.
+ */
 export function Eyebrow({
   children,
   tone = "secondary",
 }: {
   children: string;
+  /** `tertiary` survives for callers that want a quieter heading. */
   tone?: "secondary" | "tertiary";
 }) {
   return (
     <Text
-      className={`text-[11px] font-semibold uppercase ${
-        tone === "secondary" ? "text-label-secondary" : "text-label-tertiary"
+      className={`text-[15px] font-semibold ${
+        tone === "secondary" ? "text-label" : "text-label-secondary"
       }`}
+      maxFontSizeMultiplier={1.4}
+      numberOfLines={1}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/**
+ * ROW LABEL, one rank below a card title. 11pt uppercase, letterspaced.
+ *
+ * This is the treatment Eyebrow used to have, kept for the place it was always
+ * right: labels for rows INSIDE a card, where they must sit under the card's own
+ * heading rather than compete with it.
+ */
+export function RowLabel({ children }: { children: string }) {
+  return (
+    <Text
+      className="text-[11px] font-semibold uppercase text-label-tertiary"
       style={{ letterSpacing: 0.8 }}
       maxFontSizeMultiplier={1.4}
       numberOfLines={1}
@@ -93,12 +130,15 @@ const METER_TIMING = { duration: 620, easing: Easing.out(Easing.cubic) } as cons
  * was rebuilt as a transform; the same rule applies to width. The track is a
  * fixed-width View, so the layout never moves and the row cannot reflow.
  *
- * The default fill is VIOLET, because the only meter on this screen that does
- * not name its own tone is the meeting score, and the meeting score is a
- * judgement the model made. Violet means "a model produced this" everywhere in
- * the app; it was blue here, which said "this navigates" about five bars that
- * navigate nowhere. Any meter measuring something the model did NOT produce —
- * the speaker-share bars, for one — passes its own tone.
+ * The default fill is VIOLET — "a model produced this", which is what violet
+ * means everywhere in the app. It was blue once, which said "this navigates"
+ * about bars that navigate nowhere.
+ *
+ * That default is now a fallback rather than the common case: the score card's
+ * five metric bars used to take it, which made ACTIONABILITY 2.0 render
+ * identically to FOCUS 9.0 and hid the weak dimension the card exists to
+ * surface. They now pass a tone banded by value (danger / warning / success).
+ * The violet hero numeral is what carries "a model judged this" on that screen.
  */
 export function Meter({
   value,
@@ -162,9 +202,7 @@ export function EmptyPane({ title, detail }: { title: string; detail?: string })
     <View className="items-center gap-2 px-8 py-16">
       <Text className="text-center text-[17px] font-semibold text-label">{title}</Text>
       {detail ? (
-        <Text className="text-center text-[14px] leading-[20px] text-label-tertiary">
-          {detail}
-        </Text>
+        <Text className="text-center text-[14px] leading-[20px] text-label-tertiary">{detail}</Text>
       ) : null}
     </View>
   );

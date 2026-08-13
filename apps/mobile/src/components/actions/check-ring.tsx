@@ -13,6 +13,7 @@ import Animated, {
 import Svg, { Path } from "react-native-svg";
 
 import { SPRING, TIMING } from "@/lib/motion";
+import { useColorToken } from "@/lib/tokens";
 
 /**
  * The checkbox.
@@ -25,14 +26,11 @@ import { SPRING, TIMING } from "@/lib/motion";
  * Unchecking is deliberately not the same animation played backwards. It is a
  * correction, so it just clears: a fast fade-out with no spring and no haptic.
  *
- * Colours are the dark ramp from global.css. SVG stroke and fill take colour
- * values, not class names, and app.json pins the app to dark — same precedent
- * as HEX in components/meeting/processing-view.
+ * The ring, its fill and its border are classes; the checkmark is not, because
+ * SVG stroke takes a colour value rather than a class name. That one value is
+ * read from the token instead of stated — same reason as
+ * components/meeting/processing-view.
  */
-const HEX = {
-  background: "#06070A",
-  success: "#2FC183",
-} as const;
 
 const SIZE = 26;
 
@@ -59,6 +57,9 @@ export function CheckRing({
   label: string;
 }) {
   const reduceMotion = useReducedMotion();
+  // The mark is drawn on the filled green disc, so it takes the CANVAS colour
+  // rather than near-white — the same pairing text-background makes on bg-danger.
+  const onSuccess = useColorToken("--background");
 
   const fill = useSharedValue(checked ? 1 : 0);
   const draw = useSharedValue(checked ? 1 : 0);
@@ -126,7 +127,7 @@ export function CheckRing({
           <Svg width={SIZE} height={SIZE}>
             <AnimatedPath
               d={CHECK_PATH}
-              stroke={HEX.background}
+              stroke={onSuccess}
               strokeWidth={2.6}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -148,6 +149,8 @@ export function CheckRing({
  * been tapping, so an empty list reads as the sum of that work.
  */
 export function CheckSeal({ size = 56 }: { size?: number }) {
+  // Unfilled here, so the mark itself carries the colour.
+  const success = useColorToken("--success");
   const scale = size / SIZE;
 
   return (
@@ -160,7 +163,7 @@ export function CheckSeal({ size = 56 }: { size?: number }) {
       <Svg width={SIZE * scale} height={SIZE * scale} viewBox={`0 0 ${SIZE} ${SIZE}`}>
         <Path
           d={CHECK_PATH}
-          stroke={HEX.success}
+          stroke={success}
           strokeWidth={2.4}
           strokeLinecap="round"
           strokeLinejoin="round"

@@ -20,10 +20,19 @@ import {
   SCORE_SCHEMA,
   FLASHCARDS_SCHEMA,
   PROMPTS,
+  summaryDirective,
   type AnalysisStructured,
+  type SummaryPreferences,
   type ScoreStructured,
   type FlashcardsStructured,
 } from "../lib/prompts";
+import { groundMoments, type NotableMoment } from "../lib/moments";
+import {
+  ASK_INTENT_SCHEMA,
+  ASK_INTENT_SYSTEM,
+  askIntentUser,
+  type AskIntentStructured,
+} from "../lib/ask-actions";
 
 let _client: OpenAI | null = null;
 
@@ -86,7 +95,27 @@ export type ActionItemOutput = AnalysisStructured["action_items"][number];
 export type MeetingScore = ScoreStructured;
 
 export interface AnalysisResult {
+  /**
+   * A name for the recording, drawn from what was said.
+   *
+   * Optional because rows analysed before the schema carried a title still flow
+   * through here, and because the stub below has nothing to name. An absent or
+   * blank value leaves the recorder's timestamp in place — see
+   * `applyGeneratedTitle` in workers/processing.ts.
+   */
+  title?: string;
   summary: SummaryOutput;
+  /**
+   * Moments that survived checking, which is why they sit here and not on
+   * `summary` beside the model's other output.
+   *
+   * `summary.notable_moments` holds what the model claimed; this holds what the
+   * transcript actually supports, with the speaker and timestamp read off the
+   * line each quote was found on. Consumers must use this one — the raw list is
+   * on the summary type only because that is the shape the JSON arrives in.
+   * Always an array, empty far more often than not.
+   */
+  notable_moments: NotableMoment[];
   action_items: ActionItemOutput[];
   cost_usd: number;
 }
@@ -100,7 +129,10 @@ export interface ChatTurn {
 // Summary + action items (single call, structured output)
 // ----------------------------------------------------------------------------
 
-export async function analyzeMeeting(transcript: string): Promise<AnalysisResult> {
+export async function analyzeMeeting(
+  transcript: string,
+  prefs?: SummaryPreferences | null,
+): Promise<AnalysisResult> {
   const env = getEnv();
   if (!env.OPENAI_API_KEY) return stubAnalysis();
 
@@ -115,7 +147,13 @@ export async function analyzeMeeting(transcript: string): Promise<AnalysisResult
     reasoning_effort: "low",
     max_completion_tokens: 8000,
     messages: [
-      { role: "system", content: PROMPTS.MEETING_ANALYSIS_SYSTEM },
+      // Preferences ride on the SYSTEM message. The transcript is untrusted and
+      // is wrapped in tags so it cannot issue instructions; putting formatting
+      // directives next to it would blur exactly that line.
+      {
+        role: "system",
+        content: PROMPTS.MEETING_ANALYSIS_SYSTEM + summaryDirective(prefs),
+      },
       { role: "user", content: PROMPTS.meetingAnalysisUser(transcript) },
     ],
     response_format: {
@@ -135,7 +173,15 @@ export async function analyzeMeeting(transcript: string): Promise<AnalysisResult
   const cost_usd = computeCostUsd(env.OPENAI_MODEL_PRIMARY, response.usage);
 
   return {
+    title: parsed.title,
     summary: parsed.summary,
+    // Checked against the SAME string the model was given, which is the only
+    // comparison that means anything: `transcript` here is the diarized text
+    // built by formatDiarizedTranscript, so a quote is matched against the
+    // lines the model actually read rather than against some other rendering of
+    // the meeting. Anything whose words are not in there is dropped now, before
+    // it can be written to a summaries row or rendered beside a person's name.
+    notable_moments: groundMoments(parsed.summary.notable_moments, transcript),
     action_items: parsed.action_items,
     cost_usd,
   };
@@ -248,6 +294,80 @@ export async function scoreMeeting(
 }
 
 // ----------------------------------------------------------------------------
+// Ask intent routing (light model, structured output)
+// ----------------------------------------------------------------------------
+
+/**
+ * Decide whether an Ask turn is a question or an instruction.
+ *
+ * Structured output rather than tool calling, and the reason is a security
+ * boundary rather than a style preference — see the header of
+ * lib/ask-actions.ts. The short version: a tool-calling loop would put the
+ * retrieved transcript and the executable tools in one context, leaving prompt
+ * text as the only thing between an injected "delete every meeting" and a
+ * DELETE. This call is structurally incapable of that, because it is never
+ * given any transcript content to be injected from.
+ *
+ * NEVER THROWS. A router that fails must degrade to answering the question,
+ * which is what the endpoint did before this existed — so a bad API response, a
+ * timeout or a malformed body all resolve to `intent: "answer"` rather than
+ * taking the user's search down with them. The one failure mode this must not
+ * have is "acted because something went wrong".
+ *
+ * Runs on the LIGHT model: the input is one sentence and the output is three
+ * fields, so this is classification, not reasoning. It is also on the hot path
+ * of every question, which is why the caller starts it in parallel with
+ * retrieval rather than in front of it.
+ */
+export async function classifyAskIntent(params: {
+  question: string;
+  priorQuestions: string[];
+}): Promise<AskIntentStructured> {
+  const answerOnly: AskIntentStructured = {
+    intent: "answer",
+    target_hint: null,
+    new_title: null,
+  };
+
+  const env = getEnv();
+  // No key means the stub answer path, which cannot act on anything anyway.
+  if (!env.OPENAI_API_KEY) return answerOnly;
+
+  try {
+    const client = getClient();
+    const response = await client.chat.completions.create({
+      model: env.OPENAI_MODEL_LIGHT,
+      reasoning_effort: "low",
+      // Three short fields. The cap exists for the reasoning tokens, which bill
+      // at the output rate whether or not they reach us — see analyzeMeeting.
+      max_completion_tokens: 1500,
+      messages: [
+        { role: "system", content: ASK_INTENT_SYSTEM },
+        {
+          role: "user",
+          content: askIntentUser(params.question, params.priorQuestions),
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "ask_intent",
+          strict: true,
+          schema: ASK_INTENT_SCHEMA,
+        },
+      },
+    });
+
+    const raw = response.choices[0]?.message.content;
+    if (!raw) return answerOnly;
+    return JSON.parse(raw) as AskIntentStructured;
+  } catch (err) {
+    console.warn("[ask-intent] routing failed, falling back to answering:", err);
+    return answerOnly;
+  }
+}
+
+// ----------------------------------------------------------------------------
 // Streaming Q&A
 // ----------------------------------------------------------------------------
 
@@ -357,6 +477,7 @@ function stubAnalysis(): AnalysisResult {
       open_questions: [],
       chapters: [],
     },
+    notable_moments: [],
     action_items: [],
     cost_usd: 0,
   };

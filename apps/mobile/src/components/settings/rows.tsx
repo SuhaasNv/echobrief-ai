@@ -15,6 +15,7 @@ import Svg, { Path } from "react-native-svg";
 
 import { haptics } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
+import { useColorToken, useColorTokens } from "@/lib/tokens";
 
 /**
  * Inset-grouped list primitives.
@@ -34,42 +35,47 @@ import { SPRING } from "@/lib/motion";
  * The chip is GREY by default, which is the one place this deviates from iOS
  * Settings on purpose. Apple's rainbow of saturated chips works because their
  * list is forty rows of unrelated system domains and the colour is the only
- * index into it. This list is eleven rows on one subject, and painting it the
+ * index into it. This list is short and on one subject, and painting it the
  * same way produced a wall of blue squares that read as a stock settings
- * template rather than as this product. Colour survives here only where it
- * means something: violet where a model produced the thing, red where the row
- * destroys something. There is deliberately no green, no amber, and no blue
- * tone to reach for — the union below is the whole vocabulary.
+ * template rather than as this product.
+ *
+ * So colour is spent two ways, and only these two. FILLED chips — violet and
+ * red — carry a MEANING: violet is "a model produced this", red is "this row
+ * destroys something". TINTED chips — blue, green, amber at a 15% wash — carry
+ * GROUPING: a section shares one hue so the eye can tell Capture from Account
+ * from Privacy without reading, the way a tabbed divider would. The two systems
+ * do not collide because filled and tinted are visibly different weights; a
+ * filled violet chip never reads as "the violet section".
+ *
+ * An earlier version of this file had only the three filled tones and a comment
+ * here forbidding the tinted ones. The tinted grouping was added later and the
+ * comment was not — see the note on the TINTED block below, which is the one
+ * that describes what actually ships.
  */
 
 /** Minimum row height. Below this a grouped list stops reading as iOS. */
 const ROW_MIN_HEIGHT = 52;
 
-/** Dark-ramp values from global.css, for SVG and native controls. */
-const HEX = {
-  label: "#F4F5F7",
-  secondary: "#9CA1A9",
-  // Tracks --label-tertiary, which was raised from #6E727A: that value measured
-  // 4.03:1 on the canvas and carried every chevron and every field placeholder
-  // in the settings tree. #787C85 is 4.82:1 on --background, 4.65:1 on
-  // --surface. It still cannot clear AA on --fill, so nothing on a filled
-  // control may use it — those use `secondary`.
-  tertiary: "#787C85",
-  tint: "#4C99F8",
-  violet: "#A27DFA",
-  success: "#2FC183",
-  warning: "#E6AC3D",
-  danger: "#FF5F62",
-  track: "#2E3138",
-  background: "#06070A",
-} as const;
+/**
+ * Off state of the UISwitch track.
+ *
+ * No token matches it: it is lighter than --fill (#1C1E28) and darker than
+ * --separator-opaque (#383B4B), so reading either would change what ships. The
+ * same value turns up once more, as the unattributed band in
+ * components/ribbon — an inactive-track grey that two places arrived at
+ * independently. If a third appears it has earned a token; two is not enough to
+ * name one.
+ */
+const SWITCH_TRACK = "#2E3138";
 
 /**
- * The complete chip vocabulary. Three entries, not six.
+ * The complete chip vocabulary.
  *
- * `neutral` is the default and covers every ordinary row. `violet` is the app's
- * one semantic colour: a model produced this. `danger` is set by the row's
- * `destructive` flag, never by hand.
+ * `neutral` is the default and covers every ordinary row. `violet` and `danger`
+ * are the two FILLED semantic tones (a model produced this / this destroys
+ * something), set by meaning or by the `destructive` flag, never picked by
+ * hand. `tint`, `success` and `warning` are the three TINTED grouping tones —
+ * one per settings section — described on TONE_BG below.
  */
 export type IconTone = "violet" | "danger" | "neutral" | "tint" | "success" | "warning";
 
@@ -96,19 +102,13 @@ const TONE_BG: Record<IconTone, string> = {
   warning: "bg-warning/15",
 };
 
-const TONE_GLYPH: Record<IconTone, string> = {
-  neutral: HEX.secondary,
-  // Both accent chips are light values, so the glyph is the CANVAS colour, not
-  // near-white: #F4F5F7 measures 2.81:1 on violet and 2.73:1 on red, while
-  // #06070A measures 6.57:1 and 6.78:1 on the same two.
-  violet: HEX.background,
-  danger: HEX.background,
-  // Tinted chips keep the accent as the glyph: on a 15% wash over --surface the
-  // accent stays well clear of AA (tint 6.1:1, success 7.7:1, warning 8.7:1).
-  tint: HEX.tint,
-  success: HEX.success,
-  warning: HEX.warning,
-};
+const GLYPH_TOKENS = [
+  "--label-secondary",
+  "--background",
+  "--tint",
+  "--success",
+  "--warning",
+] as const;
 
 /**
  * Leading icon chip.
@@ -116,8 +116,30 @@ const TONE_GLYPH: Record<IconTone, string> = {
  * SF Symbols come through expo-image's `sf:` source rather than a vector-icon
  * font: they are the real system symbols, so they inherit the platform's
  * weights and stay correct as iOS revises them.
+ *
+ * The chip's BACKGROUND is a class (TONE_BG) and its glyph is a resolved
+ * colour, because expo-image's tintColor is a prop and not a style. The two
+ * have to stay in step, which is why the tone-to-glyph mapping is built here
+ * beside TONE_BG rather than anywhere a caller could reach it.
  */
 export function SettingIcon({ symbol, tone = "neutral" }: { symbol: string; tone?: IconTone }) {
+  const [secondary, background, tint, success, warning] = useColorTokens(GLYPH_TOKENS);
+
+  const glyph: Record<IconTone, string | undefined> = {
+    neutral: secondary,
+    // Both accent chips are light values, so the glyph is the CANVAS colour,
+    // not near-white: #F4F5F7 measures 2.81:1 on violet and 2.73:1 on red,
+    // while #06070A measures 6.57:1 and 6.78:1 on the same two.
+    violet: background,
+    danger: background,
+    // Tinted chips keep the accent as the glyph: on a 15% wash over --surface
+    // the accent stays well clear of AA (tint 6.1:1, success 7.7:1, warning
+    // 8.7:1).
+    tint,
+    success,
+    warning,
+  };
+
   return (
     <View
       className={`h-7 w-7 items-center justify-center rounded-[7px] ${TONE_BG[tone]}`}
@@ -125,7 +147,7 @@ export function SettingIcon({ symbol, tone = "neutral" }: { symbol: string; tone
     >
       <Image
         source={`sf:${symbol}`}
-        tintColor={TONE_GLYPH[tone]}
+        tintColor={glyph[tone]}
         style={{ width: 15, height: 15 }}
         contentFit="contain"
         // Decorative: the row's label already says what this is.
@@ -136,12 +158,25 @@ export function SettingIcon({ symbol, tone = "neutral" }: { symbol: string; tone
   );
 }
 
-export function Chevron({ color = HEX.tertiary }: { color?: string }) {
+/**
+ * Trailing accessories.
+ *
+ * All three default to --label-tertiary, which is what every chevron and every
+ * field placeholder in the settings tree is drawn in: 4.82:1 on --background
+ * and 4.65:1 on --surface. It does NOT clear AA on --fill, so nothing sitting
+ * on a filled control may default to it — those pass --label-secondary in.
+ *
+ * The colour is read rather than defaulted in the parameter list because a
+ * token read is a hook, and a hook cannot be a default value.
+ */
+export function Chevron({ color }: { color?: string }) {
+  const tertiary = useColorToken("--label-tertiary");
+
   return (
     <Svg width={8} height={13} viewBox="0 0 8 13">
       <Path
         d="M1.2 1.2 L6.4 6.5 L1.2 11.8"
-        stroke={color}
+        stroke={color ?? tertiary}
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -151,12 +186,15 @@ export function Chevron({ color = HEX.tertiary }: { color?: string }) {
   );
 }
 
-export function ExternalGlyph({ color = HEX.tertiary }: { color?: string }) {
+export function ExternalGlyph({ color }: { color?: string }) {
+  const tertiary = useColorToken("--label-tertiary");
+  const stroke = color ?? tertiary;
+
   return (
     <Svg width={13} height={13} viewBox="0 0 13 13">
       <Path
         d="M4 1.4 H11.6 V9"
-        stroke={color}
+        stroke={stroke}
         strokeWidth={1.9}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -164,7 +202,7 @@ export function ExternalGlyph({ color = HEX.tertiary }: { color?: string }) {
       />
       <Path
         d="M11.4 1.6 L1.4 11.6"
-        stroke={color}
+        stroke={stroke}
         strokeWidth={1.9}
         strokeLinecap="round"
         fill="none"
@@ -173,12 +211,14 @@ export function ExternalGlyph({ color = HEX.tertiary }: { color?: string }) {
   );
 }
 
-export function CheckGlyph({ color = HEX.tint }: { color?: string }) {
+export function CheckGlyph({ color }: { color?: string }) {
+  const tint = useColorToken("--tint");
+
   return (
     <Svg width={15} height={12} viewBox="0 0 15 12">
       <Path
         d="M1.4 6.2 L5.4 10.2 L13.4 1.6"
-        stroke={color}
+        stroke={color ?? tint}
         strokeWidth={2.2}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -220,6 +260,16 @@ function withDividers(children: ReactNode): ReactNode {
   });
 }
 
+/**
+ * The card a group's rows sit in.
+ *
+ * `mx-4` is the app's single left gutter, and every header and footnote around a
+ * group matches it with `px-4`. They used to be `px-5`, which put section titles
+ * and footnotes 4pt right of the card edge — aligned to neither the card nor the
+ * row label inside it. One screen never showed it; a scrolling settings page
+ * stacks six of them and the eye reads the ragged margin as sloppiness without
+ * being able to name it. If you add text beside a group, it is px-4.
+ */
 function SectionShell({ children }: { children: ReactNode }) {
   return (
     <View
@@ -246,7 +296,7 @@ export function Section({
     <View className="gap-2">
       {title ? (
         <Text
-          className="px-5 text-[13px] font-medium text-label-secondary"
+          className="px-4 text-[13px] font-medium text-label-secondary"
           maxFontSizeMultiplier={1.6}
         >
           {title}
@@ -257,7 +307,7 @@ export function Section({
 
       {footer ? (
         <Text
-          className="px-5 text-[13px] leading-[18px] text-label-tertiary"
+          className="px-4 text-[13px] leading-[18px] text-label-tertiary"
           maxFontSizeMultiplier={1.8}
         >
           {footer}
@@ -354,7 +404,7 @@ export function CollapsibleSection({
 
       {footer ? (
         <Text
-          className="px-5 text-[13px] leading-[18px] text-label-tertiary"
+          className="px-4 text-[13px] leading-[18px] text-label-tertiary"
           maxFontSizeMultiplier={1.8}
         >
           {footer}
@@ -494,6 +544,10 @@ export function ToggleRow({
   onValueChange: (next: boolean) => void;
   disabled?: boolean;
 }) {
+  // UISwitch takes colours as props, not styles, so the on-state tint is one of
+  // the handful of values that has to reach JS resolved.
+  const tint = useColorToken("--tint");
+
   return (
     <View className="flex-row items-center gap-3 px-4 py-3" style={{ minHeight: ROW_MIN_HEIGHT }}>
       {icon ? <SettingIcon symbol={icon} tone={iconTone} /> : null}
@@ -519,8 +573,8 @@ export function ToggleRow({
           onValueChange(next);
         }}
         disabled={disabled}
-        trackColor={{ false: HEX.track, true: HEX.tint }}
-        ios_backgroundColor={HEX.track}
+        trackColor={{ false: SWITCH_TRACK, true: tint }}
+        ios_backgroundColor={SWITCH_TRACK}
         accessibilityLabel={label}
       />
     </View>
@@ -533,6 +587,8 @@ export function TextFieldRow({
   ref,
   ...input
 }: { label?: string; ref?: Ref<TextInput> } & TextInputProps) {
+  const tertiary = useColorToken("--label-tertiary");
+
   return (
     <View className="flex-row items-center gap-3 px-4 py-2" style={{ minHeight: ROW_MIN_HEIGHT }}>
       {label ? (
@@ -544,7 +600,7 @@ export function TextFieldRow({
         keyboardAppearance="dark"
         ref={ref}
         className="flex-1 py-2 text-[17px] text-label"
-        placeholderTextColor={HEX.tertiary}
+        placeholderTextColor={tertiary}
         {...input}
       />
     </View>
@@ -619,4 +675,4 @@ export function AppearingRow({ children }: { children: ReactNode }) {
   );
 }
 
-export { HEX as SETTINGS_HEX, ROW_MIN_HEIGHT };
+export { ROW_MIN_HEIGHT };

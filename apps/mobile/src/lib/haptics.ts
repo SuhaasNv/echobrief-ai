@@ -30,9 +30,7 @@ export const haptics = {
   /** Value changed within a set: segmented control, picker, row selection. */
   select: () => safe(() => Haptics.selectionAsync()),
   /** Terminal outcomes only — not intermediate steps. */
-  success: () =>
-    safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
-  warning: () =>
-    safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)),
+  success: () => safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
+  warning: () => safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)),
   error: () => safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)),
 };

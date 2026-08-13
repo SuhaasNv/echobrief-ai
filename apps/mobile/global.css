@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
- * EchoBrief iOS design tokens
+ * Puffin iOS design tokens
  *
  * Derived from the web app's OKLCH tokens in src/styles.css, converted to sRGB
  * and then corrected for iOS. Four deliberate divergences from web, each fixing

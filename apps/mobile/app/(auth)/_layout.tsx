@@ -1,6 +1,14 @@
 import { Stack } from "expo-router";
 
+import { useColorTokens } from "@/lib/tokens";
+
+const TOKENS = ["--tint", "--background"] as const;
+
 export default function AuthLayout() {
+  // Native navigation chrome: neither prop takes a className, so both colours
+  // have to arrive resolved.
+  const [tint, background] = useColorTokens(TOKENS);
+
   return (
     <Stack
       screenOptions={{
@@ -12,11 +20,11 @@ export default function AuthLayout() {
         // sign-up. Do not add headerStyle.backgroundColor alongside it — a
         // painted bar would cut a grey slab across the orb.
         headerTransparent: true,
-        headerTintColor: "#4C99F8",
+        headerTintColor: tint,
         headerTitle: "",
         // Without this the native screen container is system white until the
         // screen's own View paints, which shows as a white flash on every push.
-        contentStyle: { backgroundColor: "#06070A" },
+        contentStyle: { backgroundColor: background },
       }}
     >
       {/* Sign-in is the root of this stack — nothing to go back to. */}

@@ -4,7 +4,7 @@ import { useReducedMotion } from "react-native-reanimated";
 
 import type { MeetingScore } from "@/lib/api/meeting-detail";
 
-import { Eyebrow, Meter, Rule, SectionCard } from "./primitives";
+import { Eyebrow, Meter, RowLabel, Rule, SectionCard } from "./primitives";
 
 /**
  * Meeting score — the anchor of the screen.
@@ -41,6 +41,38 @@ function scaleFor(score: MeetingScore): number {
   const values = METRICS.map((m) => score[m.key]).filter((v) => Number.isFinite(v));
   const max = Math.max(0, ...values, Number.isFinite(score.total) ? score.total : 0);
   return max > 10 ? 100 : 10;
+}
+
+/**
+ * Bar tone by value.
+ *
+ * The card exists to say which dimension cost the meeting its points, and five
+ * bars in one colour made that a reading task: ACTIONABILITY 2.0 was visually
+ * identical to FOCUS 9.0, so the weak dimension could only be found by reading
+ * five numerals. Three bands put it first in the eye instead.
+ *
+ * Bands, not a gradient: a continuous ramp gives every bar a slightly different
+ * hue and none of them a meaning. These are the same three tones the rest of the
+ * app already spends on state, so they need no legend.
+ *
+ * The hero numeral is deliberately NOT ramped — see ScoreNumeral.
+ */
+function toneFor(value: number): string {
+  if (value < 4) return "bg-danger";
+  if (value < 7) return "bg-warning";
+  return "bg-success";
+}
+
+/**
+ * A decimal only when there is one.
+ *
+ * Sub-scores arrive whole far more often than not, and `7.0` claims a precision
+ * the model did not produce — five of them in a column read as a measurement
+ * rather than a judgement. The total keeps its decimal because it genuinely
+ * uses it: 6.6 is a real value there.
+ */
+function formatScore(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 /**
@@ -90,10 +122,13 @@ function ScoreNumeral({ total, animate }: { total: number; animate: boolean }) {
     <Text
       // Uniwind resolves className AFTER inline style, so the display face has
       // to come from the class or it silently falls back to system.
-      // Violet, not --label. The score is the single clearest instance of "a
-      // model produced this" in the product, and at 54px it is the biggest
-      // numeral in the app — so it is the one place the accent buys the most
-      // presence for the least noise.
+      // Violet, not --label, and not the sub-scores' red/amber/green ramp. The
+      // score is the single clearest instance of "a model produced this" in the
+      // product, and at 54px it is the biggest numeral in the app — so it is the
+      // one place the accent buys the most presence for the least noise. A total
+      // is also not a pass/fail: the ramp below says which dimension to fix,
+      // which a single number cannot, and colouring the total red would grade
+      // the meeting rather than describe it.
       className="font-display text-[54px] leading-[58px] text-violet"
       style={{ fontVariant: ["tabular-nums"] }}
       maxFontSizeMultiplier={1.3}
@@ -115,28 +150,38 @@ function MetricRow({
   animate: boolean;
   index: number;
 }) {
+  // Rounded once, so the band the bar is painted in and the figure printed
+  // beside it can never disagree at the edge of a threshold.
+  const shown = Math.round(value * 10) / 10;
+
   return (
     <View
       className="flex-row items-center gap-3"
       accessible
-      accessibilityLabel={`${label}, ${value.toFixed(1)} out of 10`}
+      accessibilityLabel={`${label}, ${formatScore(shown)} out of 10`}
     >
       {/* Wide enough for PARTICIPATION and ACTIONABILITY at 11pt with the
           0.8 tracking these micro-labels carry; both are 13 characters. */}
       <View className="w-[112px]">
-        <Eyebrow tone="tertiary">{label}</Eyebrow>
+        <RowLabel>{label}</RowLabel>
       </View>
 
       <View className="flex-1">
         {/* Staggered by row so the readout sweeps up the column once, the way an
             instrument settles, instead of five bars snapping together.
 
-            The fill is Meter's default violet, on purpose: these five bars are
-            the model's judgement of the meeting, and violet is the app's mark
-            for model output. They were blue, which is the navigation colour —
-            five of the loudest blue elements in the product, none of them
-            leading anywhere. */}
-        <Meter value={value / 10} animate={animate} delay={index * 55} height={5} />
+            The fill overrides Meter's default violet with the value's band. The
+            default is right for a meter whose only job is to show a quantity,
+            but these five exist to be COMPARED, and one colour across all five
+            made the comparison a reading task. Violet stays on the total, where
+            it still means "a model produced this". */}
+        <Meter
+          value={value / 10}
+          tone={toneFor(shown)}
+          animate={animate}
+          delay={index * 55}
+          height={5}
+        />
       </View>
 
       <Text
@@ -144,7 +189,7 @@ function MetricRow({
         style={{ fontVariant: ["tabular-nums"] }}
         maxFontSizeMultiplier={1.3}
       >
-        {value.toFixed(1)}
+        {formatScore(shown)}
       </Text>
     </View>
   );

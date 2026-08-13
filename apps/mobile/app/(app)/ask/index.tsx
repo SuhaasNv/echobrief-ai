@@ -7,6 +7,7 @@ import { router } from "expo-router";
 import { useMeetings } from "@/lib/api/meetings";
 import { useSearch } from "@/lib/api/search";
 import { haptics } from "@/lib/haptics";
+import { AskActionCard } from "@/components/ask/action";
 import { AnswerCard } from "@/components/ask/answer";
 import { Composer } from "@/components/ask/composer";
 import { AskEmptyState } from "@/components/ask/empty-state";
@@ -105,22 +106,40 @@ export default function AskScreen() {
     stop();
   }, [stop]);
 
-  const { phase } = search;
+  const { phase, action } = search;
   useEffect(() => {
     if (settledRef.current) return;
 
     if (phase === "done") {
       settledRef.current = true;
-      haptics.success();
-      AccessibilityInfo.announceForAccessibility("Answer ready");
+      /**
+       * An instruction gets no success chord and no "ready" announcement here.
+       *
+       * The card is the event, and it announces itself — it is a live region,
+       * and for a delete it is an assertive one. Congratulating the user at the
+       * moment a card appears asking whether to destroy a recording is the
+       * wrong sound entirely, and firing both would talk over the card's own
+       * announcement.
+       */
+      if (!action) {
+        haptics.success();
+        AccessibilityInfo.announceForAccessibility("Answer ready");
+      }
     } else if (phase === "error") {
       settledRef.current = true;
       haptics.error();
       AccessibilityInfo.announceForAccessibility("Search failed");
     }
-  }, [phase]);
+  }, [action, phase]);
 
-  const noResult = search.phase === "done" && !search.answer && search.citations.length === 0;
+  /**
+   * `!search.action` is load-bearing. An instruction turn comes back with an
+   * empty body and no citations by design — every condition of "no result" —
+   * so without this the app would answer "No meeting mentions that" underneath
+   * a card that had just deleted a recording.
+   */
+  const noResult =
+    search.phase === "done" && !search.answer && search.citations.length === 0 && !search.action;
 
   return (
     <View className="flex-1 bg-background">
@@ -196,6 +215,12 @@ export default function AskScreen() {
             ) : null}
 
             <SourcesRail citations={search.citations} />
+
+            {/* An instruction, not a question. Sits exactly where the answer
+                would have gone — this turn produced one or the other, never
+                both — and carries no sources rail above it, because nothing was
+                retrieved to reach it. */}
+            {search.action ? <AskActionCard plan={search.action} /> : null}
 
             {search.phase === "streaming" || search.answer ? (
               <Animated.View

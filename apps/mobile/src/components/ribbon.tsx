@@ -3,6 +3,7 @@ import { View } from "react-native";
 import Svg, { Rect } from "react-native-svg";
 
 import type { Speaker, TranscriptSegment } from "@/lib/api/meeting-detail";
+import { useColorTokens } from "@/lib/tokens";
 
 /**
  * The Ribbon — a conversation fingerprint.
@@ -23,18 +24,50 @@ import type { Speaker, TranscriptSegment } from "@/lib/api/meeting-detail";
  * speaker legend, and it carries an accessibilityLabel naming the split.
  */
 
-/** Matches SPEAKER_CLASSES in lib/api/meeting-detail, as resolved hex. */
-const SPEAKER_HEX = ["#4C99F8", "#A27DFA", "#2FC183", "#E6AC3D", "#7A869F"] as const;
+/** The same five tokens SPEAKER_CLASSES names in lib/api/meeting-detail. */
+const SPEAKER_TOKENS = [
+  "--speaker-a",
+  "--speaker-b",
+  "--speaker-c",
+  "--speaker-d",
+  "--speaker-e",
+] as const;
+
+/** Plus the playhead. Read together so the strip is one subscription. */
+const RIBBON_TOKENS = [...SPEAKER_TOKENS, "--label"] as const;
+
+/**
+ * Speech nobody was attributed to.
+ *
+ * No token matches it — it is lighter than --fill (#1C1E28), which is the track
+ * it is drawn on, and darker than --separator-opaque (#383B4B). The settings
+ * switch track is the same value and is stated the same way; see the note on
+ * SWITCH_TRACK in components/settings/rows.
+ */
 const UNKNOWN_HEX = "#2E3138";
-/** --label, dark ramp. The app is locked to dark (app.json userInterfaceStyle). */
-const PLAYHEAD_HEX = "#F4F5F7";
 
 export interface RibbonBand {
   /** 0..1 start position along the meeting. */
   start: number;
   /** 0..1 end position. */
   end: number;
-  color: string;
+  /**
+   * Absent when `buildBands` was called without a palette — see the note on
+   * the `palette` parameter. Also absent for a token missing from global.css,
+   * which uniwind logs in dev.
+   */
+  color?: string;
+}
+
+/**
+ * Resolved speaker colours, in `speakers` order, wrapping past the fifth.
+ *
+ * SVG rects take a colour and not a className, so the strip is one of the
+ * places the tokens have to be resolved before they can be drawn.
+ */
+export interface RibbonPalette {
+  speakers: ReadonlyArray<string | undefined>;
+  unknown: string;
 }
 
 export interface RibbonSpan {
@@ -78,6 +111,16 @@ export function ribbonSpan(segments: TranscriptSegment[]): RibbonSpan | null {
 export function buildBands(
   segments: TranscriptSegment[],
   speakers: Speaker[],
+  /**
+   * Omit it to get band GEOMETRY only.
+   *
+   * The scrubber calls this for the left edge of every band and nothing else —
+   * it deliberately keeps a float array out of its worklet closure rather than
+   * a colour table — and requiring a palette there would make it resolve five
+   * tokens it never draws. Colour is the Ribbon's business, and the Ribbon is
+   * the only thing in the app that renders a RibbonBand.
+   */
+  palette?: RibbonPalette,
   minWidth = 0.005,
 ): RibbonBand[] {
   if (segments.length === 0) return [];
@@ -103,14 +146,14 @@ export function buildBands(
   // Both keys rather than normalising one into the other: the label is
   // user-editable (speaker names), so today's "Speaker A" can become "Priya"
   // while the id stays "A", and only a map that answers to both survives that.
-  const colors = new Map<string, string>();
+  const colors = new Map<string, string | undefined>();
   speakers.forEach((speaker, i) => {
-    const hex = SPEAKER_HEX[i % SPEAKER_HEX.length] ?? UNKNOWN_HEX;
-    colors.set(speaker.id, hex);
-    if (speaker.label) colors.set(speaker.label, hex);
+    const hue = palette?.speakers[i % SPEAKER_TOKENS.length] ?? palette?.unknown;
+    colors.set(speaker.id, hue);
+    if (speaker.label) colors.set(speaker.label, hue);
   });
-  const colorFor = (speakerId: string | null): string =>
-    (speakerId ? colors.get(speakerId) : undefined) ?? UNKNOWN_HEX;
+  const colorFor = (speakerId: string | null): string | undefined =>
+    (speakerId ? colors.get(speakerId) : undefined) ?? palette?.unknown;
 
   const merged: RibbonBand[] = [];
   // Runs merge on speaker IDENTITY, not on colour. Past five speakers the
@@ -170,9 +213,20 @@ export function Ribbon({
   radius,
   placeholder = false,
 }: RibbonProps) {
+  const [speakerA, speakerB, speakerC, speakerD, speakerE, playhead] =
+    useColorTokens(RIBBON_TOKENS);
+
+  const palette: RibbonPalette = useMemo(
+    () => ({
+      speakers: [speakerA, speakerB, speakerC, speakerD, speakerE],
+      unknown: UNKNOWN_HEX,
+    }),
+    [speakerA, speakerB, speakerC, speakerD, speakerE],
+  );
+
   const bands = useMemo(
-    () => (placeholder ? [] : buildBands(segments, speakers)),
-    [segments, speakers, placeholder],
+    () => (placeholder ? [] : buildBands(segments, speakers, palette)),
+    [segments, speakers, placeholder, palette],
   );
 
   const r = radius ?? Math.min(height / 2, 3);
@@ -230,7 +284,7 @@ export function Ribbon({
             y={0}
             width={2}
             height={height}
-            fill={PLAYHEAD_HEX}
+            fill={playhead}
           />
         ) : null}
       </Svg>

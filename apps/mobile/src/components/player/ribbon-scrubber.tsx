@@ -15,6 +15,7 @@ import type { PlaybackController } from "@/lib/audio/playback";
 import { buildBands, Ribbon } from "@/components/ribbon";
 import { haptics } from "@/lib/haptics";
 import { SPRING } from "@/lib/motion";
+import { useColorToken } from "@/lib/tokens";
 
 /**
  * The Ribbon, made scrubbable.
@@ -37,8 +38,6 @@ import { SPRING } from "@/lib/motion";
  *   44pt target is padding around it.
  */
 
-/** --label, dark ramp. Matches PLAYHEAD_HEX in components/ribbon. */
-const PLAYHEAD = "#F4F5F7";
 /**
  * The unplayed veil, keyed to how big the strip is.
  *
@@ -80,6 +79,10 @@ export function RibbonScrubber({
   radius,
 }: RibbonScrubberProps) {
   const { progress, scrubbing, available } = playback;
+  // The overlay playhead is a plain View, but it is positioned by a transform
+  // on a shared value rather than styled per frame, so its colour is set once
+  // here as a resolved value. Matches the SVG playhead in components/ribbon.
+  const playhead = useColorToken("--label");
   const width = useSharedValue(0);
   /** Band the playhead was last inside. Latches the haptic to crossings only. */
   const band = useSharedValue(-1);
@@ -267,7 +270,7 @@ export function RibbonScrubber({
               width: PLAYHEAD_WIDTH,
               height,
               borderRadius: PLAYHEAD_WIDTH / 2,
-              backgroundColor: PLAYHEAD,
+              backgroundColor: playhead,
             },
             headStyle,
           ]}
