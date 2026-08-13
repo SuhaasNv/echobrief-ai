@@ -42,6 +42,27 @@ export function initMonitoring() {
     profilesSampleRate: 0.1,
     // Release tracking (optional - set via SENTRY_RELEASE env var)
     release: process.env.SENTRY_RELEASE || undefined,
+    // Never let the SDK attach cookies, headers or request bodies on its own.
+    // We opt into exactly one piece of PII (user id + email, set in the Hono
+    // middleware); everything else stays out of the issue payload.
+    sendDefaultPii: false,
+    beforeSend(event) {
+      // Belt and braces: strip credential-bearing headers and any request body
+      // if a future integration starts attaching them.
+      if (event.request) {
+        delete event.request.cookies;
+        delete event.request.data;
+        if (event.request.headers) {
+          for (const header of Object.keys(event.request.headers)) {
+            const name = header.toLowerCase();
+            if (name === "authorization" || name === "cookie" || name === "x-api-key") {
+              delete event.request.headers[header];
+            }
+          }
+        }
+      }
+      return event;
+    },
   });
 
   initialized = true;

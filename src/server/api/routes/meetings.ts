@@ -55,6 +55,23 @@ function sanitizeRecordedAt(value: string | undefined): string | null {
   return new Date(ts).toISOString();
 }
 
+/**
+ * Reject an R2 object key that does not live under the caller's own prefix.
+ *
+ * `audio_key` on /from-live is the ONLY place the client hands us a storage key
+ * instead of us minting one. Without this check an authenticated user could
+ * post `<other-user-id>/<meeting-id>/original.webm`, then read that object back
+ * through GET /meetings/:id/audio-url (which signs whatever key is on the row)
+ * or destroy it through DELETE /meetings/:id. buildAudioKey() always prefixes
+ * with the owner's user id, so the prefix is the ownership boundary.
+ */
+function assertOwnedAudioKey(audioKey: string, userId: string): void {
+  const prefix = `${userId}/`;
+  if (!audioKey.startsWith(prefix) || audioKey.includes("..")) {
+    throw new HTTPException(403, { message: "audio_key does not belong to this account" });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // POST /upload-url
 // ---------------------------------------------------------------------------
@@ -166,6 +183,8 @@ app.post("/from-live", zValidator("json", LiveUploadRequest), async (c) => {
   const user = c.get("user");
   const workspaceId = c.get("workspaceId");
   const sql = getSql();
+
+  assertOwnedAudioKey(body.audio_key, user.id);
 
   const meetingId = randomUUID();
 
@@ -787,9 +806,19 @@ app.post("/:id/share", zValidator("json", ShareBody), async (c) => {
   const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
+  // 128 bits from a CSPRNG. Guessing is not a threat model at this width; the
+  // share bucket in the rate limiter covers the unauthenticated read side.
   const share_token = enabled ? randomBytes(16).toString("hex") : null;
 
-  await sql`UPDATE meetings SET share_token = ${share_token} WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}`;
+  // RETURNING, not a bare UPDATE: without it the endpoint happily handed back a
+  // freshly-minted share_url for a meeting id the caller doesn't own — the row
+  // was never written, but the response said otherwise.
+  const updated = await sql<Array<{ id: string }>>`
+    UPDATE meetings SET share_token = ${share_token}
+    WHERE id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
+    RETURNING id
+  `;
+  if (updated.length === 0) throw new HTTPException(404, { message: "Meeting not found" });
 
   const env = await import("../../env").then((m) => m.getEnv());
   return c.json({

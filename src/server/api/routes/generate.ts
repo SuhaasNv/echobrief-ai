@@ -16,6 +16,7 @@ const app = new Hono<AppBindings>();
 app.post("/email", zValidator("json", EmailGenerationRequest), async (c) => {
   const { meeting_id, type, tone } = c.req.valid("json");
   const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
   const rows = await sql<
@@ -42,7 +43,7 @@ app.post("/email", zValidator("json", EmailGenerationRequest), async (c) => {
     FROM meetings m
     LEFT JOIN summaries s ON s.meeting_id = m.id
     LEFT JOIN transcripts t ON t.meeting_id = m.id
-    WHERE m.id = ${meeting_id} AND m.user_id = ${user.id}
+    WHERE m.id = ${meeting_id} AND m.user_id = ${user.id} AND m.workspace_id = ${workspaceId}
   `;
   const meeting = rows[0];
   if (!meeting) throw new HTTPException(404, { message: "Meeting not found" });

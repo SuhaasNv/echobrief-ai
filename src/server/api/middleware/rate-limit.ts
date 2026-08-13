@@ -1,17 +1,43 @@
 /**
- * Redis-backed sliding-window rate limiter with tier-based limits.
+ * Redis-backed fixed-window rate limiter with tier-based limits.
  *
  * Keys: ratelimit:{user_id|ip}:{bucket}:{window}
  *
  * Buckets:
  *   - general — Tier-based limits (free: 100, student: 300, pro: 500, team: 2000 req/min)
  *   - ai      — Tier-based limits (free: 10, student: 50, pro: 100, team: 500 req/min)
+ *   - upload  — 20 upload-URL / transcript-ingest calls per hour per user. Each
+ *               one can turn into a 4-hour AssemblyAI job, so this is a money
+ *               budget, not a traffic budget, and it is deliberately much
+ *               tighter than `general`.
+ *   - auth_ip — 30 auth requests / 15min / IP. Blanket cap on the whole /auth
+ *               surface (login, signup, Google SSO round-trips) so one host
+ *               can't spray thousands of credentials across many accounts.
  *   - auth    — 5 attempts / 15min / (IP + email) — login bruteforce defense
+ *   - auth_account — 10 attempts / 15min / email ALONE. The (IP + email) bucket
+ *               above resets the moment an attacker rotates source IPs, which is
+ *               trivial with a proxy pool; this one does not, so a single
+ *               account cannot be ground down regardless of where the traffic
+ *               comes from.
  *   - signup  — 3 signups / hour / IP — signup spam defense
+ *   - share   — 60 req/min/IP on the public, unauthenticated share endpoint.
  *
- * The auth bucket also accepts an explicit `keySuffix` so the caller can mix
- * email into the identifier (so per-account brute-force is throttled even
- * if attacker rotates IPs).
+ * FAIL-OPEN vs FAIL-CLOSED WHEN REDIS IS DOWN
+ * -------------------------------------------
+ * A limiter that swallows Redis errors and calls next() is the classic version
+ * of this bug: an attacker who can knock Redis over (or who simply gets lucky
+ * during an outage) gets an unmetered API. But failing closed on *everything*
+ * turns a cache outage into a total outage. So the decision is per route class:
+ *
+ *   general → FAIL OPEN. These are authenticated reads of the caller's own
+ *     rows. The worst case is extra Postgres load from an already-authenticated
+ *     account, which is bounded and attributable. Availability wins.
+ *
+ *   ai / upload / auth / auth_ip / auth_account / signup / share → FAIL CLOSED
+ *     (503). Every one of these either spends money per request (OpenAI,
+ *     AssemblyAI, R2) or is the unauthenticated edge of the system. An
+ *     unmetered credential-stuffing window or an unmetered LLM window is worse
+ *     than a few minutes of 503s on those specific endpoints.
  */
 
 import type { MiddlewareHandler, Context } from "hono";
@@ -27,15 +53,24 @@ interface BucketConfig {
 }
 
 // Base limits (for non-authenticated or fixed-bucket endpoints)
-const LIMITS: Record<string, BucketConfig> = {
+const LIMITS = {
   general: { max: 100, window_sec: 60 },
   ai: { max: 10, window_sec: 60 },
+  upload: { max: 20, window_sec: 60 * 60 },
   auth: { max: 5, window_sec: 60 * 15 },
+  auth_ip: { max: 30, window_sec: 60 * 15 },
+  auth_account: { max: 10, window_sec: 60 * 15 },
   signup: { max: 3, window_sec: 60 * 60 },
-};
+  share: { max: 60, window_sec: 60 },
+} satisfies Record<string, BucketConfig>;
+
+export type RateLimitBucket = keyof typeof LIMITS;
+
+/** See the FAIL-OPEN vs FAIL-CLOSED note in the file header. */
+const FAIL_OPEN_BUCKETS: ReadonlySet<RateLimitBucket> = new Set<RateLimitBucket>(["general"]);
 
 // Tier-based limits (for authenticated users)
-const TIER_LIMITS: Record<SubscriptionTier, Record<string, BucketConfig>> = {
+const TIER_LIMITS: Record<SubscriptionTier, Partial<Record<RateLimitBucket, BucketConfig>>> = {
   free: {
     general: { max: 100, window_sec: 60 },
     ai: { max: 10, window_sec: 60 },
@@ -55,22 +90,38 @@ const TIER_LIMITS: Record<SubscriptionTier, Record<string, BucketConfig>> = {
 };
 
 /**
- * Best-effort client IP. Order:
- *   1. cf-connecting-ip (Cloudflare proxy header)
- *   2. x-forwarded-for first hop (when behind a trusted proxy like Railway)
- *   3. socket.remoteAddress (direct connection)
- *   4. "unknown" — falls into a shared bucket. Should be rare in practice.
+ * Best-effort client IP.
+ *
+ * SECURITY: only the hop written by *our own* edge can be trusted. Proxies
+ * APPEND to X-Forwarded-For, so the LEFTMOST entry is whatever the client sent
+ * — which means reading `xff.split(",")[0]` lets any caller mint a fresh
+ * rate-limit bucket per request by sending `X-Forwarded-For: <random>`. We
+ * therefore count in from the RIGHT: with `TRUSTED_PROXY_HOPS` proxies in front
+ * of us (Railway's edge = 1, the default), the entry that many places from the
+ * end is the address our edge actually observed.
+ *
+ * `cf-connecting-ip` is only meaningful when traffic is forced through
+ * Cloudflare; if it isn't, the header is pure client input. It is ignored
+ * unless TRUST_CF_CONNECTING_IP=true is set explicitly.
  *
  * Hono's node adapter exposes the raw IncomingMessage via env.incoming.
  */
 export function clientIp<E extends { Variables: AppBindings["Variables"] }>(c: Context<E>): string {
-  const cf = c.req.header("cf-connecting-ip");
-  if (cf) return cf.trim();
+  if (process.env.TRUST_CF_CONNECTING_IP === "true") {
+    const cf = c.req.header("cf-connecting-ip");
+    if (cf) return cf.trim();
+  }
 
   const xff = c.req.header("x-forwarded-for");
   if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
+    const hops = xff
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean);
+    const configured = Number.parseInt(process.env.TRUSTED_PROXY_HOPS ?? "1", 10);
+    const trustedHops = Number.isFinite(configured) && configured > 0 ? configured : 1;
+    const candidate = hops[Math.max(0, hops.length - trustedHops)];
+    if (candidate) return candidate;
   }
 
   // Node adapter — pull socket IP from the underlying IncomingMessage.
@@ -81,18 +132,57 @@ export function clientIp<E extends { Variables: AppBindings["Variables"] }>(c: C
   return "unknown";
 }
 
+/** Thrown when the counter could not be read/written. Callers decide the policy. */
+class RateLimiterUnavailable extends Error {}
+
+/** Increment a fixed-window counter. Throws RateLimiterUnavailable if Redis is down. */
+async function incrementWindow(key: string, windowSec: number): Promise<number> {
+  try {
+    const redis = getRedis();
+    const count = await redis.incr(key);
+    if (count === 1) {
+      // Window TTL with a small grace so the key auto-expires even if the
+      // request handler crashes before completion.
+      await redis.expire(key, windowSec + 5);
+    }
+    return count;
+  } catch (err) {
+    throw new RateLimiterUnavailable(err instanceof Error ? err.message : "redis unavailable");
+  }
+}
+
+function limiterUnavailable<E extends { Variables: AppBindings["Variables"] }>(
+  c: Context<E>,
+  bucket: RateLimitBucket,
+  err: unknown,
+): Response {
+  console.error(
+    `[RateLimit] counter unavailable for bucket '${bucket}' — failing closed:`,
+    err instanceof Error ? err.message : err,
+  );
+  return c.json(
+    {
+      error: "rate_limiter_unavailable",
+      message: "Service temporarily unavailable. Please retry shortly.",
+    },
+    503,
+    { "Retry-After": "30" },
+  );
+}
+
 interface RateLimitOptions {
   /** Optional value mixed into the bucket key (e.g. email for login). */
   keySuffix?: string;
 }
 
 export function rateLimit(
-  bucket: keyof typeof LIMITS,
+  bucket: RateLimitBucket,
   opts: RateLimitOptions = {},
 ): MiddlewareHandler<AppBindings> {
   return async (c, next) => {
     // Bypass rate limiting in test environments to prevent CI flakiness
-    // (all test workers share the same runner IP + Redis instance)
+    // (all test workers share the same runner IP + Redis instance).
+    // Keyed on NODE_ENV only — never on anything a client can set.
     if (process.env.NODE_ENV === "test") {
       await next();
       return;
@@ -103,7 +193,7 @@ export function rateLimit(
     const suffix = opts.keySuffix ? `:${opts.keySuffix}` : "";
 
     // Get tier-specific limits for authenticated users
-    let cfg = LIMITS[bucket];
+    let cfg: BucketConfig = LIMITS[bucket];
     if (user && (bucket === "general" || bucket === "ai")) {
       try {
         const tier = await getUserTier(user.id);
@@ -117,12 +207,19 @@ export function rateLimit(
     const windowStart = Math.floor(Date.now() / 1000 / cfg.window_sec);
     const key = `ratelimit:${identifier}${suffix}:${bucket}:${windowStart}`;
 
-    const redis = getRedis();
-    const count = await redis.incr(key);
-    if (count === 1) {
-      // Window TTL with a small grace so the key auto-expires even if the
-      // request handler crashes before completion.
-      await redis.expire(key, cfg.window_sec + 5);
+    let count: number;
+    try {
+      count = await incrementWindow(key, cfg.window_sec);
+    } catch (err) {
+      if (FAIL_OPEN_BUCKETS.has(bucket)) {
+        console.error(
+          `[RateLimit] counter unavailable for bucket '${bucket}' — failing open:`,
+          err instanceof Error ? err.message : err,
+        );
+        await next();
+        return;
+      }
+      return limiterUnavailable(c, bucket, err);
     }
 
     // Calculate rate limit info for headers
@@ -160,38 +257,62 @@ export function rateLimit(
 }
 
 /**
- * Helper: rate-limit a single auth action by IP + email combination.
+ * Helper: rate-limit a single auth action.
  * Use inside the route handler AFTER parsing the body to access `email`.
  *
- * Returns null on success, or a Response to short-circuit with on 429.
+ * `auth` checks TWO counters — (IP + email) and email-alone — because the first
+ * one alone is defeated by rotating source IPs, and the second one alone would
+ * let a single shared-NAT user lock out an entire office after one typo.
+ * `signup` is keyed on IP alone; the email is attacker-chosen and worthless as
+ * a key there.
+ *
+ * Returns null on success, or a Response to short-circuit with on 429/503.
+ *
+ * ANTI-ENUMERATION: the 429 body is identical whether or not the email belongs
+ * to a real account — the counters key on the submitted string either way.
  */
 export async function checkAuthRateLimit(
   c: Context<AppBindings>,
   bucket: "auth" | "signup",
   email: string,
 ): Promise<Response | null> {
-  // Bypass rate limiting in test environments
+  // Bypass rate limiting in test environments. NODE_ENV only.
   if (process.env.NODE_ENV === "test") return null;
 
-  const cfg = LIMITS[bucket];
   const ip = clientIp(c);
-  const windowStart = Math.floor(Date.now() / 1000 / cfg.window_sec);
-  const key = `ratelimit:${ip}:${email.toLowerCase()}:${bucket}:${windowStart}`;
+  const normalizedEmail = email.trim().toLowerCase();
 
-  const redis = getRedis();
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, cfg.window_sec + 5);
+  const counters: Array<{ bucket: RateLimitBucket; key: string }> =
+    bucket === "signup"
+      ? [{ bucket: "signup", key: `ratelimit:signup:ip:${ip}` }]
+      : [
+          { bucket: "auth", key: `ratelimit:auth:ip:${ip}:${normalizedEmail}` },
+          { bucket: "auth_account", key: `ratelimit:auth:acct:${normalizedEmail}` },
+        ];
+
+  for (const counter of counters) {
+    const cfg = LIMITS[counter.bucket];
+    const windowStart = Math.floor(Date.now() / 1000 / cfg.window_sec);
+    let count: number;
+    try {
+      count = await incrementWindow(`${counter.key}:${windowStart}`, cfg.window_sec);
+    } catch (err) {
+      // Auth is fail-closed: an unmetered login endpoint during a Redis outage
+      // is a credential-stuffing window.
+      return limiterUnavailable(c, counter.bucket, err);
+    }
+
+    if (count > cfg.max) {
+      return c.json(
+        {
+          error: "rate_limited",
+          message: `Too many attempts. Try again in ${Math.ceil(cfg.window_sec / 60)} minute(s).`,
+        },
+        429,
+        { "Retry-After": String(cfg.window_sec) },
+      );
+    }
   }
-  if (count > cfg.max) {
-    return c.json(
-      {
-        error: "rate_limited",
-        message: `Too many attempts. Try again in ${Math.ceil(cfg.window_sec / 60)} minute(s).`,
-      },
-      429,
-      { "Retry-After": String(cfg.window_sec) },
-    );
-  }
+
   return null;
 }

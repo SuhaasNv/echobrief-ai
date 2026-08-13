@@ -84,7 +84,14 @@ api.route("/", healthRoutes);
 // API documentation (no auth, public documentation)
 api.route("/docs", docsRoutes);
 
-// Public routes (no auth)
+// Public routes (no auth).
+//
+// These are the only endpoints an unauthenticated attacker can reach, so they
+// carry their own IP-keyed budgets. /auth additionally runs per-email and
+// per-(IP+email) counters inside the handlers — see checkAuthRateLimit.
+api.use("/auth/*", rateLimit("auth_ip"));
+api.use("/share/*", rateLimit("share"));
+
 api.route("/auth", authRoutes);
 api.route("/auth", googleAuthRoutes);
 api.route("/share", shareRoutes);
@@ -101,6 +108,14 @@ protectedApi.use("/workspaces/*", rateLimit("general"));
 protectedApi.use("/flashcards/*", rateLimit("general"));
 protectedApi.use("/analytics/*", rateLimit("general"));
 protectedApi.use("/subscription/*", rateLimit("general"));
+protectedApi.use("/admin/*", rateLimit("general"));
+
+// Ingest endpoints get their own hourly budget on top of `general`. Each call
+// can commit us to a multi-hour AssemblyAI job and a 500MB R2 object, so 100
+// req/min of `general` headroom is the wrong unit entirely.
+protectedApi.use("/meetings/upload-url", rateLimit("upload"));
+protectedApi.use("/meetings/from-transcript", rateLimit("upload"));
+protectedApi.use("/meetings/from-live", rateLimit("upload"));
 
 protectedApi.use("/search", rateLimit("ai"));
 protectedApi.use("/generate/*", rateLimit("ai"));

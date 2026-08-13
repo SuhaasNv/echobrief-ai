@@ -69,7 +69,13 @@ export const requireTranscriptionQuota = createMiddleware<AppBindings>(async (c,
     throw new HTTPException(400, { message: "Invalid duration: must be a finite number" });
   }
 
-  const minutes = Math.ceil(durationSec / 60);
+  // Floor of 1 minute. `duration_sec` is OPTIONAL on UploadUrlRequest, so a
+  // caller that simply omits it used to be charged 0 minutes here — which made
+  // the pre-check a no-op for anyone not already over their limit, and let a
+  // free-tier account start a 4-hour transcription at 299/300 minutes used. The
+  // worker still bills the real duration afterwards; this makes the gate refuse
+  // to wave through an upload of unknown size.
+  const minutes = Math.max(1, Math.ceil(durationSec / 60));
 
   const result = await checkQuota(user.id, "transcription", minutes);
 

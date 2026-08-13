@@ -148,7 +148,7 @@ describe("requireTranscriptionQuota middleware", () => {
         "content-type": "application/json",
         authorization: `Bearer ${freeUser.token}`,
       },
-      body: JSON.stringify({ durationSec: 60 }), // 1 minute
+      body: JSON.stringify({ duration_sec: 60 }), // 1 minute
     });
 
     expect(res.status).toBe(200);
@@ -167,7 +167,7 @@ describe("requireTranscriptionQuota middleware", () => {
         "content-type": "application/json",
         authorization: `Bearer ${testUser.token}`,
       },
-      body: JSON.stringify({ durationSec: 60 }),
+      body: JSON.stringify({ duration_sec: 60 }),
     });
 
     expect(res.status).toBe(429);
@@ -191,7 +191,7 @@ describe("requireTranscriptionQuota middleware", () => {
         "content-type": "application/json",
         authorization: `Bearer ${testUser.token}`,
       },
-      body: JSON.stringify({ durationSec: 60 }),
+      body: JSON.stringify({ duration_sec: 60 }),
     });
 
     expect(res.status).toBe(429);
@@ -211,13 +211,13 @@ describe("requireTranscriptionQuota middleware", () => {
         "content-type": "application/json",
         authorization: `Bearer ${proUser.token}`,
       },
-      body: JSON.stringify({ durationSec: 60 }),
+      body: JSON.stringify({ duration_sec: 60 }),
     });
 
     expect(res.status).toBe(200);
   });
 
-  it("calculates minutes from durationSec correctly", async () => {
+  it("calculates minutes from duration_sec correctly", async () => {
     const testUser = await createUserWithTier("free");
     const app = createTestApp(requireTranscriptionQuota);
 
@@ -231,7 +231,7 @@ describe("requireTranscriptionQuota middleware", () => {
         "content-type": "application/json",
         authorization: `Bearer ${testUser.token}`,
       },
-      body: JSON.stringify({ durationSec: 90 }), // 1.5 min → ceil to 2
+      body: JSON.stringify({ duration_sec: 90 }), // 1.5 min → ceil to 2
     });
 
     // 299 + 2 = 301, exceeds 300 limit
@@ -431,7 +431,7 @@ describe("quota middleware error responses", () => {
         "content-type": "application/json",
         authorization: `Bearer ${testUser.token}`,
       },
-      body: JSON.stringify({ durationSec: 60 }),
+      body: JSON.stringify({ duration_sec: 60 }),
     });
 
     const body = await res.json();

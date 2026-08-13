@@ -93,12 +93,16 @@ app.post("/meetings/:id/flashcards/generate", async (c) => {
 // ---------------------------------------------------------------------------
 app.get("/meetings/:id/flashcards", async (c) => {
   const id = c.req.param("id");
+  const user = c.get("user");
   const workspaceId = c.get("workspaceId");
   const sql = getSql();
 
+  // user_id as well as workspace_id: every other flashcard route scopes by
+  // both, and workspaces are membership-based, so workspace_id alone would show
+  // one member another member's cards the moment a workspace has two people.
   const items = await sql<FlashcardRow[]>`
     SELECT * FROM flashcards
-    WHERE meeting_id = ${id} AND workspace_id = ${workspaceId}
+    WHERE meeting_id = ${id} AND user_id = ${user.id} AND workspace_id = ${workspaceId}
     ORDER BY created_at ASC
   `;
   return c.json({ items });
