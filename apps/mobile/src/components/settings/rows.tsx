@@ -1,19 +1,5 @@
-import {
-  Fragment,
-  isValidElement,
-  useEffect,
-  useState,
-  type ReactNode,
-  type Ref,
-} from "react";
-import {
-  Pressable,
-  Switch,
-  Text,
-  TextInput,
-  View,
-  type TextInputProps,
-} from "react-native";
+import { Fragment, isValidElement, useEffect, useState, type ReactNode, type Ref } from "react";
+import { Pressable, Switch, Text, TextInput, View, type TextInputProps } from "react-native";
 import Animated, {
   FadeIn,
   FadeInUp,
@@ -70,6 +56,9 @@ const HEX = {
   // control may use it — those use `secondary`.
   tertiary: "#787C85",
   tint: "#4C99F8",
+  violet: "#A27DFA",
+  success: "#2FC183",
+  warning: "#E6AC3D",
   danger: "#FF5F62",
   track: "#2E3138",
   background: "#06070A",
@@ -82,14 +71,29 @@ const HEX = {
  * one semantic colour: a model produced this. `danger` is set by the row's
  * `destructive` flag, never by hand.
  */
-export type IconTone = "violet" | "danger" | "neutral";
+export type IconTone = "violet" | "danger" | "neutral" | "tint" | "success" | "warning";
 
 const TONE_BG: Record<IconTone, string> = {
   // Recessed rather than filled — the chip is a container for the glyph, not a
   // colour swatch. --label-secondary on --surface-3 measures 5.85:1.
   neutral: "bg-surface-3",
+
+  // FILLED. Reserved for the two tones that carry a meaning rather than an
+  // identity: violet is "a model produced this", red is "this destroys
+  // something". Keeping them the only saturated chips is what stops the
+  // sections below from diluting them.
   violet: "bg-violet",
   danger: "bg-danger",
+
+  // TINTED. A wash at 15% with the accent as the glyph, so a section reads as
+  // its own colour without eleven filled swatches shouting at each other. The
+  // grouping is by section, not by row: Capture is blue, Account is green,
+  // Privacy is amber. Rows within a section share a hue on purpose — the
+  // colour names the group, which is a real distinction, rather than giving
+  // every row an arbitrary one.
+  tint: "bg-tint/15",
+  success: "bg-success/15",
+  warning: "bg-warning/15",
 };
 
 const TONE_GLYPH: Record<IconTone, string> = {
@@ -99,6 +103,11 @@ const TONE_GLYPH: Record<IconTone, string> = {
   // #06070A measures 6.57:1 and 6.78:1 on the same two.
   violet: HEX.background,
   danger: HEX.background,
+  // Tinted chips keep the accent as the glyph: on a 15% wash over --surface the
+  // accent stays well clear of AA (tint 6.1:1, success 7.7:1, warning 8.7:1).
+  tint: HEX.tint,
+  success: HEX.success,
+  warning: HEX.warning,
 };
 
 /**
@@ -408,10 +417,7 @@ export function Row({
   const isPicker = selected !== undefined;
 
   const content = (
-    <View
-      className="flex-row items-center gap-3 px-4 py-3"
-      style={{ minHeight: ROW_MIN_HEIGHT }}
-    >
+    <View className="flex-row items-center gap-3 px-4 py-3" style={{ minHeight: ROW_MIN_HEIGHT }}>
       {icon ? <SettingIcon symbol={icon} tone={destructive ? "danger" : iconTone} /> : null}
 
       <View className={`flex-1 ${detail ? "gap-0.5" : ""} ${disabled ? "opacity-40" : ""}`}>
@@ -489,10 +495,7 @@ export function ToggleRow({
   disabled?: boolean;
 }) {
   return (
-    <View
-      className="flex-row items-center gap-3 px-4 py-3"
-      style={{ minHeight: ROW_MIN_HEIGHT }}
-    >
+    <View className="flex-row items-center gap-3 px-4 py-3" style={{ minHeight: ROW_MIN_HEIGHT }}>
       {icon ? <SettingIcon symbol={icon} tone={iconTone} /> : null}
 
       <View className={`flex-1 ${detail ? "gap-0.5" : ""} ${disabled ? "opacity-40" : ""}`}>
@@ -531,10 +534,7 @@ export function TextFieldRow({
   ...input
 }: { label?: string; ref?: Ref<TextInput> } & TextInputProps) {
   return (
-    <View
-      className="flex-row items-center gap-3 px-4 py-2"
-      style={{ minHeight: ROW_MIN_HEIGHT }}
-    >
+    <View className="flex-row items-center gap-3 px-4 py-2" style={{ minHeight: ROW_MIN_HEIGHT }}>
       {label ? (
         <Text className="w-[104px] text-[17px] text-label" maxFontSizeMultiplier={1.4}>
           {label}
@@ -567,10 +567,7 @@ export function ValueRow({
   mono?: boolean;
 }) {
   return (
-    <View
-      className="flex-row items-center gap-3 px-4 py-3"
-      style={{ minHeight: ROW_MIN_HEIGHT }}
-    >
+    <View className="flex-row items-center gap-3 px-4 py-3" style={{ minHeight: ROW_MIN_HEIGHT }}>
       {icon ? <SettingIcon symbol={icon} tone={iconTone} /> : null}
       {/* The label sizes to its own text and the VALUE takes the remainder.
           It was the other way round — `flex-1` on the label plus `max-w-[52%]`

@@ -16,14 +16,26 @@ import { pluralize } from "@/lib/format";
  * web app's design language, and it ports directly.
  */
 
+/**
+ * A stat tile.
+ *
+ * `tone` exists because these three numerals are the boldest typographic moment
+ * in the app and all three were --label, on a screen that is otherwise entirely
+ * neutral. They are the cheapest place in the product to spend colour: no new
+ * hue, no new meaning, just the accents already in the system given some area.
+ * Captured stays white — it is the count of everything, so it is the baseline
+ * the other two are read against.
+ */
 function Tile({
   label,
   value,
   unit,
+  tone = "text-label",
 }: {
   label: string;
   value: string;
   unit?: string;
+  tone?: string;
 }) {
   return (
     <View className="flex-1 gap-3 bg-surface p-4">
@@ -37,7 +49,7 @@ function Tile({
       </Text>
       <View className="flex-row items-baseline gap-1">
         <Text
-          className="font-display text-[30px] leading-[32px] text-label"
+          className={`font-display text-[30px] leading-[32px] ${tone}`}
           // Proportional figures, deliberately, and this is the fix for "11".
           //
           // `tabular-nums` maps `one` to `one.tf`, a slab-footed form whose foot
@@ -85,9 +97,7 @@ export function StatHeader({
   const complete = meetings.filter((m) => m.status === "complete");
   const processing = meetings.filter((m) => isProcessing(m.status)).length;
 
-  const totalMinutes = Math.round(
-    complete.reduce((sum, m) => sum + (m.duration_sec ?? 0), 0) / 60,
-  );
+  const totalMinutes = Math.round(complete.reduce((sum, m) => sum + (m.duration_sec ?? 0), 0) / 60);
   const tasks = complete.reduce((sum, m) => sum + (m.action_item_count ?? 0), 0);
 
   const durationValue = totalMinutes >= 60 ? (totalMinutes / 60).toFixed(1) : String(totalMinutes);
@@ -107,8 +117,8 @@ export function StatHeader({
         {/* Top highlight spans the whole group so it reads as one object. */}
         <View className="absolute inset-x-0 top-0 z-10 h-px bg-highlight" pointerEvents="none" />
         <Tile label="Captured" value={String(captured)} />
-        <Tile label="Recorded" value={durationValue} unit={durationUnit} />
-        <Tile label="Tasks" value={String(tasks)} />
+        <Tile label="Recorded" value={durationValue} unit={durationUnit} tone="text-speaker-d" />
+        <Tile label="Tasks" value={String(tasks)} tone="text-tint" />
       </View>
 
       {/* Reconciles the tiles with the list: Recorded and Tasks can only count

@@ -140,9 +140,8 @@ export function SummaryView({ meeting }: { meeting: MeetingDetail }) {
   }
 
   // Chapter clocks share the transcript's gutter rule, so the two panes line up.
-  const chapterGutter = chapters.reduce((max, ch) => Math.max(max, ch.start_sec), 0) >= 3600
-    ? 58
-    : 44;
+  const chapterGutter =
+    chapters.reduce((max, ch) => Math.max(max, ch.start_sec), 0) >= 3600 ? 58 : 44;
 
   const cards: React.ReactNode[] = [];
   const next = () => cards.length;
@@ -155,10 +154,17 @@ export function SummaryView({ meeting }: { meeting: MeetingDetail }) {
     cards.push(
       <SectionCard key="executive" animate={animate} index={next()}>
         {/* Violet reads as "the model produced this" in this palette, and appears
-            nowhere else in the app. */}
-        <View className="flex-row items-center gap-2">
-          <View className="h-1.5 w-1.5 rounded-full bg-violet" />
-          <Eyebrow>AI summary</Eyebrow>
+            nowhere else in the app.
+            It used to say so with a 6pt dot. This is an AI product, so model
+            output is most of the value on the screen, and announcing it with the
+            smallest mark available was the reason the app read as monochrome:
+            the colour was correct, it just never occupied any area. The wash is
+            6% so the body text keeps its contrast against --surface. */}
+        <View className="-mx-4 -mt-4 mb-1 border-b border-violet/20 bg-violet/[0.06] px-4 pb-3 pt-4">
+          <View className="flex-row items-center gap-2">
+            <View className="h-1.5 w-1.5 rounded-full bg-violet" />
+            <Eyebrow>AI summary</Eyebrow>
+          </View>
         </View>
         <Text className="text-[17px] leading-[25px] text-label" selectable>
           {executive}
@@ -225,10 +231,7 @@ export function SummaryView({ meeting }: { meeting: MeetingDetail }) {
                   {chapter.title}
                 </Text>
                 {chapter.summary?.trim() ? (
-                  <Text
-                    className="text-[14px] leading-[20px] text-label-secondary"
-                    selectable
-                  >
+                  <Text className="text-[14px] leading-[20px] text-label-secondary" selectable>
                     {chapter.summary}
                   </Text>
                 ) : null}

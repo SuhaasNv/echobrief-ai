@@ -130,9 +130,9 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #06070a;
-    --surface: #0b0d11;
-    --elevated: #121418;
-    --sheet: #0d0f13;
+    --surface: #0c0d12;
+    --elevated: #12141b;
+    --sheet: #0d0f15;
 
     --label: #f4f5f7;
     --label-secondary: #9ca1a9;
@@ -149,17 +149,17 @@
        physically invisible on a real display. UIKit's own separator on a black
        table sits nearer 1.9-2.2:1. Without this the list reads as one
        undifferentiated black wall with no row boundaries. */
-    --separator: #2e3138;
-    --separator-opaque: #3a3e46;
+    --separator: #2a2d3a;
+    --separator-opaque: #383b4b;
 
-    --edge: rgba(255, 255, 255, 0.09);
-    --edge-strong: rgba(255, 255, 255, 0.14);
+    --edge: rgba(196, 202, 255, 0.1);
+    --edge-strong: rgba(196, 202, 255, 0.15);
     /* Top-edge only, to read as a light source above rather than a border. */
-    --highlight: rgba(255, 255, 255, 0.16);
+    --highlight: rgba(255, 247, 238, 0.17);
 
-    --inset: #030407;
-    --surface-2: #191c21;
-    --surface-3: #22262c;
+    --inset: #040406;
+    --surface-2: #191b24;
+    --surface-3: #232531;
 
     --tint: #4c99f8;
     --tint-label: #4c99f8;
@@ -170,9 +170,9 @@
     --warning: #e6ac3d;
     --danger: #ff5f62;
 
-    --fill: #1c1f25;
-    --fill-secondary: #181b1f;
-    --fill-tertiary: #14161a;
+    --fill: #1c1e28;
+    --fill-secondary: #181a23;
+    --fill-tertiary: #14161d;
 
     --speaker-a: #4c99f8;
     --speaker-b: #a27dfa;

@@ -148,9 +148,7 @@ export default function AccountScreen() {
 
   // The active workspace lives in the Keychain-backed token store, which is not
   // reactive, so it is re-read whenever this screen comes back into view.
-  const [workspaceId, setWorkspaceId] = useState<string | null>(() =>
-    tokenStore.getWorkspaceId(),
-  );
+  const [workspaceId, setWorkspaceId] = useState<string | null>(() => tokenStore.getWorkspaceId());
 
   useFocusEffect(
     useCallback(() => {
@@ -213,11 +211,13 @@ export default function AccountScreen() {
       <Section title="Capture">
         <Row
           icon="waveform"
+          iconTone="tint"
           label="Recording"
           onPress={() => router.push("/(app)/account/recording")}
         />
         <Row
           icon="text.bubble"
+          iconTone="tint"
           label="Transcription"
           onPress={() => router.push("/(app)/account/transcription")}
         />
@@ -229,6 +229,7 @@ export default function AccountScreen() {
         />
         <Row
           icon="bell"
+          iconTone="tint"
           label="Notifications"
           onPress={() => router.push("/(app)/account/notifications")}
         />
@@ -237,6 +238,7 @@ export default function AccountScreen() {
       <Section title="Account">
         <Row
           icon="rectangle.stack"
+          iconTone="success"
           label="Workspace"
           value={activeWorkspace?.name}
           onPress={() => router.push("/(app)/account/workspaces")}
@@ -244,11 +246,13 @@ export default function AccountScreen() {
         />
         <Row
           icon="lock"
+          iconTone="success"
           label="Password"
           onPress={() => router.push("/(app)/account/password")}
         />
         <Row
           icon="creditcard"
+          iconTone="success"
           label="Plan"
           onPress={() => router.push("/(app)/account/plan")}
         />
@@ -260,6 +264,7 @@ export default function AccountScreen() {
       <Section>
         <Row
           icon="hand.raised"
+          iconTone="warning"
           label="Privacy"
           onPress={() => router.push("/(app)/account/privacy")}
         />

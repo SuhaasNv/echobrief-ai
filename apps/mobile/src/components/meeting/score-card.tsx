@@ -90,7 +90,11 @@ function ScoreNumeral({ total, animate }: { total: number; animate: boolean }) {
     <Text
       // Uniwind resolves className AFTER inline style, so the display face has
       // to come from the class or it silently falls back to system.
-      className="font-display text-[54px] leading-[58px] text-label"
+      // Violet, not --label. The score is the single clearest instance of "a
+      // model produced this" in the product, and at 54px it is the biggest
+      // numeral in the app — so it is the one place the accent buys the most
+      // presence for the least noise.
+      className="font-display text-[54px] leading-[58px] text-violet"
       style={{ fontVariant: ["tabular-nums"] }}
       maxFontSizeMultiplier={1.3}
     >
