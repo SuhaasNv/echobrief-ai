@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -18,6 +18,8 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 
 import { useMeetingDetail, type TranscriptSegment } from "@/lib/api/meeting-detail";
 import { isProcessing } from "@/lib/api/meetings";
+import { failUpload, useUploadState } from "@/lib/api/upload-progress";
+import { retryUpload } from "@/lib/audio/segment-upload";
 import { useMeetingPlayback } from "@/lib/audio/playback";
 import { displayTitle, formatDuration, formatListDate } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
@@ -27,14 +29,15 @@ import { useFollowScroll } from "@/components/player/follow-scroll";
 import { PlayerBar } from "@/components/player/player-bar";
 import { RibbonScrubber } from "@/components/player/ribbon-scrubber";
 import { MeetingMenuButton } from "@/components/meeting/meeting-menu";
+import { NameSpeakerSheet } from "@/components/meeting/name-speaker";
 import { dismissShareToast, useShareToastNote } from "@/components/meeting/share-toast";
-import { ProcessingView } from "@/components/meeting/processing-view";
+import { FailureCard, ProcessingView } from "@/components/meeting/processing-view";
 import { SummaryView } from "@/components/meeting/summary-view";
 import { TranscriptView } from "@/components/meeting/transcript-view";
 
 type Tab = "summary" | "transcript";
 
-/** Legend swatches — mirrors SPEAKER_HEX in components/ribbon. */
+/** Legend swatches — the class form of SPEAKER_TOKENS in components/ribbon. */
 const SPEAKER_DOT = [
   "bg-speaker-a",
   "bg-speaker-b",
@@ -191,10 +194,108 @@ function ShareToast({ bottomInset }: { bottomInset: number }) {
 /** Stable empty identity, so the span memo does not recompute on every poll. */
 const NO_SEGMENTS: TranscriptSegment[] = [];
 
+/**
+ * The upload from this device failed, and the user is standing on the meeting.
+ *
+ * This state has to exist here rather than as an Alert, because by the time it
+ * happens the screen that started the upload is gone — ending a recording
+ * navigates immediately and the transfer finishes behind the user. An alert
+ * fired from a screen they left is not an option.
+ *
+ * Distinct from ProcessingView's failure card, which is about the SERVER
+ * pipeline failing on audio it already has. Here the audio never arrived, it is
+ * still on this iPhone, and the only useful thing on screen is the button that
+ * sends it again. Without this the meeting would sit at `queued` forever,
+ * looking like it was waiting for a worker.
+ */
+function UploadFailedCard({ meetingId, error }: { meetingId: string; error?: string }) {
+  const [retrying, setRetrying] = useState(false);
+
+  const retry = useCallback(() => {
+    setRetrying(true);
+    void (async () => {
+      try {
+        const started = await retryUpload(meetingId);
+        if (!started) {
+          // Nothing on disk to send. Saying so is better than a button that
+          // appears to do nothing every time it is pressed.
+          failUpload(
+            meetingId,
+            "The audio for this recording is no longer on this iPhone, so it cannot be uploaded again.",
+          );
+        }
+      } catch {
+        // retryUpload reports its own failure through the progress store, which
+        // is what re-renders this card with the new message.
+      } finally {
+        setRetrying(false);
+      }
+    })();
+  }, [meetingId]);
+
+  return (
+    <View className="mx-4 gap-3 rounded-card bg-surface p-5" style={{ borderCurve: "continuous" }}>
+      <Text className="text-[17px] font-semibold text-danger">Upload didn&apos;t finish</Text>
+      <Text className="text-[15px] leading-[21px] text-label-secondary" selectable>
+        {error ?? "The recording could not be sent."}
+      </Text>
+      <Text className="text-[13px] leading-[18px] text-label-tertiary">
+        The audio is still on this iPhone, so nothing was lost.
+      </Text>
+      <Pressable
+        onPress={retry}
+        disabled={retrying}
+        accessibilityRole="button"
+        accessibilityLabel="Try uploading again"
+        accessibilityState={{ disabled: retrying }}
+        className="mt-1 min-h-[50px] items-center justify-center rounded-full bg-label px-6 active:opacity-80"
+      >
+        {retrying ? (
+          <ActivityIndicator color="#06070A" />
+        ) : (
+          <Text className="text-[17px] font-semibold text-background" maxFontSizeMultiplier={1.6}>
+            Try again
+          </Text>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
 export default function MeetingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: meeting, isLoading, isError } = useMeetingDetail(id);
   const [tab, setTab] = useState<Tab>("summary");
+
+  /**
+   * An upload this device still owns for this meeting.
+   *
+   * Read here as well as inside ProcessingView because the FAILED case has to
+   * pre-empt it: a meeting whose audio never arrived reports `queued` from the
+   * server, which the processing view would render as "waiting for a free
+   * worker" — a stall the user cannot act on, in place of the retry they need.
+   */
+  const upload = useUploadState(id);
+  const uploadFailed = upload?.status === "failed";
+
+  /**
+   * The voice whose naming sheet is open, by raw diarization id ("A").
+   *
+   * Held here rather than in each pane because all three entry points — the
+   * ribbon legend, the "Who talked" bars, and the speaker name on a transcript
+   * turn — open the same sheet, and two of them live inside panes that unmount
+   * when the segmented control flips. The sheet is a Modal, so it survives
+   * that, but only if the state that opens it does too.
+   */
+  const [namingId, setNamingId] = useState<string | null>(null);
+
+  // Stable, because it is handed to 800 memoised transcript rows. A fresh
+  // identity on every five second poll would re-render all of them.
+  const nameSpeaker = useCallback((speakerId: string) => {
+    haptics.tap();
+    setNamingId(speakerId);
+  }, []);
+  const closeNaming = useCallback(() => setNamingId(null), []);
 
   /**
    * Playback.
@@ -244,7 +345,7 @@ export default function MeetingDetailScreen() {
     .join(" · ");
 
   const processing = isProcessing(meeting.status);
-  const title = displayTitle(meeting.title);
+  const title = displayTitle(meeting.title, meeting.recorded_at ?? meeting.created_at);
 
   /**
    * Leave the screen as soon as the undo window opens.
@@ -268,6 +369,10 @@ export default function MeetingDetailScreen() {
   const speakerCount = meeting.transcript?.speakers.length ?? 0;
   const showRibbon = speakerCount >= 2 && (meeting.transcript?.segments.length ?? 0) > 0;
 
+  // Resolved rather than stored, so a poll that renames a voice from another
+  // device updates the open sheet instead of leaving it on a stale label.
+  const naming = meeting.transcript?.speakers.find((s) => s.id === namingId) ?? null;
+
   return (
     <View className="flex-1 bg-background">
       <Stack.Screen
@@ -289,62 +394,114 @@ export default function MeetingDetailScreen() {
         // last lines of a transcript are readable rather than parked under the
         // transport.
         contentContainerStyle={{ paddingBottom: follow.bottomInset }}
+        /**
+         * The ribbon pins instead of scrolling away.
+         *
+         * It is the one element here that beats both competitors — the timeline
+         * you scrub IS the diarization map — and it was spending that advantage
+         * on 28pt of decoration you saw once. The moment you scrolled into the
+         * transcript, which is the whole reason you opened the meeting, the map
+         * was gone and the only thing left was a 6pt strip in the player bar.
+         *
+         * Pinned, it becomes the navigation spine: wherever you are in an hour
+         * of transcript, "take me back to where Priya was talking" stays a thumb
+         * drag away. The follow-scroll already moves the transcript to the
+         * playhead, so a scrub from the pinned strip drives the reading position
+         * too — the two halves of the feature only connect once the strip is
+         * reachable from anywhere in the document.
+         *
+         * Index 1, not 0: the meta line is its own child so the pinned band is
+         * the ribbon alone. Only set when the ribbon actually renders — a null
+         * child is dropped from the children array, so a fixed [1] would pin the
+         * segmented control on single-speaker meetings.
+         */
+        stickyHeaderIndices={showRibbon ? [1] : undefined}
         {...follow.scrollProps}
       >
-        <View className="gap-3 px-4 pb-4 pt-1">
+        <View className="px-4 pb-3 pt-1">
           <Text
             className="text-[13px] text-label-secondary"
             style={{ fontVariant: ["tabular-nums"] }}
           >
             {meta}
           </Text>
+        </View>
 
-          {/* The signature, at hero size. Only meaningful once diarization has
-              produced segments, so it holds a placeholder bar while processing
-              rather than disappearing and shifting the layout. */}
-          {showRibbon ? (
-            <View className="gap-2">
-              {/* Scrubbable when there is audio, identical to before when there
+        {/* The signature, at hero size. Only meaningful once diarization has
+            produced segments, so it holds a placeholder bar while processing
+            rather than disappearing and shifting the layout. */}
+        {showRibbon ? (
+          // Opaque, because a pinned header is the one view in a scroll
+          // container that has content moving underneath it. Transparent, the
+          // transcript reads straight through the bands.
+          //
+          // The hairline is not decoration. Without it the pinned block has no
+          // bottom edge, so a chapter title passing beneath it is simply sliced
+          // in half mid-word and reads as a rendering fault rather than as
+          // content going under chrome. Measured on the 30-minute fixture: the
+          // word "Timeline" and its "0:00" timestamp were bisected with nothing
+          // to explain the cut. One border resolves it — the same `--edge` the
+          // cards already use, so the strip joins the existing surface language
+          // instead of introducing a new one.
+          <View className="gap-2 border-b border-edge bg-background px-4 pb-3">
+            {/* Scrubbable when there is audio, identical to before when there
                   is not. Dragging along the bands is the point of the feature:
                   the colours say WHO you are scrubbing to, which is the one
                   thing an amplitude waveform can never tell you. */}
-              <RibbonScrubber
-                playback={playback}
-                segments={meeting.transcript?.segments ?? []}
-                speakers={meeting.transcript?.speakers ?? []}
-                height={28}
-                radius={8}
-              />
-              {meeting.transcript?.speakers.length ? (
-                <View className="flex-row flex-wrap gap-x-4 gap-y-1">
-                  {meeting.transcript.speakers.map((s, i) => (
-                    <View key={s.id} className="flex-row items-center gap-1.5">
+            <RibbonScrubber
+              playback={playback}
+              segments={meeting.transcript?.segments ?? []}
+              speakers={meeting.transcript?.speakers ?? []}
+              height={28}
+              radius={8}
+            />
+            {/* The legend is also the naming control. It sits directly under
+                  the bands, which is where a reader first asks who the colours
+                  are — and the answer being "Speaker A" is exactly the problem
+                  worth fixing at that moment. */}
+            {meeting.transcript?.speakers.length ? (
+              <View className="flex-row flex-wrap gap-x-4 gap-y-1">
+                {meeting.transcript.speakers.map((s, i) => (
+                  <Pressable
+                    key={s.id}
+                    onPress={() => nameSpeaker(s.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={s.label}
+                    accessibilityHint="Puts a name to this voice"
+                    hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+                  >
+                    {({ pressed }) => (
                       <View
-                        className={`h-2 w-2 rounded-full ${SPEAKER_DOT[i % SPEAKER_DOT.length]}`}
-                      />
-                      <Text className="text-[11px] text-label-secondary">{s.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-
-        {processing ? (
-          <ProcessingView meeting={meeting} />
-        ) : meeting.status === "failed" ? (
-          <View
-            className="mx-4 gap-2 rounded-card bg-surface p-5"
-            style={{ borderCurve: "continuous" }}
-          >
-            <Text className="text-[17px] font-semibold text-danger">Processing failed</Text>
-            {meeting.failure_reason ? (
-              <Text className="text-[14px] leading-[20px] text-label-secondary" selectable>
-                {meeting.failure_reason}
-              </Text>
+                        className="flex-row items-center gap-1.5"
+                        style={{ opacity: pressed ? 0.5 : 1 }}
+                      >
+                        <View
+                          className={`h-2 w-2 rounded-full ${SPEAKER_DOT[i % SPEAKER_DOT.length]}`}
+                        />
+                        <Text className="text-[11px] text-label-secondary">{s.label}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                ))}
+              </View>
             ) : null}
           </View>
+        ) : null}
+
+        {processing && uploadFailed ? (
+          <UploadFailedCard meetingId={id} error={upload?.error} />
+        ) : processing ? (
+          <ProcessingView meeting={meeting} />
+        ) : meeting.status === "failed" ? (
+          // The SAME card ProcessingView shows, not a second copy of it. This
+          // used to be an inline duplicate with no retry, so the working retry
+          // button — which lives in FailureCard — was unreachable for exactly
+          // the case it exists for: a meeting that has already failed.
+          <FailureCard
+            meetingId={id}
+            reason={meeting.failure_reason ?? null}
+            hasAudio={meeting.has_audio}
+          />
         ) : (
           <>
             <Segmented value={tab} onChange={setTab} />
@@ -356,9 +513,14 @@ export default function MeetingDetailScreen() {
               exiting={FadeOut.duration(120)}
             >
               {tab === "summary" ? (
-                <SummaryView meeting={meeting} />
+                <SummaryView meeting={meeting} onNameSpeaker={nameSpeaker} />
               ) : (
-                <TranscriptView meeting={meeting} playback={playback} follow={follow} />
+                <TranscriptView
+                  meeting={meeting}
+                  playback={playback}
+                  follow={follow}
+                  onNameSpeaker={nameSpeaker}
+                />
               )}
             </Animated.View>
           </>
@@ -372,6 +534,13 @@ export default function MeetingDetailScreen() {
       {/* Above the transport and the tab bar, on the same measured inset the
           content already clears, so it can never land under either. */}
       <ShareToast bottomInset={follow.bottomInset} />
+
+      {/* Mounted only while open, so each presentation gets fresh shared values
+          and a fresh layout pass — the same reason the header menu mounts its
+          sheet rather than toggling a prop on a permanent one. */}
+      {naming ? (
+        <NameSpeakerSheet meeting={meeting} speaker={naming} onDismissed={closeNaming} />
+      ) : null}
     </View>
   );
 }

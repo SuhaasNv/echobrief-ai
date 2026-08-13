@@ -82,7 +82,24 @@
   --radius-sheet: 20px;
 }
 
-/* Light — iOS grouped convention: white cards on a gray grouped background. */
+/* Light — iOS grouped convention: white cards on a gray grouped background.
+ *
+ * CURRENTLY UNREACHABLE. app.json pins `"userInterfaceStyle": "dark"`, so iOS
+ * never reports a light trait to the app and this block never wins. Verified by
+ * putting the simulator in light appearance and relaunching: the UI stayed dark.
+ *
+ * Kept rather than deleted because it is a complete, considered palette and
+ * throwing it away means rebuilding it from scratch if light mode is ever
+ * turned on. But it is NOT maintained and must not be assumed correct: it has
+ * never been rendered, so its contrast ratios are unverified and every screen
+ * built since would need checking against it. The dark values below carry
+ * measured contrast notes; these do not.
+ *
+ * Turning light mode on is a real project, not a one-line change to app.json:
+ * the record orb, the speaker ribbon and the tab-bar glass are all tuned for a
+ * near-black canvas, and the five speaker hues were picked for separation
+ * against #06070A. Flipping the flag without that work ships a broken theme.
+ */
 :root {
   --background: #ffffff;
   --surface: #f4f5f7;
@@ -154,8 +171,22 @@
 
     --edge: rgba(196, 202, 255, 0.1);
     --edge-strong: rgba(196, 202, 255, 0.15);
-    /* Top-edge only, to read as a light source above rather than a border. */
-    --highlight: rgba(255, 247, 238, 0.17);
+    /*
+     * Top-edge only, to read as a light source above rather than a border.
+     *
+     * 0.11, down from 0.17. Measured off a render: at 0.17 the top edge came out
+     * at luminance 39.6 against 24.5 for the other three borders — 1.6x — on a
+     * card fill of 12.0 over a 7.9 canvas. That stopped reading as depth and
+     * started reading as a bright line, which is how it got reported: as a
+     * "shadow effect", i.e. as something noticeable rather than something felt.
+     *
+     * Not removed. The card fill sits only ~4 luminance points above the canvas,
+     * so the bevel is doing real separation work; deleting it would leave the
+     * border alone to carry it. 0.11 lands the top edge just above the other
+     * borders instead of well above them — still light from above, no longer an
+     * announcement.
+     */
+    --highlight: rgba(255, 247, 238, 0.11);
 
     --inset: #040406;
     --surface-2: #191b24;

@@ -48,10 +48,14 @@ function priceLabel(price: number | string | null, interval: string | null): str
  * payment or invoice endpoint, so there are no payment or invoice rows. The
  * screen is shorter and every line on it is true.
  *
- * There is no upgrade button, and there will not be one. Selling a digital
- * subscription inside the app pulls in Apple's In-App Purchase obligations and
- * its cut, so plan changes stay on the web — stated as a fact, without a link
- * or a row that would read as steering around the rule.
+ * There IS an upgrade button now, and the reasoning that used to say there never
+ * would be has been inverted deliberately. The old note argued plan changes
+ * belonged on the web because in-app selling pulls in Apple's IAP obligations
+ * and its cut. That is true and it is also not optional: for digital content
+ * consumed in an iOS app, Apple requires IAP, and steering users to a web
+ * checkout is the thing that gets an app rejected — not the thing that avoids
+ * it. So the subscription is sold here, through StoreKit, and the 15% Small
+ * Business Program rate is the cost of being on the platform.
  */
 export default function PlanScreen() {
   const online = useOnline();
@@ -116,7 +120,14 @@ export default function PlanScreen() {
       ) : null}
 
       <Section title="Current plan">
-        <ValueRow icon="creditcard" label="Plan" value={tier} />
+        {/* No icon, deliberately. The three rows below it have none, so the tile
+            pushed this label 40pt right of theirs — a step in the left margin
+            INSIDE one card, which is the most visible misalignment on any
+            settings screen. Adding tiles to the others was the alternative and
+            is worse: everywhere else in this app an icon marks a row you can tap
+            INTO, and all four of these are facts about the plan, not
+            destinations. */}
+        <ValueRow label="Plan" value={tier} />
         {subscription.status ? (
           <ValueRow label="Status" value={titleCase(subscription.status)} />
         ) : null}
@@ -124,10 +135,7 @@ export default function PlanScreen() {
         {renews ? <ValueRow label="Renews" value={renews} mono /> : null}
       </Section>
 
-      <Section
-        title="Usage this period"
-        footer="Usage resets at the start of each calendar month."
-      >
+      <Section title="Usage this period" footer="Usage resets at the start of each calendar month.">
         <UsageMeter
           label="Transcription"
           used={data.usage.transcription_minutes}
