@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>EchoBrief concept 2 — The Brief</title>
+  <desc>Three uneven turns of talk, flush right, resolving into one solid bar: the brief.</desc>
+
+  <rect width="1024" height="1024" fill="#06070A"/>
+
+  <!-- design authored in a 92 x 77 space (x 4..96, y 4..81) -->
+  <g transform="translate(512 512) scale(6.9) translate(-50 -42.5)">
+
+    <!-- the conversation: ragged left edge, flush right. Irregular on purpose —
+         a monotonic taper would read as a sort/filter glyph. -->
+    <rect x="46" y="4"  width="50" height="11" rx="5.5" fill="#4C99F8"/>
+    <rect x="26" y="23" width="70" height="11" rx="5.5" fill="#2FC183"/>
+    <rect x="38" y="42" width="58" height="11" rx="5.5" fill="#E6AC3D"/>
+
+    <!-- the brief: widest, heaviest, violet — "a model produced this" -->
+    <rect x="4"  y="61" width="92" height="20" rx="10" fill="#A27DFA"/>
+
+  </g>
+</svg>

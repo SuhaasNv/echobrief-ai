@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024">
+  <title>EchoBrief app icon (tinted)</title>
+  <defs><clipPath id="m"><rect x="14" y="14" width="72" height="72" rx="11.52"/></clipPath></defs>
+  <g clip-path="url(#m)" transform="translate(14 14) scale(0.72)">
+  <polygon points="-10,32 56,32 56,56 110,56 110,-20 -10,-20" fill="#FFFFFF"/>
+  <polygon points="-10,44 44,44 44,68 110,68 110,120 -10,120" fill="#9A9A9A"/>
+  </g>
+</svg>

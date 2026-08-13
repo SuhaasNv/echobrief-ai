@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024">
+  <title>EchoBrief splash mark</title>
+  <defs><clipPath id="m"><rect x="7" y="7" width="86" height="86" rx="13.76"/></clipPath></defs>
+  <g clip-path="url(#m)" transform="translate(7 7) scale(0.86)">
+  <polygon points="-10,32 56,32 56,56 110,56 110,-20 -10,-20" fill="#4C99F8"/>
+  <polygon points="-10,44 44,44 44,68 110,68 110,120 -10,120" fill="#2FC183"/>
+  </g>
+</svg>

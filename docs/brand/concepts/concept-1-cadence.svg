@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>EchoBrief concept 1 — Cadence</title>
+  <desc>Two speaker lanes of time, interlocking. The Ribbon unrolled into turn-taking.</desc>
+
+  <rect width="1024" height="1024" fill="#06070A"/>
+
+  <!-- design authored in a 100 x 44 space, centred and scaled to ~64% of tile -->
+  <g transform="translate(512 512) scale(6.6) translate(-50 -22)">
+
+    <!-- lane A — top row, speaker one -->
+    <g>
+      <rect x="0"  y="0" width="26" height="16" rx="8" fill="#4C99F8"/>
+      <rect x="32" y="0" width="22" height="16" rx="8" fill="#4C99F8"/>
+      <rect x="60" y="0" width="40" height="16" rx="8" fill="#4C99F8"/>
+    </g>
+
+    <!-- lane B — bottom row, speaker two. Gaps above sit over mass below. -->
+    <g>
+      <rect x="0"  y="28" width="14" height="16" rx="8" fill="#A27DFA"/>
+      <rect x="20" y="28" width="26" height="16" rx="8" fill="#A27DFA"/>
+      <rect x="52" y="28" width="22" height="16" rx="8" fill="#A27DFA"/>
+      <rect x="80" y="28" width="20" height="16" rx="8" fill="#A27DFA"/>
+    </g>
+
+  </g>
+</svg>

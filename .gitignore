@@ -51,3 +51,6 @@ skills-lock.json
 
 # Local Claude Code settings. Has held a live API key; never commit.
 .claude/settings.local.json
+
+# Python bytecode from docs/brand/build-icons.py
+__pycache__/

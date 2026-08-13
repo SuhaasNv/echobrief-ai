@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024">
+  <title>EchoBrief concept 6 — The Interruption</title>
+  <desc>The seam reverses once: one speaker's block is driven into the middle of the other's.</desc>
+  <rect width="100" height="100" fill="#06070A"/>
+  <defs><clipPath id="c"><rect x="14" y="14" width="72" height="72" rx="11.52"/></clipPath></defs>
+  <g clip-path="url(#c)" transform="translate(14 14) scale(0.72)">
+  <polygon points="-10,32 36,32 36,62 64,62 64,32 110,32 110,-20 -10,-20" fill="#4C99F8"/>
+  <polygon points="-10,44 24,44 24,74 76,74 76,44 110,44 110,120 -10,120" fill="#2FC183"/>
+  </g>
+</svg>

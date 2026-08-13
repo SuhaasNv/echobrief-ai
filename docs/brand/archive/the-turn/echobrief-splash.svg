@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024">
+  
+  <defs><clipPath id="e-clip2"><rect x="7" y="7" width="86" height="86" rx="13.76"/></clipPath></defs>
+  <g clip-path="url(#e-clip2)" transform="translate(7 7) scale(0.86)">
+    <polygon points="-26,66 28,66 28,42 62,42 62,18 114,18 120,-20 -20,-20" fill="#4C99F8"/>
+    <polygon points="-14,78 40,78 40,54 74,54 74,30 126,30 120,120 -20,120" fill="#2FC183"/>
+  </g>
+</svg>
