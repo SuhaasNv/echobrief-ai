@@ -54,3 +54,6 @@ skills-lock.json
 
 # Python bytecode from docs/brand/build-icons.py
 __pycache__/
+
+# Generated test recordings (scripts/make-test-audio.sh) — regenerate, never commit
+test-audio/
