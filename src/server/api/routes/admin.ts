@@ -15,6 +15,7 @@ import { getEnv } from "../../env";
 import type { AppBindings } from "../types";
 import type Redis from "ioredis";
 import adminWorkerRoutes from "./admin-workers";
+import adminBillingRoutes from "./admin-billing";
 
 const admin = new Hono<AppBindings>();
 admin.use("*", requireAdmin);
@@ -422,5 +423,6 @@ admin.get("/system", async (c) => {
 
 // Mount worker monitoring routes
 admin.route("/workers", adminWorkerRoutes);
+admin.route("/billing", adminBillingRoutes);
 
 export default admin;

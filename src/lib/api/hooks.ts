@@ -326,6 +326,88 @@ export function useAdminSystem() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Billing — revenue, and comping accounts
+// ---------------------------------------------------------------------------
+
+export interface AdminBillingMetrics {
+  subscriptions: { paying: number; comped: number; cancelling: number; grace: number };
+  revenue: {
+    mrr_usd: number;
+    arr_usd: number;
+    net_after_apple_usd: number;
+    cost_usd: number;
+    margin_usd: number;
+  };
+  users: { total: number; new_30d: number; active_30d: number };
+  meetings: { total: number; last_30d: number; failed_30d: number; minutes_30d: number };
+  usage_this_period: { transcription_minutes: number };
+}
+
+export interface AdminSubscriptionRow {
+  user_id: string;
+  email: string;
+  name: string | null;
+  tier: string;
+  status: string;
+  provider: string;
+  billing_interval: string | null;
+  current_period_end: string | null;
+  auto_renew: boolean;
+  granted_reason: string | null;
+  granted_by_email: string | null;
+}
+
+export function useAdminBillingMetrics() {
+  return useQuery({
+    queryKey: ["admin", "billing", "metrics"] as const,
+    queryFn: () => apiRequest<AdminBillingMetrics>("/admin/billing/metrics"),
+    // 30s, not 10s. These are money figures read by a person deciding something,
+    // not a liveness indicator — a number that reshuffles while you are reading
+    // it is harder to trust, not fresher.
+    refetchInterval: 30_000,
+  });
+}
+
+export function useAdminSubscriptions() {
+  return useQuery({
+    queryKey: ["admin", "billing", "subscriptions"] as const,
+    queryFn: () =>
+      apiRequest<{ subscriptions: AdminSubscriptionRow[] }>("/admin/billing/subscriptions"),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useGrantTier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { user_id: string; tier: string; reason: string }) =>
+      apiRequest<{ ok: true; email: string; tier: string }>("/admin/billing/grant", {
+        method: "POST",
+        body,
+      }),
+    // Both billing queries AND the user list: the users table shows tier, so
+    // leaving it stale means the grant appears to have failed on the screen the
+    // admin was just looking at.
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin", "billing"] });
+      void qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+}
+
+export function useRevokeTier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { user_id: string; reason: string }) =>
+      apiRequest<{ ok: true; tier: string }>("/admin/billing/revoke", { method: "POST", body }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin", "billing"] });
+      void qc.invalidateQueries({ queryKey: ["admin", "users"] });
+    },
+  });
+}
+
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
