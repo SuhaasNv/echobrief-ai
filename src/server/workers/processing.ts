@@ -14,19 +14,50 @@
 
 import type { ProcessingJob } from "../env";
 import { getSql } from "../db";
+import type { UserPreferencesRow } from "../db/types";
 import { createSignedReadUrl } from "../services/r2";
-import { transcribeAudioUrl, type TranscriptionWord } from "../services/assemblyai";
+import {
+  formatDiarizedTranscript,
+  transcribeAudioUrl,
+  type TranscriptionParagraph,
+  type TranscriptionWord,
+} from "../services/assemblyai";
 import { analyzeMeeting, scoreMeeting } from "../services/llm";
 import { embedChunks } from "../services/openai";
 import { sendProcessingCompleteEmail, sendProcessingFailedEmail } from "../services/resend";
 import { chunkTranscript, chunkRawText } from "../lib/chunking";
 import { getEnv } from "../env";
-import { logTranscription, logAIQuery } from "../services/usage-tracker";
+import { logTranscription, logPipelineAICost } from "../services/usage-tracker";
 
 interface SpeakerStat {
   label: string;
   talk_time_sec: number;
   word_count: number;
+}
+
+/**
+ * Pull the diarized utterances back out of a stored transcript row.
+ *
+ * `transcripts.content` is JSONB written as `{ words, paragraphs }`, and
+ * postgres.js can hand it back either parsed or as a JSON string depending on
+ * how it was written — the codebase already notes this double-encoding
+ * elsewhere. Both shapes are handled, and anything unrecognised degrades to an
+ * empty list so the caller falls back to prose rather than throwing inside a
+ * retry, which is the one place a crash is least welcome.
+ */
+function storedParagraphs(content: unknown): TranscriptionParagraph[] {
+  const parsed: unknown = typeof content === "string" ? safeJson(content) : content;
+  if (typeof parsed !== "object" || parsed === null) return [];
+  const value = (parsed as { paragraphs?: unknown }).paragraphs;
+  return Array.isArray(value) ? (value as TranscriptionParagraph[]) : [];
+}
+
+function safeJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 export async function processMeeting(job: ProcessingJob): Promise<void> {
@@ -45,17 +76,51 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
   // ---- 1. Transcribe (or skip if user uploaded text directly) -----------
   // For transcript-only uploads, a `transcripts` row already exists and
   // `audio_key` is empty. Skip the AssemblyAI step entirely.
-  const existing = await sql<Array<{ raw_text: string }>>`
-    SELECT raw_text FROM transcripts WHERE meeting_id = ${job.meeting_id} LIMIT 1
+  const existing = await sql<Array<{ raw_text: string; content: unknown }>>`
+    SELECT raw_text, content FROM transcripts WHERE meeting_id = ${job.meeting_id} LIMIT 1
   `;
-  const transcriptProvided = existing.length > 0 && !job.audio_key;
+  /**
+   * Skip transcription whenever a transcript already exists — however it got
+   * there.
+   *
+   * This used to be `existing.length > 0 && !job.audio_key`, which only skipped
+   * for user-supplied text. On an AUDIO job `audio_key` is always truthy, so a
+   * retry re-ran AssemblyAI even though attempt 1 had already written the
+   * transcripts row and only the analyze step had failed. With `attempts: 3`,
+   * one transient OpenAI 500 bought three full transcriptions of the same
+   * audio.
+   *
+   * Transcription is ~75% of the cost of processing a meeting, so this is the
+   * difference between a retry costing a fraction of a cent and costing more
+   * than the original run. The row is the receipt: if it exists, the expensive
+   * call already succeeded and must not be repeated.
+   */
+  const transcriptProvided = existing.length > 0;
 
   let raw_text: string;
   let words: TranscriptionWord[] = [];
   let speakers: SpeakerStat[] = [];
+  /**
+   * What the ANALYSIS step reads: the same transcript, but attributed.
+   *
+   * Kept separate from `raw_text`, which is still what gets stored and shown.
+   * Only the model needs the labels; the reader already has the ribbon.
+   */
+  let analysis_text: string;
 
   if (transcriptProvided) {
     raw_text = existing[0].raw_text;
+    /**
+     * Rebuild the attributed transcript from what was stored.
+     *
+     * Two very different callers land here: a user-supplied transcript, which
+     * has no diarization and correctly falls back to prose, and a RETRY of an
+     * audio job, which does. Reading `raw_text` alone in the retry case would
+     * quietly hand the analyst the flat wall of text again — the exact bug the
+     * diarized format exists to fix — and it would only show up as summaries
+     * that are worse after a retry than before one.
+     */
+    analysis_text = formatDiarizedTranscript(storedParagraphs(existing[0].content), raw_text);
     await logStep(job, {
       step: "transcribe",
       provider: "user",
@@ -67,9 +132,49 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
   } else {
     await sql`UPDATE meetings SET status = 'transcribing' WHERE id = ${job.meeting_id}`;
 
+    // The user's standing transcription choices, scoped to the workspace that
+    // owns this meeting — vocabulary is company jargon and colleague names, and
+    // it should not leak between the workspaces one person belongs to.
+    //
+    // Read here rather than carried on the BullMQ payload: a job can sit behind
+    // a backlog for a long time, and someone who adds a vocabulary term while
+    // their upload is still queued expects it to apply to that upload. The
+    // payload would have frozen the list at enqueue time.
+    const prefRows = await sql<
+      Array<Pick<UserPreferencesRow, "transcription_language" | "vocabulary">>
+    >`
+      SELECT transcription_language, vocabulary
+      FROM user_preferences
+      WHERE user_id = ${job.user_id} AND workspace_id = ${workspaceId}
+    `;
+    const prefs = prefRows[0];
+
+    /**
+     * The account preference outranks `job.language`.
+     *
+     * That looks backwards — a per-request value normally beats a stored
+     * default — but no client ever offers a per-upload language. Both the web
+     * uploader and the mobile app send the schema default "en" on every single
+     * upload, so `job.language` is not an expressed intent, it is a field
+     * nobody filled in. The settings screen is the only place a user has ever
+     * been asked, so it wins. If a per-upload picker ever ships, this ordering
+     * has to flip.
+     *
+     * `null` here means "let AssemblyAI detect it" — the 'auto' sentinel from
+     * migration 0015. A missing row or a NULL column falls through to the old
+     * behaviour instead, which is what keeps existing users unaffected.
+     */
+    const language =
+      prefs?.transcription_language === "auto"
+        ? null
+        : (prefs?.transcription_language ?? job.language ?? "en");
+
     const audioUrl = await createSignedReadUrl(job.audio_key, 1800);
     const transcribeStart = Date.now();
-    const result = await transcribeAudioUrl(audioUrl, job.language ?? "en");
+    const result = await transcribeAudioUrl(audioUrl, {
+      language,
+      wordBoost: prefs?.vocabulary ?? [],
+    });
 
     // postgres.js double-encodes objects when bound as text+::jsonb, storing
     // the value as a JSONB string scalar instead of an object. Reads are
@@ -94,7 +199,16 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
         provider = EXCLUDED.provider
     `;
 
-    await sql`UPDATE meetings SET duration_sec = ${result.duration_sec} WHERE id = ${job.meeting_id}`;
+    // `language` is written back, not just `duration_sec`: with detection on,
+    // the row was created holding the upload request's "en" placeholder, and
+    // leaving it there means the detail endpoint reports English for a meeting
+    // AssemblyAI transcribed as Portuguese.
+    await sql`
+      UPDATE meetings
+      SET duration_sec = ${result.duration_sec},
+          language = ${result.language}
+      WHERE id = ${job.meeting_id}
+    `;
 
     await logStep(job, {
       step: "transcribe",
@@ -111,13 +225,14 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
     raw_text = result.raw_text;
     words = result.words;
     speakers = result.speakers;
+    analysis_text = formatDiarizedTranscript(result.paragraphs, result.raw_text);
   }
 
   // ---- 2. Analyze -------------------------------------------------------
   await sql`UPDATE meetings SET status = 'analyzing' WHERE id = ${job.meeting_id}`;
 
   const analyzeStart = Date.now();
-  const analysis = await analyzeMeeting(raw_text);
+  const analysis = await analyzeMeeting(analysis_text);
 
   await sql`
     INSERT INTO summaries (
@@ -169,7 +284,7 @@ export async function processMeeting(job: ProcessingJob): Promise<void> {
   });
 
   // Log AI query usage (summary + action items generation)
-  await logAIQuery(job.user_id, workspaceId, analysis.cost_usd);
+  await logPipelineAICost(job.user_id, workspaceId, analysis.cost_usd);
 
   // ---- 3. Embed for vector search ---------------------------------------
   await sql`UPDATE meetings SET status = 'indexing' WHERE id = ${job.meeting_id}`;
