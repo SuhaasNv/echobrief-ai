@@ -36,6 +36,23 @@ export interface UserRow {
   updated_at: string;
 }
 
+/**
+ * One row per (user, workspace) — see migration 0015. A missing row is normal
+ * and means every preference is at its fallback, so readers must LEFT JOIN or
+ * tolerate an empty result rather than treating absence as an error.
+ */
+export interface UserPreferencesRow {
+  user_id: string;
+  workspace_id: string;
+  /** `"auto"` for language detection, a language code, or NULL for "unset". */
+  transcription_language: string | null;
+  vocabulary: string[];
+  /** NULL = platform default, 0 = keep until deleted by hand, N = N days. */
+  audio_retention_days: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface FlashcardRow {
   id: string;
   meeting_id: string;

@@ -23,6 +23,24 @@ const ListQuery = z.object({
   // `due_date <= $1` comparison, so free-form text reached Postgres and came
   // back as a 500 rather than a 400.
   assignee: z.string().trim().max(100).optional(),
+  /**
+   * Narrow the list to commitments the caller plausibly owns.
+   *
+   * The base query is scoped by `user_id`, which is the ACCOUNT the meeting
+   * belongs to — not the person the task is for. So "Priya will send the deck
+   * by Friday" landed in the owner's task list with Priya's name on it. Every
+   * commitment anyone made in any of your meetings became your to-do list,
+   * which is why the list reads as other people's work.
+   *
+   * Mine = unassigned, or assigned to a name that matches the caller's own.
+   * Unassigned counts because a commitment made in your own meeting with no
+   * owner named is far more likely to be yours than anyone else's, and
+   * dropping it would hide the most common case of all.
+   */
+  mine: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
   due_before: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "due_before must be YYYY-MM-DD")
@@ -39,6 +57,24 @@ app.get("/", zValidator("query", ListQuery), async (c) => {
   if (q.completed !== undefined) conditions.push(sql`ai.completed = ${q.completed}`);
   if (q.meeting_id) conditions.push(sql`ai.meeting_id = ${q.meeting_id}`);
   if (q.assignee) conditions.push(sql`ai.assignee_name ILIKE ${`%${q.assignee}%`}`);
+  if (q.mine) {
+    // Matched against the account's display name, read here rather than taken
+    // from the auth context: AuthenticatedUser carries id, email and is_admin
+    // only, and the extraction step has no user ids to work with — it reads
+    // names out of speech, so a name is the only identity the two sides share.
+    //
+    // A caller with no name set falls back to the unassigned rows, which is the
+    // right degradation: it is a narrower list, never a wrong one.
+    const [row] = await sql<Array<{ name: string | null }>>`
+      SELECT name FROM users WHERE id = ${user.id} LIMIT 1
+    `;
+    const own = row?.name?.trim();
+    conditions.push(
+      own
+        ? sql`(ai.assignee_name IS NULL OR ai.assignee_name ILIKE ${own})`
+        : sql`ai.assignee_name IS NULL`,
+    );
+  }
   if (q.due_before) conditions.push(sql`ai.due_date <= ${q.due_before}`);
 
   const where = conditions.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc} AND ${cur}`));

@@ -265,6 +265,14 @@ export const MeetingDetail = z.object({
           summary: z.string(),
         }),
       ),
+      /**
+       * People the analysis is confident were actually in the conversation,
+       * from what was said out loud.
+       *
+       * Optional because meetings analysed before this field existed are still
+       * in the database and must still parse.
+       */
+      participants: z.array(z.string()).optional(),
     })
     .nullable(),
   created_at: isoDateSchema,
@@ -423,6 +431,84 @@ export const UpdateProfileRequest = z
   })
   .strict();
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
+
+// ----------------------------------------------------------------------------
+// Account — pipeline preferences
+// ----------------------------------------------------------------------------
+/**
+ * How long audio survives when the user has expressed no preference.
+ *
+ * Exported rather than written as a literal in three places because it already
+ * drifted once: the cleanup worker deleted audio at 7 days flat while the
+ * settings screen offered windows up to 90 and told people their choice was
+ * honoured. Every surface that states a number — the worker, the API's GET
+ * response, the iOS copy — reads it from here.
+ */
+export const DEFAULT_AUDIO_RETENTION_DAYS = 7;
+
+/** The longest retention window the API will store. See migration 0015. */
+export const MAX_AUDIO_RETENTION_DAYS = 365;
+
+/** Mirrors MAX_VOCABULARY_TERMS on iOS and the CHECK in migration 0015. */
+export const MAX_VOCABULARY_TERMS = 100;
+
+/**
+ * A transcription language, or `"auto"` for AssemblyAI's language detection.
+ *
+ * The pattern is deliberately wider than the picker: AssemblyAI accepts plain
+ * codes ("en", "fr") and regional ones ("en_us", "pt_br"), and a stricter rule
+ * here would reject a language the vendor supports for no gain.
+ */
+export const TranscriptionLanguage = z.union([
+  z.literal("auto"),
+  z.string().regex(/^[a-z]{2,3}(_[a-zA-Z0-9]{2,4})?$/, "Not a supported language code"),
+]);
+export type TranscriptionLanguage = z.infer<typeof TranscriptionLanguage>;
+
+/**
+ * Preferences that reach the processing pipeline.
+ *
+ * `null` on any field means "never chosen", and the server falls back to the
+ * behaviour that shipped before preferences existed. That is distinct from
+ * `"auto"` on the language, which is an expressed choice to let the transcriber
+ * decide — see migration 0015 for why the two cannot share NULL.
+ */
+export const UserPreferences = z.object({
+  transcription_language: TranscriptionLanguage.nullable(),
+  vocabulary: z.array(z.string()),
+  /** Days. `0` means keep until deleted by hand; `null` means use the default. */
+  audio_retention_days: z.number().int().nullable(),
+  /**
+   * What `audio_retention_days: null` resolves to. Returned so a client can
+   * label the unset state with the real number instead of hardcoding one and
+   * being wrong the next time the worker changes.
+   */
+  default_audio_retention_days: z.number().int(),
+});
+export type UserPreferences = z.infer<typeof UserPreferences>;
+
+export const UpdatePreferencesRequest = z
+  .object({
+    transcription_language: TranscriptionLanguage.nullable().optional(),
+    /**
+     * Replaces the whole list — there is no add/remove endpoint, because the
+     * client already holds the list and a partial update would need conflict
+     * rules for a 100-item array that two devices can both edit.
+     */
+    vocabulary: z.array(z.string().trim().min(1).max(80)).max(MAX_VOCABULARY_TERMS).optional(),
+    audio_retention_days: z
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_AUDIO_RETENTION_DAYS)
+      .nullable()
+      .optional(),
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, {
+    message: "Provide at least one preference to update",
+  });
+export type UpdatePreferencesRequest = z.infer<typeof UpdatePreferencesRequest>;
 
 // ----------------------------------------------------------------------------
 // Error envelope

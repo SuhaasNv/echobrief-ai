@@ -140,6 +140,11 @@ protectedApi.use("/integrations/*", requireWorkspace);
 protectedApi.use("/generate/*", requireWorkspace);
 protectedApi.use("/streaming/*", requireWorkspace);
 protectedApi.use("/analytics/*", requireWorkspace);
+// Only this one path under /account. The rest of /account is workspace-agnostic
+// on purpose — requireWorkspace answers 409 for a user who has no workspace
+// yet, and locking /account/me behind that would make a half-provisioned
+// account unable to load its own profile or delete itself.
+protectedApi.use("/account/preferences", requireWorkspace);
 
 // Pro-only carve-outs (server-side enforcement, not just UI-hide).
 protectedApi.use("/integrations/*", requireProfessionalWorkspace());

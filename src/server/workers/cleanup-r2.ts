@@ -1,5 +1,5 @@
 /**
- * R2 Cleanup Worker - Deletes audio files older than 7 days.
+ * R2 Cleanup Worker - Deletes audio past each owner's retention window.
  *
  * Driven by the database, NOT by sweeping the bucket. Audio keys are
  * `${userId}/${meetingId}/original.${ext}` (see buildAudioKey) — there is no
@@ -13,15 +13,20 @@
  * Selecting the exact keys from Postgres fixes all of that: only audio is
  * eligible, and the row is updated in the same pass.
  *
+ * RETENTION IS PER OWNER, NOT A CONSTANT. It used to be 7 days flat for
+ * everyone while the settings screen offered windows up to 90 days and reported
+ * the choice as saved. Someone who picked 90 lost their audio on day 7 and was
+ * never told. The window now comes from user_preferences, joined on the
+ * meeting's own (user_id, workspace_id) — a workspace that agreed on 30 days
+ * does not impose that on the same person's other workspaces.
+ *
  * This runs as a scheduled job in the worker process.
  */
 
 import { S3Client, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { getSql } from "../db";
 import { getEnv } from "../env";
-
-const RETENTION_DAYS = 7;
-const RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
+import { DEFAULT_AUDIO_RETENTION_DAYS } from "../../lib/schemas";
 
 let _client: S3Client | null = null;
 
@@ -58,24 +63,45 @@ export async function cleanupOldAudioFiles(): Promise<number> {
     return 0;
   }
 
-  console.log(`[r2-cleanup] starting cleanup (retention: ${RETENTION_DAYS} days)`);
+  console.log(
+    `[r2-cleanup] starting cleanup (default retention: ${DEFAULT_AUDIO_RETENTION_DAYS} days, per-user overrides apply)`,
+  );
 
-  const cutoffDate = new Date(Date.now() - RETENTION_MS);
   const client = getClient();
   const sql = getSql();
   let deletedCount = 0;
 
   try {
     for (;;) {
-      // Only meetings still holding an audio key past the retention window.
-      // The '' sentinel marks transcript-only meetings that never had audio.
+      // Only meetings still holding an audio key past THEIR OWNER's retention
+      // window. The '' sentinel marks transcript-only meetings that never had
+      // audio.
+      //
+      // LEFT JOIN, not JOIN: most users have never opened settings and have no
+      // preferences row at all. An inner join would quietly stop deleting
+      // anything for exactly those users, and the bucket would grow without a
+      // single error to notice.
+      //
+      // The join is on both columns because that pair is the primary key of
+      // user_preferences and because there is no RLS here — user_id alone would
+      // apply one workspace's retention policy to another's recordings.
+      //
+      // `retention = 0` means "keep until I delete it" and is filtered out
+      // rather than turned into a zero-day interval, which would delete the
+      // audio the instant it finished uploading.
       const rows = await sql<Array<{ id: string; audio_key: string }>>`
-        SELECT id, audio_key
-        FROM meetings
-        WHERE audio_key IS NOT NULL
-          AND audio_key <> ''
-          AND created_at < ${cutoffDate}
-        ORDER BY created_at ASC
+        SELECT m.id, m.audio_key
+        FROM meetings m
+        LEFT JOIN user_preferences p
+          ON p.user_id = m.user_id AND p.workspace_id = m.workspace_id
+        WHERE m.audio_key IS NOT NULL
+          AND m.audio_key <> ''
+          AND COALESCE(p.audio_retention_days, ${DEFAULT_AUDIO_RETENTION_DAYS}) > 0
+          AND m.created_at
+              < now() - make_interval(
+                  days => COALESCE(p.audio_retention_days, ${DEFAULT_AUDIO_RETENTION_DAYS})
+                )
+        ORDER BY m.created_at ASC
         LIMIT ${DELETE_BATCH_SIZE}
       `;
 

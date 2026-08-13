@@ -9,8 +9,14 @@ import { z } from "zod";
 import argon2 from "argon2";
 import { SignJWT } from "jose";
 import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
-import { UpdateProfileRequest } from "../../../lib/schemas";
+import {
+  DEFAULT_AUDIO_RETENTION_DAYS,
+  UpdatePreferencesRequest,
+  UpdateProfileRequest,
+  type UserPreferences,
+} from "../../../lib/schemas";
 import { getSql } from "../../db";
+import type { UserPreferencesRow } from "../../db/types";
 import { enqueueExportJob } from "../../services/queue";
 import { getEnv } from "../../env";
 import type { AppBindings } from "../types";
@@ -123,6 +129,97 @@ app.post("/password", zValidator("json", ChangePasswordRequest), async (c) => {
     .sign(new TextEncoder().encode(env.AUTH_SECRET));
 
   return c.json({ ok: true, token });
+});
+
+// ---- Pipeline preferences ---------------------------------------------------
+//
+// Scoped to (user, workspace), like every other partitioned table here — the
+// active workspace comes from requireWorkspace, which is mounted on this path
+// (and only this path under /account) in api/index.ts. /account/me deliberately
+// stays workspace-free: a user with no workspace yet must still be able to load
+// their profile, and requireWorkspace answers 409 in that case.
+
+/** The stored columns the API cares about; created_at/updated_at are internal. */
+type StoredPreferences = Pick<
+  UserPreferencesRow,
+  "transcription_language" | "vocabulary" | "audio_retention_days"
+>;
+
+/**
+ * Absence is the common case, not an error: a row only exists once someone has
+ * saved a preference, so an unconfigured account answers with nulls and the
+ * pipeline keeps doing exactly what it did before this endpoint existed.
+ */
+function toPreferences(row: StoredPreferences | undefined): UserPreferences {
+  return {
+    transcription_language: row?.transcription_language ?? null,
+    vocabulary: row?.vocabulary ?? [],
+    audio_retention_days: row?.audio_retention_days ?? null,
+    default_audio_retention_days: DEFAULT_AUDIO_RETENTION_DAYS,
+  };
+}
+
+app.get("/preferences", async (c) => {
+  const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
+  const sql = getSql();
+
+  const rows = await sql<StoredPreferences[]>`
+    SELECT transcription_language, vocabulary, audio_retention_days
+    FROM user_preferences
+    WHERE user_id = ${user.id} AND workspace_id = ${workspaceId}
+  `;
+
+  return c.json(toPreferences(rows[0]));
+});
+
+app.patch("/preferences", zValidator("json", UpdatePreferencesRequest), async (c) => {
+  const patch = c.req.valid("json");
+  const user = c.get("user");
+  const workspaceId = c.get("workspaceId");
+  const sql = getSql();
+
+  // `!== undefined` rather than a truthiness or nullish check: null is a
+  // meaningful value on every one of these fields (it clears the preference back
+  // to the platform behaviour), so "absent" and "explicitly null" must not
+  // collapse into the same branch.
+  const sets = [];
+  if (patch.transcription_language !== undefined) {
+    sets.push(sql`transcription_language = EXCLUDED.transcription_language`);
+  }
+  if (patch.vocabulary !== undefined) {
+    sets.push(sql`vocabulary = EXCLUDED.vocabulary`);
+  }
+  if (patch.audio_retention_days !== undefined) {
+    sets.push(sql`audio_retention_days = EXCLUDED.audio_retention_days`);
+  }
+  const setClause = sets.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc}, ${cur}`));
+
+  // One upsert rather than SELECT-then-INSERT-or-UPDATE: two devices saving
+  // different settings at the same moment would otherwise race on the read and
+  // the loser would insert over the winner's row.
+  //
+  // Omitted fields fall to the column defaults on INSERT, and are left untouched
+  // on UPDATE because they are not in the SET list. Those defaults are the same
+  // "unset" nulls the reader treats as no-preference, which is what keeps
+  // saving a vocabulary term from silently reassigning someone's language.
+  const rows = await sql<StoredPreferences[]>`
+    INSERT INTO user_preferences (
+      user_id, workspace_id, transcription_language, vocabulary, audio_retention_days
+    ) VALUES (
+      ${user.id},
+      ${workspaceId},
+      ${patch.transcription_language ?? null},
+      ${sql.array(patch.vocabulary ?? [])}::text[],
+      ${patch.audio_retention_days ?? null}
+    )
+    ON CONFLICT (user_id, workspace_id) DO UPDATE SET ${setClause}, updated_at = now()
+    RETURNING transcription_language, vocabulary, audio_retention_days
+  `;
+
+  // Returning the merged row saves the client a follow-up GET and, more
+  // usefully, lets it see what the server actually kept.
+  return c.json(toPreferences(rows[0]));
 });
 
 app.post("/export", async (c) => {
