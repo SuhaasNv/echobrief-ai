@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Easing,
   cancelAnimation,
+  useAnimatedReaction,
   useDerivedValue,
   useSharedValue,
   withRepeat,
@@ -30,12 +31,18 @@ import { SPRING, TIMING } from "@/lib/motion";
 export type OrbPhase = "armed" | "recording" | "paused";
 
 /**
- * Level release. Attack is TIMING.meter (80ms) so the orb never lags the voice.
- * Release is ~5x slower on purpose: a meter that falls as fast as it rises
- * strobes on consonants, because speech is mostly gaps. Ears integrate loudness
- * over roughly this window, so the eye should too.
+ * Level release. Attack is TIMING.meter (50ms) so the orb never lags the voice.
+ * Release is slower on purpose: a meter that falls as fast as it rises strobes
+ * on consonants, because speech is mostly gaps.
+ *
+ * 220ms, down from 420ms. Syllables arrive 125–250ms apart, so a 420ms release
+ * never reached the floor between two of them — the orb sat pinned near its
+ * peak for the whole of a sentence and only sagged during real pauses, which
+ * is precisely the "floating, not reacting" read. At 220ms it still integrates
+ * across a consonant but recovers enough between syllables for the rhythm of
+ * speech to show.
  */
-const RELEASE: WithTimingConfig = { duration: 420, easing: Easing.out(Easing.quad) };
+const RELEASE: WithTimingConfig = { duration: 220, easing: Easing.out(Easing.quad) };
 
 /**
  * Pause. Long and monotonic — the light has to be seen coasting to a stop, not
@@ -110,6 +117,8 @@ function pingPong(from: number, period: number, easing: Easer) {
 }
 
 function shapeLevel(raw: number): number {
+  // Called from a worklet now, so it has to be one.
+  "worklet";
   const clamped = Math.max(0, Math.min(1, raw));
   const gated = (clamped - GATE) / (CEILING - GATE);
   const normalized = Math.max(0, Math.min(1, gated));
@@ -160,7 +169,7 @@ export interface OrbEngine {
  * position in the cycle that is a worse place to resume from than any other.
  */
 export function useOrbEngine(
-  level: number,
+  level: SharedValue<number>,
   phase: OrbPhase,
   reducedMotion: boolean,
   focused: boolean,
@@ -200,29 +209,33 @@ export function useOrbEngine(
   const breath = useDerivedValue(() => (ambient.value - 0.5) * breathAmp.value);
 
   /**
-   * Mirror the React-state level onto the UI thread.
+   * Follow the mic level, entirely on the UI thread.
    *
-   * This is an assignment, not per-frame work: ten writes a second, each of
-   * which starts one interpolation that then runs without React.
+   * The level is a shared value written by the sampling loop 25 times a second,
+   * so this reaction runs there too and React never sees a single one of them.
+   * It was previously a useEffect on React state, which meant a render, a
+   * commit and an effect between the microphone and the pixel — for a number
+   * whose only destination was a worklet.
    *
    * Rising is tested against the previous sample rather than against
-   * `energy.value`, because `energy.value` is mid-flight on the UI thread and
-   * the copy readable from JS can be a frame behind — comparing against it
-   * picks the wrong envelope leg on roughly every other sample.
+   * `energy.value`, because `energy.value` is mid-flight and reading it picks
+   * the wrong envelope leg on roughly every other sample.
    */
-  const previousLevel = useRef(0);
-  useEffect(() => {
-    // Gated on focus as well, and this one matters more than it looks: the
-    // recorder keeps metering in the background, so an ungated mirror would
-    // start a fresh interpolation ten times a second and keep every layer's
-    // worklet hot even with all the clocks frozen. The next sample after
-    // refocus is at most 100ms away, so nothing is lost by dropping these.
-    if (reducedMotion || !focused) return;
-    const target = shapeLevel(level);
-    const rising = target > previousLevel.current;
-    previousLevel.current = target;
-    energy.value = withTiming(target, rising ? TIMING.meter : RELEASE);
-  }, [level, reducedMotion, focused, energy]);
+  const previousLevel = useSharedValue(0);
+  useAnimatedReaction(
+    // Gated on focus, and this matters more than it looks: the recorder keeps
+    // metering in the background, so an ungated follower would start a fresh
+    // interpolation 25 times a second and keep every layer's worklet hot with
+    // all the clocks frozen. Returning null parks the reaction entirely.
+    () => (reducedMotion || !focused ? null : level.value),
+    (raw) => {
+      if (raw === null) return;
+      const target = shapeLevel(raw);
+      const rising = target > previousLevel.value;
+      previousLevel.value = target;
+      energy.value = withTiming(target, rising ? TIMING.meter : RELEASE);
+    },
+  );
 
   // Free-running loops: the breath and the capture heartbeat. Neither is tied
   // to phase, so neither is restarted by one — the breath's depth is changed by
@@ -309,7 +322,7 @@ export function useOrbEngine(
       // signal nobody is looking at, and leaving it frozen high would hold the
       // orb open on a level that stopped being true the moment we blurred.
       energy.value = 0;
-      previousLevel.current = 0;
+      previousLevel.value = 0;
       return;
     }
 
@@ -366,6 +379,7 @@ export function useOrbEngine(
     phase,
     reducedMotion,
     focused,
+    previousLevel,
     settle,
     live,
     awake,

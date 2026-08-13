@@ -256,11 +256,7 @@ export default function MeetingsScreen() {
           </View>
         )}
         renderSectionHeader={({ section }) => (
-          <SectionHeader
-            title={section.title}
-            count={section.data.length}
-            first={section.first}
-          />
+          <SectionHeader title={section.title} count={section.data.length} first={section.first} />
         )}
         ListHeaderComponent={
           items.length > 0 && !searching ? <StatHeader meetings={items} total={total} /> : null
@@ -274,9 +270,22 @@ export default function MeetingsScreen() {
         // edge effect to have something to blur. RN defaults this to 'never',
         // which is NOT the UIKit default.
         contentInsetAdjustmentBehavior="automatic"
-        // flexGrow lets the empty and error states own the screen instead of
-        // clinging to the top of a zero-height content view.
-        contentContainerStyle={{ paddingTop: 8, paddingBottom: tabBarInset, flexGrow: 1 }}
+        // NO flexGrow, and it was never doing what its old comment claimed.
+        //
+        // It was there to stop the empty and error states "clinging to the top
+        // of a zero-height content view", but none of them fill: LibraryEmpty,
+        // NoResults and the ErrorState all position themselves with their own
+        // top padding (pt-4 / pt-16 / pt-8) and none uses flex-1 or centring.
+        // So the stretch moved nothing on screen — it only made the content
+        // container taller than its content.
+        //
+        // That cost is real because this list runs contentInsetAdjustmentBehavior
+        // "automatic": Yoga stretches to the ScrollView's FRAME, which extends up
+        // under the large title, while UIKit's inset is what keeps the visible
+        // window below it. The container came out one header taller than the
+        // window, which is a screenful of dead scroll under an empty list. Same
+        // trap the Ask screen documents at the top of its own contentContainer.
+        contentContainerStyle={{ paddingTop: 8, paddingBottom: tabBarInset }}
         keyboardDismissMode="on-drag"
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) void fetchNextPage();

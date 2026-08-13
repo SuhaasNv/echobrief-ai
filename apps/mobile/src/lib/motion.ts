@@ -94,8 +94,15 @@ export const TIMING = {
   crossfade: { duration: 180, easing: Easing.inOut(Easing.quad) } satisfies WithTimingConfig,
   progress: { duration: 300, easing: Easing.out(Easing.cubic) } satisfies WithTimingConfig,
   instant: { duration: 100, easing: Easing.out(Easing.quad) } satisfies WithTimingConfig,
-  /** Audio meters must not lag the signal they represent. */
-  meter: { duration: 80, easing: Easing.linear } satisfies WithTimingConfig,
+  /**
+   * Audio meters must not lag the signal they represent.
+   *
+   * 50ms, against a 40ms sample. Any attack longer than the sampling period is
+   * a low-pass filter: the next reading lands before the previous one has
+   * arrived, so the meter permanently chases a target it never reaches and
+   * peaks get rounded off into an average. At 80ms it never caught a syllable.
+   */
+  meter: { duration: 50, easing: Easing.linear } satisfies WithTimingConfig,
 } as const;
 
 /** Press feedback scale. Cards and buttons only — never full-width list rows. */

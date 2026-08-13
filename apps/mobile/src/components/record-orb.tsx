@@ -1,6 +1,10 @@
 import { memo, useMemo } from "react";
 import { View } from "react-native";
-import Animated, { useAnimatedStyle, useReducedMotion } from "react-native-reanimated";
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  type SharedValue,
+} from "react-native-reanimated";
 
 import { ORB_COLOR } from "./orb/palette";
 import { useOrbEngine, type OrbPhase } from "./orb/engine";
@@ -121,8 +125,13 @@ const ANCHOR = {
 } as const;
 
 export interface RecordOrbProps {
-  /** Normalized input level 0..1, arriving as React state at ~10Hz. */
-  level: number;
+  /**
+   * Normalized input level 0..1, written on the UI thread at 25Hz.
+   *
+   * A shared value, so a new sample never re-renders this component — it only
+   * moves the engine's envelope, which the layers are already watching.
+   */
+  level: SharedValue<number>;
   phase: OrbPhase;
   /** Overall diameter in points. Callers should scale this to the viewport. */
   size?: number;
@@ -161,8 +170,7 @@ function RecordOrbComponent({ level, phase, size = 264, focused = true }: Record
   const stageAnimation = useAnimatedStyle(() => ({
     transform: [
       {
-        scale:
-          (1 + breath.value * 0.035 + energy.value * 0.13) * (1 - settle.value * 0.05),
+        scale: (1 + breath.value * 0.035 + energy.value * 0.13) * (1 - settle.value * 0.05),
       },
     ],
   }));

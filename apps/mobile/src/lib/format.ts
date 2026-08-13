@@ -6,6 +6,29 @@
  */
 
 /**
+ * A recording with no name is titled with its own timestamp, which then sits
+ * beside the date column repeating the same information. "Untitled recording"
+ * is more honest and stops the row leading with a string of digits.
+ */
+const TIMESTAMP_TITLE = /^\w{3},?\s+\w{3}\s+\d{1,2}(\s+at)?\s+\d{1,2}:\d{2}/i;
+
+/**
+ * True when a title is really just the timestamp the recorder pre-filled.
+ *
+ * Surfaces that already sit next to a clock — the meetings list beside its date
+ * column, the Live Activity beneath the Lock Screen's own clock — gain nothing
+ * from repeating it, and it costs them their most-read line.
+ */
+export function isPlaceholderTitle(title: string): boolean {
+  const trimmed = title.trim();
+  return trimmed.length === 0 || TIMESTAMP_TITLE.test(trimmed);
+}
+
+export function displayTitle(title: string): string {
+  return isPlaceholderTitle(title) ? "Untitled recording" : title;
+}
+
+/**
  * Human duration.
  *
  * Deliberately not mm:ss. A 90-minute meeting formatted that way renders as
@@ -51,9 +74,7 @@ export function formatListDate(iso: string | null | undefined): string | null {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const dayDiff = Math.round(
-    (startOfToday.getTime() - startOfDate.getTime()) / 86_400_000,
-  );
+  const dayDiff = Math.round((startOfToday.getTime() - startOfDate.getTime()) / 86_400_000);
 
   if (dayDiff === 0) {
     return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });

@@ -35,7 +35,7 @@ import {
   updateRecordingActivity,
   type RecordingControl,
 } from "@/lib/live-activity";
-import { formatClock } from "@/lib/format";
+import { formatClock, isPlaceholderTitle } from "@/lib/format";
 import { RecordOrb, type OrbPhase } from "@/components/record-orb";
 
 /** Tagged so the release targets this screen's lock and not someone else's. */
@@ -248,10 +248,7 @@ export default function RecordScreen() {
    */
   const { width, height } = useWindowDimensions();
   const orbSize = Math.round(
-    Math.max(
-      ORB_MIN,
-      Math.min(width - ORB_SIDE_BLEED * 2, height - topPad - bottomPad - CHROME_H),
-    ),
+    Math.max(ORB_MIN, Math.min(width - ORB_SIDE_BLEED * 2, height - topPad - bottomPad - CHROME_H)),
   );
 
   // A recording screen that sleeps mid-meeting is a broken recording screen —
@@ -432,7 +429,15 @@ export default function RecordScreen() {
       // Both calls, every time. start is ignored once a pill exists, so this
       // costs nothing after the first pass and removes the need to track
       // whether we have already started one.
-      startRecordingActivity({ title: titleRef.current.trim() || defaultTitle() });
+      // Empty when the user has not named this yet. The recorder pre-fills the
+      // field with a timestamp, and passing that through put "Thu, Aug 13 at
+      // 10:22 AM" on the Lock Screen directly beneath the Lock Screen's own
+      // clock — the card's most-read line spent on information already on
+      // screen twice. The widget drops the line entirely when it is empty and
+      // gives the space to the waveform instead.
+      startRecordingActivity({
+        title: isPlaceholderTitle(titleRef.current) ? "" : titleRef.current.trim(),
+      });
       updateRecordingActivity({ paused: recorderState === "paused" });
     } else {
       endRecordingActivity();
@@ -515,10 +520,7 @@ export default function RecordScreen() {
       style={{ paddingTop: topPad, paddingBottom: bottomPad }}
     >
       <View className="items-center" style={{ gap: HEADER_GAP }}>
-        <View
-          className="flex-row items-center justify-center gap-2"
-          style={{ height: EYEBROW_H }}
-        >
+        <View className="flex-row items-center justify-center gap-2" style={{ height: EYEBROW_H }}>
           {active ? (
             <>
               <RecordingDot live={recording} />
@@ -594,16 +596,8 @@ export default function RecordScreen() {
             live in. Stated rather than left to overflow: a child that is simply
             bigger than its parent renders the same today and disappears the day
             something upstream clips. */}
-        <View
-          className="items-center"
-          style={{ alignSelf: "stretch", marginHorizontal: -24 }}
-        >
-          <RecordOrb
-            level={recorder.level}
-            phase={phase}
-            size={orbSize}
-            focused={focused}
-          />
+        <View className="items-center" style={{ alignSelf: "stretch", marginHorizontal: -24 }}>
+          <RecordOrb level={recorder.level} phase={phase} size={orbSize} focused={focused} />
         </View>
 
         {/* Tabular figures are not optional: the timer reflows ten times a
@@ -636,10 +630,7 @@ export default function RecordScreen() {
             accessibilityLabel="Start recording"
             className="min-h-[64px] items-center justify-center rounded-full bg-label active:opacity-80"
           >
-            <Text
-              className="text-[17px] font-semibold text-background"
-              maxFontSizeMultiplier={1.4}
-            >
+            <Text className="text-[17px] font-semibold text-background" maxFontSizeMultiplier={1.4}>
               Start recording
             </Text>
           </Pressable>
@@ -654,10 +645,7 @@ export default function RecordScreen() {
               {/* 1.4, not 1.8. These two sit side by side at half the column
                   each, so their labels run out of horizontal room long before
                   the 64pt button runs out of vertical. */}
-              <Text
-                className="text-[17px] font-semibold text-label"
-                maxFontSizeMultiplier={1.4}
-              >
+              <Text className="text-[17px] font-semibold text-label" maxFontSizeMultiplier={1.4}>
                 {paused ? "Resume" : "Pause"}
               </Text>
             </Pressable>
@@ -670,10 +658,7 @@ export default function RecordScreen() {
             >
               {/* "End meeting", not "Stop recording" — the user is finishing a
                   meeting, not operating a tape deck. */}
-              <Text
-                className="text-[17px] font-semibold text-label"
-                maxFontSizeMultiplier={1.4}
-              >
+              <Text className="text-[17px] font-semibold text-label" maxFontSizeMultiplier={1.4}>
                 End meeting
               </Text>
             </Pressable>

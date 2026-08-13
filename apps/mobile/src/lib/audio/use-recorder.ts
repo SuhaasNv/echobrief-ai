@@ -1,15 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  AudioModule,
-  RecordingPresets,
-  setAudioModeAsync,
-  useAudioRecorder,
-} from "expo-audio";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSharedValue, type SharedValue } from "react-native-reanimated";
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from "expo-audio";
 
 export type RecorderState = "idle" | "requesting" | "denied" | "recording" | "paused" | "stopping";
-
-/** Bars kept in the rolling live waveform. */
-const BAR_COUNT = 56;
 
 /**
  * dBFS floor. Metering reports roughly -160..0; -50 is quiet-room noise.
@@ -19,8 +12,22 @@ const BAR_COUNT = 56;
  */
 const DB_FLOOR = -50;
 
-/** Metering fires many times a second; the UI only needs ~10fps of bars. */
-const SAMPLE_INTERVAL_MS = 100;
+/**
+ * 25 Hz, not 10 Hz.
+ *
+ * Syllables land at roughly 4–8 per second and a stressed one peaks and decays
+ * inside ~150ms. Sampling every 100ms put barely one reading on a syllable and
+ * missed short bursts entirely, so the orb answered the *average* of the room
+ * rather than the voice in it — which is what made it feel lazy no matter how
+ * the animation was tuned. You cannot smooth your way out of an undersampled
+ * signal; it has to be sampled faster first.
+ *
+ * Affordable only because `level` is a shared value now. At 10 Hz this loop ran
+ * three setStates per tick and re-rendered the record screen for each one; at
+ * 25 Hz that would have been 75 renders a second. It now writes straight to the
+ * UI thread and re-renders nothing.
+ */
+const SAMPLE_INTERVAL_MS = 40;
 
 function normalizeDb(db: number | undefined): number {
   if (db === undefined || Number.isNaN(db)) return 0;
@@ -31,12 +38,17 @@ function normalizeDb(db: number | undefined): number {
 
 export interface Recorder {
   state: RecorderState;
-  /** Elapsed seconds. Drives the timer. */
+  /** Elapsed seconds, whole. Drives the timer. */
   duration: number;
-  /** Rolling normalized levels 0..1, oldest first. */
-  bars: number[];
-  /** Most recent normalized level 0..1. */
-  level: number;
+  /**
+   * Most recent normalized level, 0..1, on the UI thread.
+   *
+   * A shared value rather than React state: this changes 25 times a second and
+   * only ever feeds an animation, so routing it through a render would cost a
+   * reconcile per sample to hand a number to a worklet that could have read it
+   * directly.
+   */
+  level: SharedValue<number>;
   start: () => Promise<void>;
   pause: () => void;
   resume: () => void;
@@ -49,8 +61,11 @@ export interface Recorder {
 export function useRecorder(): Recorder {
   const [state, setState] = useState<RecorderState>("idle");
   const [duration, setDuration] = useState(0);
-  const [bars, setBars] = useState<number[]>(() => Array<number>(BAR_COUNT).fill(0));
-  const [level, setLevel] = useState(0);
+  const level = useSharedValue(0);
+  // Last whole second published to React. The timer renders mm:ss, so pushing a
+  // new duration on every 40ms sample would re-render the screen 25 times to
+  // redraw the same two digits.
+  const secondRef = useRef(-1);
 
   const recorder = useAudioRecorder({
     ...RecordingPresets.HIGH_QUALITY,
@@ -66,17 +81,22 @@ export function useRecorder(): Recorder {
 
     const id = setInterval(() => {
       const status = recorder.getStatus();
-      const next = normalizeDb(status.metering);
 
-      setLevel(next);
-      setBars((prev) => [...prev.slice(1), next]);
+      // Straight to the UI thread. No setState, so no render.
+      level.value = normalizeDb(status.metering);
+
       // The recorder's own clock, so it stays correct across pauses without us
-      // tracking wall time.
-      setDuration(status.durationMillis / 1000);
+      // tracking wall time. Published only when the displayed second actually
+      // changes.
+      const seconds = Math.floor(status.durationMillis / 1000);
+      if (seconds !== secondRef.current) {
+        secondRef.current = seconds;
+        setDuration(seconds);
+      }
     }, SAMPLE_INTERVAL_MS);
 
     return () => clearInterval(id);
-  }, [state, recorder]);
+  }, [state, recorder, level]);
 
   const start = useCallback(async () => {
     setState("requesting");
@@ -104,7 +124,7 @@ export function useRecorder(): Recorder {
     // Synchronous and returns void — do not await it.
     recorder.record();
 
-    setBars(Array<number>(BAR_COUNT).fill(0));
+    secondRef.current = -1;
     setDuration(0);
     setState("recording");
   }, [recorder]);
@@ -112,8 +132,8 @@ export function useRecorder(): Recorder {
   const pause = useCallback(() => {
     recorder.pause();
     setState("paused");
-    setLevel(0);
-  }, [recorder]);
+    level.value = 0;
+  }, [recorder, level]);
 
   const resume = useCallback(() => {
     recorder.record();
@@ -130,22 +150,22 @@ export function useRecorder(): Recorder {
     // Release the audio session so playback elsewhere is not left ducked.
     await setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
     setState("idle");
-    setLevel(0);
+    level.value = 0;
     return recorder.uri ?? null;
-  }, [recorder]);
+  }, [recorder, level]);
 
   const reset = useCallback(() => {
+    secondRef.current = -1;
     setDuration(0);
-    setLevel(0);
-    setBars(Array<number>(BAR_COUNT).fill(0));
-  }, []);
+    level.value = 0;
+  }, [level]);
 
   // Memoised because callers put this object in dependency arrays. Returning a
   // fresh literal each render made a useFocusEffect re-fire every render, which
   // called reset(), which set state, which re-rendered — an infinite loop that
   // crashed the app on launch.
   return useMemo(
-    () => ({ state, duration, bars, level, start, pause, resume, stop, reset }),
-    [state, duration, bars, level, start, pause, resume, stop, reset],
+    () => ({ state, duration, level, start, pause, resume, stop, reset }),
+    [state, duration, level, start, pause, resume, stop, reset],
   );
 }

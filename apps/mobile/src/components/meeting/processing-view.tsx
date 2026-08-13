@@ -1,15 +1,21 @@
 import { useEffect } from "react";
 import { Text, View } from "react-native";
 import Animated, {
+  Easing,
+  Extrapolation,
   FadeIn,
   ReduceMotion,
   cancelAnimation,
+  interpolate,
   useAnimatedProps,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
+  type SharedValue,
+  type WithTimingConfig,
 } from "react-native-reanimated";
 import { useQueryClient } from "@tanstack/react-query";
 import Svg, { Circle, Path } from "react-native-svg";
@@ -60,6 +66,108 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
+/**
+ * The readout counts, rather than cutting — one column per digit.
+ *
+ * The ring and the number are the same fact, so they move as one, off the same
+ * shared value. Earlier this was a single field whose whole string was rewritten
+ * as the value climbed, which made "30" become "60" by swapping both characters
+ * at once. Digits that change together read as a value being REPLACED. Digits
+ * that roll independently read as a value being COUNTED, which is what is
+ * actually happening — and the ones column spinning while the tens crawls is
+ * the entire reason an odometer feels alive.
+ *
+ * Each column is a 0-9 strip translated by the digit's own continuous position,
+ * so a column is mid-roll between two glyphs rather than snapping at integers.
+ * All of it runs on the UI thread: no per-frame setState, and this subtree does
+ * not re-render while counting.
+ */
+
+/**
+ * How long the ring and the digits take to travel between two pipeline stages.
+ *
+ * TIMING.progress is 300ms, which is right for a usage meter settling on entry
+ * and wrong here. The stages are 5 → 30 → 60 → 85 → 100, so every move is a
+ * 15-30 point jump; at 300ms the columns blur through it too fast to read, and
+ * the screen then sits still for the ~30s until the next stage. Stall, glitch,
+ * stall.
+ *
+ * 850ms is long enough to watch 30 climb to 60 and still far shorter than the
+ * gap between stages. Local rather than a change to TIMING.progress, which the
+ * usage meters and list rows share and where 300ms is correct.
+ */
+const SWEEP: WithTimingConfig = {
+  // Eases out, never in: the move must begin the instant the poll reports a new
+  // stage, or it reads as network lag rather than as motion.
+  duration: 850,
+  easing: Easing.out(Easing.cubic),
+};
+
+/** Line box of one digit. Matches the 46px face's leading. */
+const DIGIT_HEIGHT = 50;
+/**
+ * Column width.
+ *
+ * Space Grotesk's tabular figures advance 0.62em, so 46px is ~28.5. Rounded up
+ * to 30 for a little air: at 46px two adjacent "1"s in this face have foot bars
+ * that visually fuse into one continuous mark, which is the bug that took the
+ * stat tiles off tabular figures. Here the columns are separate boxes, so the
+ * gap is set by geometry rather than by the glyph.
+ */
+const DIGIT_WIDTH = 30;
+/** 0-9, then 0 again so the roll past 9 wraps without travelling backwards. */
+const DIGIT_STRIP = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+
+/** Rendered width of the "%", including its left margin. Used to re-centre. */
+const PERCENT_WIDTH = 13;
+
+function DigitColumn({
+  progress,
+  place,
+  reveal,
+}: {
+  progress: SharedValue<number>;
+  place: number;
+  /** 0 = this column is a leading zero and hidden, 1 = it carries a digit. */
+  reveal?: SharedValue<number>;
+}) {
+  const style = useAnimatedStyle(() => {
+    // Continuous, not floored: the fractional part is what puts a column
+    // between two glyphs mid-roll instead of snapping from one to the next.
+    const value = progress.value * 100;
+    const position = (value / Math.pow(10, place)) % 10;
+    return { transform: [{ translateY: -position * DIGIT_HEIGHT }] };
+  });
+
+  /**
+   * Leading zeros fade, they do not unmount.
+   *
+   * Removing the column would change the row's width mid-count and walk the
+   * whole group sideways. It keeps its 30pt either way — which is exactly why
+   * the row has to be re-centred around it; see COUNTER_OFFSET below.
+   */
+  const fade = useAnimatedStyle(() => ({ opacity: reveal ? reveal.value : 1 }));
+
+  return (
+    <Animated.View style={[{ width: DIGIT_WIDTH, height: DIGIT_HEIGHT, overflow: "hidden" }, fade]}>
+      <Animated.View style={style}>
+        {DIGIT_STRIP.map((digit, i) => (
+          <Text
+            key={i}
+            // The face has to come from the class: Uniwind resolves className
+            // AFTER inline style, so a fontFamily style prop is overridden.
+            className="font-display text-[46px] text-label"
+            style={{ height: DIGIT_HEIGHT, lineHeight: DIGIT_HEIGHT, textAlign: "center" }}
+            maxFontSizeMultiplier={1}
+          >
+            {digit}
+          </Text>
+        ))}
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
 /** Uppercase micro-eyebrow — matches components/meeting/summary-view. */
 function Eyebrow({ children }: { children: string }) {
   return (
@@ -89,8 +197,41 @@ function ProgressRing({ percent, label }: { percent: number; label: string }) {
   const progress = useSharedValue(0);
 
   useEffect(() => {
-    progress.value = withTiming(Math.max(0, Math.min(1, percent / 100)), TIMING.progress);
+    progress.value = withTiming(Math.max(0, Math.min(1, percent / 100)), SWEEP);
   }, [percent, progress]);
+
+  /**
+   * Whether each leading column is carrying a digit yet, 0..1.
+   *
+   * Ramped over one whole unit rather than switched at the threshold, so the
+   * column fades in as the value crosses it instead of appearing.
+   */
+  const tensIn = useDerivedValue(() =>
+    interpolate(progress.value * 100, [9, 10], [0, 1], Extrapolation.CLAMP),
+  );
+  const hundredsIn = useDerivedValue(() =>
+    interpolate(progress.value * 100, [99, 100], [0, 1], Extrapolation.CLAMP),
+  );
+
+  /**
+   * Re-centre the visible digits on the ring.
+   *
+   * A hidden leading zero still occupies its 30pt of layout — it has to, or the
+   * row's width would change mid-count and the whole group would walk sideways.
+   * The consequence is that centring the ROW does not centre what you can SEE:
+   * at 60 the invisible hundreds column sits on the left and the "%" hangs on
+   * the right, so the digits land 8pt right of the ring's centre. Measured
+   * against the render, which is where this was caught.
+   *
+   * offset = (percent width − hidden width) / 2, which lands within half a
+   * point at every value: −23.5 below 10, −8.5 through the nineties, +6.5 at
+   * 100. Driven by the same ramps as the fades, so a column brightening and the
+   * row sliding are one movement rather than two.
+   */
+  const centring = useAnimatedStyle(() => {
+    const hidden = (1 - tensIn.value) * DIGIT_WIDTH + (1 - hundredsIn.value) * DIGIT_WIDTH;
+    return { transform: [{ translateX: (PERCENT_WIDTH - hidden) / 2 }] };
+  });
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: RING_CIRCUMFERENCE * (1 - progress.value),
@@ -137,21 +278,22 @@ function ProgressRing({ percent, label }: { percent: number; label: string }) {
         />
       </Svg>
 
-      <View className="flex-row items-baseline">
+      {/* Hundreds, tens, ones. Fixed geometry, so the group stays centred on
+          the ring at every value from 5 to 100. */}
+      <Animated.View className="flex-row items-center" style={centring}>
+        <DigitColumn progress={progress} place={2} reveal={hundredsIn} />
+        <DigitColumn progress={progress} place={1} reveal={tensIn} />
+        <DigitColumn progress={progress} place={0} />
+        {/* Nudged onto the numeral's baseline — level with the middle of a 46px
+            digit a percent sign reads as a superscript. */}
         <Text
-          // Uniwind resolves className AFTER inline style, so a fontFamily style
-          // prop here would be silently overridden. The face has to come from
-          // the class.
-          className="font-display text-[46px] leading-[50px] text-label"
-          style={{ fontVariant: ["tabular-nums"] }}
+          className="text-[17px] text-label-tertiary"
+          style={{ marginTop: 12, marginLeft: 2 }}
           maxFontSizeMultiplier={1.3}
         >
-          {percent}
-        </Text>
-        <Text className="text-[17px] text-label-tertiary" maxFontSizeMultiplier={1.3}>
           %
         </Text>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -181,7 +323,11 @@ function ActiveDot() {
     }
 
     pulse.value = withRepeat(
-      withTiming(0.25, { duration: 900, easing: TIMING.crossfade.easing, reduceMotion: ReduceMotion.System }),
+      withTiming(0.25, {
+        duration: 900,
+        easing: TIMING.crossfade.easing,
+        reduceMotion: ReduceMotion.System,
+      }),
       -1,
       true,
     );
@@ -349,7 +495,10 @@ export function ProcessingView({ meeting }: { meeting: MeetingDetail }) {
       entering={FadeIn.duration(TIMING.crossfade.duration)}
       className="gap-3 px-4 pb-10"
     >
-      <View className="items-center gap-5 rounded-card bg-surface px-5 py-7" style={{ borderCurve: "continuous" }}>
+      <View
+        className="items-center gap-5 rounded-card bg-surface px-5 py-7"
+        style={{ borderCurve: "continuous" }}
+      >
         <Eyebrow>Processing</Eyebrow>
 
         <ProgressRing percent={percent} label={`${stageLabel}, ${percent} percent complete`} />
@@ -394,9 +543,7 @@ export function ProcessingView({ meeting }: { meeting: MeetingDetail }) {
               <StepIcon state={step.state} />
               <Text
                 className={`flex-1 text-[15px] ${
-                  step.state === "pending"
-                    ? "text-label-tertiary"
-                    : "font-medium text-label"
+                  step.state === "pending" ? "text-label-tertiary" : "font-medium text-label"
                 }`}
                 maxFontSizeMultiplier={1.6}
               >

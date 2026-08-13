@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Keyboard, ScrollView, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown, FadeOut, useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -65,6 +65,24 @@ export default function AskScreen() {
   const busy = search.phase === "searching" || search.phase === "streaming";
   const idle = search.phase === "idle";
 
+  /**
+   * The thread, as question/answer pairs.
+   *
+   * `turns` is the wire shape the endpoint wants — a flat alternating array —
+   * so it is paired here rather than stored twice. Stepping by two is safe
+   * because commitTurn appends both halves together or neither.
+   */
+  const settled = useMemo(() => {
+    const pairs: { question: string; answer: string }[] = [];
+    for (let i = 0; i + 1 < search.turns.length; i += 2) {
+      pairs.push({
+        question: search.turns[i]?.content ?? "",
+        answer: search.turns[i + 1]?.content ?? "",
+      });
+    }
+    return pairs;
+  }, [search.turns]);
+
   const submit = useCallback(
     (query: string) => {
       const trimmed = query.trim();
@@ -102,8 +120,7 @@ export default function AskScreen() {
     }
   }, [phase]);
 
-  const noResult =
-    search.phase === "done" && !search.answer && search.citations.length === 0;
+  const noResult = search.phase === "done" && !search.answer && search.citations.length === 0;
 
   return (
     <View className="flex-1 bg-background">
@@ -148,6 +165,21 @@ export default function AskScreen() {
           />
         ) : (
           <>
+            {/* Everything already answered, oldest first.
+                Held back at 70% so the exchange in flight stays the loudest
+                thing on the screen — this is a thread you are reading forward,
+                not a log you are scanning. */}
+            {settled.length > 0 ? (
+              <View className="gap-6 opacity-70">
+                {settled.map((turn, index) => (
+                  <View key={`${index}-${turn.question.slice(0, 24)}`} className="gap-3">
+                    <QuestionHeader question={turn.question} />
+                    <AnswerCard answer={turn.answer} streaming={false} />
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
             <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(260)}>
               <QuestionHeader question={search.question} />
             </Animated.View>
@@ -171,10 +203,7 @@ export default function AskScreen() {
                 // order the data arrived in is the order the eye reads it.
                 entering={reduceMotion ? undefined : FadeInDown.duration(320).delay(140)}
               >
-                <AnswerCard
-                  answer={search.answer}
-                  streaming={search.phase === "streaming"}
-                />
+                <AnswerCard answer={search.answer} streaming={search.phase === "streaming"} />
               </Animated.View>
             ) : null}
 
@@ -184,8 +213,8 @@ export default function AskScreen() {
                   No meeting mentions that.
                 </Text>
                 <Text className="text-[15px] leading-[21px] text-label-secondary">
-                  Nothing in your transcripts matched closely enough to quote. Try the
-                  words that would have been said out loud.
+                  Nothing in your transcripts matched closely enough to quote. Try the words that
+                  would have been said out loud.
                 </Text>
               </View>
             ) : null}
@@ -194,20 +223,21 @@ export default function AskScreen() {
                 is spent gets no retry at all, a per-minute limit gets one that
                 unlocks when it can succeed. */}
             {search.error ? (
-              <AskFailureCard
-                error={search.error}
-                onRetry={() => submit(search.question)}
-              />
+              <AskFailureCard error={search.error} onRetry={() => submit(search.question)} />
             ) : null}
 
+            {/* "Start over", not "Ask something else". Asking something else no
+                longer needs a button — the composer is right there and the next
+                question now carries this one with it. This clears the thread,
+                which is a different and rarer intent. */}
             {!busy ? (
               <PillButton
-                label="Ask something else"
+                label="Start over"
                 onPress={() => {
                   reset();
                   setInput("");
                 }}
-                accessibilityHint="Clears this answer and returns to suggestions"
+                accessibilityHint="Clears this conversation and returns to suggestions"
               />
             ) : null}
           </>

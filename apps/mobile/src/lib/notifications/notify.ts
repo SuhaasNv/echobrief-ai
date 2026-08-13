@@ -1,6 +1,7 @@
 import * as Notifications from "expo-notifications";
 
 import { api } from "@/lib/api/client";
+import { displayTitle, isPlaceholderTitle } from "@/lib/format";
 import { hydrateSession } from "@/lib/api/token-store";
 import type { MeetingListResponse, MeetingSummary } from "@/lib/api/meetings";
 
@@ -46,7 +47,13 @@ export function notificationCopy(announcement: MeetingAnnouncement): {
   title: string;
   body: string;
 } {
-  const title = announcement.title.trim() || "Your meeting";
+  // Same normalisation the list uses. The recorder pre-fills the title with a
+  // timestamp, so an unnamed recording arrived on the Lock Screen as
+  // "Thu, Aug 13 at 11:13 AM" — a date, as the headline, directly under the
+  // Lock Screen's own clock. "Untitled recording" at least says what it is.
+  const title = isPlaceholderTitle(announcement.title)
+    ? displayTitle(announcement.title)
+    : announcement.title.trim();
 
   if (announcement.status === "failed") {
     return {

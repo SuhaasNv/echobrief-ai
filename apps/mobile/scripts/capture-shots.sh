@@ -48,7 +48,7 @@ NAMES=(
 )
 
 mkdir -p "$OUT"
-rm -f "$OUT"/*.png 2>/dev/null
+rm -f "$OUT"/*.png "$OUT"/manifest.txt 2>/dev/null
 
 xcrun simctl terminate booted "$BUNDLE" >/dev/null 2>&1
 sleep 1
@@ -63,6 +63,9 @@ for i in "${!NAMES[@]}"; do
   if [ "$WAIT" -gt 0 ]; then sleep "$WAIT"; fi
 
   if xcrun simctl io booted screenshot --type=png "$OUT/${NAMES[$i]}.png" >/dev/null 2>&1; then
+    # Millisecond stamp, matched later against the app's own [shot-route] lines.
+    # The filename is a GUESS derived from the route list; this is the evidence.
+    echo "${NAMES[$i]} $(python3 -c 'import time; print(int(time.time()*1000))')" >> "$OUT/manifest.txt"
     echo "  ${NAMES[$i]}"
   else
     echo "  FAILED ${NAMES[$i]}"
