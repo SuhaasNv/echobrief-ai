@@ -7,11 +7,13 @@
  * - Token exhaustion attacks (oversized inputs)
  */
 
-import { logPromptInjection } from "./logger";
-
 /**
  * Patterns that indicate potential prompt injection attempts.
  * These are logged and redacted when found in user input.
+ *
+ * NOT applied to transcripts — see sanitizeTranscript for why. Several of these
+ * ("you are now", "act as a") are ordinary English and match constantly in
+ * recorded speech.
  */
 const SUSPICIOUS_PATTERNS = [
   // Direct instruction overrides
@@ -57,65 +59,45 @@ const MAX_LENGTHS = {
 
 export interface SanitizeOptions {
   maxLength?: number;
-  stripHtml?: boolean;
-  checkSuspiciousPatterns?: boolean;
   logSecurityEvents?: boolean;
 }
 
 /**
  * Sanitize user-provided transcript text for LLM processing.
  *
- * This is the most critical sanitization point since transcripts
- * go directly into LLM prompts and could contain adversarial content.
+ * Length cap ONLY — the redaction pass was removed deliberately, because it
+ * corrupted the user's own words in the one place they are least replaceable.
+ * It rewrote ordinary English as "[REDACTED - POLICY VIOLATION]" ("you are now
+ * the lead on this", "he'll act as the tiebreaker"), and the tag-stripping
+ * regex swallowed the span "<50k but >" out of "revenue <50k but >100 units".
+ * The summary was then built from the mangled text, so the damage reached the
+ * user's screen.
+ *
+ * The defence that actually holds is already in place in prompts.ts: the
+ * transcript is fenced inside <transcript> XML tags and the prompt states
+ * plainly that the content is USER DATA, not instructions. Injection into a
+ * transcript that only ever produces a summary shown back to the person who
+ * recorded it is a near-zero-impact threat; silently mangling their words is a
+ * real one.
  */
 export function sanitizeTranscript(text: string, options: SanitizeOptions = {}): string {
-  const {
-    maxLength = MAX_LENGTHS.transcript,
-    stripHtml = true,
-    checkSuspiciousPatterns = true,
-    logSecurityEvents = true,
-  } = options;
+  const { maxLength = MAX_LENGTHS.transcript, logSecurityEvents = true } = options;
 
-  let sanitized = text;
-
-  // 1. Strip HTML/XML tags that could break prompt structure
-  if (stripHtml) {
-    sanitized = sanitized.replace(/<\/?[^>]+(>|$)/g, "");
-  }
-
-  // 2. Check for and redact suspicious patterns
-  if (checkSuspiciousPatterns) {
-    for (const pattern of SUSPICIOUS_PATTERNS) {
-      const matches = sanitized.match(pattern);
-      if (matches) {
-        if (logSecurityEvents) {
-          // Use centralized security logger
-          logPromptInjection(
-            "unknown", // userId not available in sanitization context
-            pattern.source,
-            matches[0],
-            text.length,
-          );
-        }
-        sanitized = sanitized.replace(pattern, "[REDACTED - POLICY VIOLATION]");
-      }
-    }
-  }
-
-  // 3. Truncate to prevent token exhaustion
-  if (sanitized.length > maxLength) {
+  // Truncate to prevent token exhaustion — the only genuine DoS vector here,
+  // and the only transformation allowed to touch transcript text.
+  if (text.length > maxLength) {
     if (logSecurityEvents) {
       console.warn("[SECURITY] Transcript truncated:", {
-        originalLength: sanitized.length,
+        originalLength: text.length,
         maxLength,
-        truncated: sanitized.length - maxLength,
+        truncated: text.length - maxLength,
         timestamp: new Date().toISOString(),
       });
     }
-    sanitized = sanitized.slice(0, maxLength) + "\n\n[TRUNCATED FOR LENGTH]";
+    return text.slice(0, maxLength) + "\n\n[TRUNCATED FOR LENGTH]";
   }
 
-  return sanitized;
+  return text;
 }
 
 /**

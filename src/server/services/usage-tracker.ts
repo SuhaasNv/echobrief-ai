@@ -107,6 +107,42 @@ export async function logTranscription(
 /**
  * Log AI query usage (chat, search, email generation).
  */
+/**
+ * Record what the pipeline spent, WITHOUT spending the user's query quota.
+ *
+ * The automatic summary used to call logAIQuery, which increments the same
+ * `ai_queries_count` that gates Ask. Free tier allows 300 transcription minutes
+ * and 10 AI queries, so a user recording 25-minute meetings hit the query cap
+ * on meeting ten with transcription minutes still unspent — and had zero Ask
+ * queries left. Not "few": zero. The one feature the product is differentiated
+ * on was unreachable on the free tier for exactly the short in-person
+ * conversations it is meant for, and the meter that hid it was our own.
+ *
+ * Cost still lands on the row, because that is real money and the margin model
+ * depends on it. Only the quota counter is left alone: the user did not ask for
+ * this, the pipeline did.
+ */
+export async function logPipelineAICost(
+  userId: string,
+  workspaceId: string | null,
+  costUsd: number,
+): Promise<void> {
+  const sql = getSql();
+  const period = getCurrentPeriod();
+
+  await ensureUsageLog(sql, userId, workspaceId, period);
+
+  await sql`
+    UPDATE usage_logs
+    SET
+      total_cost_usd = total_cost_usd + ${costUsd},
+      updated_at = now()
+    WHERE user_id = ${userId}
+      AND workspace_id IS NOT DISTINCT FROM ${workspaceId}
+      AND period = ${period}
+  `;
+}
+
 export async function logAIQuery(
   userId: string,
   workspaceId: string | null,

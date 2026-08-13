@@ -38,6 +38,46 @@ function getClient(): OpenAI {
 }
 
 // ----------------------------------------------------------------------------
+// Cost accounting
+// ----------------------------------------------------------------------------
+
+/**
+ * USD per 1M tokens, keyed on the exact model string we send to OpenAI
+ * (env.OPENAI_MODEL_PRIMARY / OPENAI_MODEL_LIGHT).
+ *
+ * Every call site used to hardcode $5 in / $15 out — GPT-4o's rates — while the
+ * service has been running GPT-5. That flowed straight into pipeline_logs.cost_usd,
+ * usage_logs.total_cost_usd and the analytics endpoint, wrong in both directions
+ * (4x over on the primary model, under on the light one).
+ */
+const MODEL_PRICING_USD_PER_1M: Record<string, { input: number; output: number }> = {
+  "gpt-5": { input: 1.25, output: 10 },
+  "gpt-5-mini": { input: 0.25, output: 2 },
+};
+
+/**
+ * Used when OPENAI_MODEL_* points at a model we have no verified price for.
+ * These are gpt-5's rates, not a guess at the unknown model's: an operator who
+ * switches models gets a cost figure anchored to a real price they can reason
+ * about, rather than an invented one. Add the model above when its price is known.
+ */
+const FALLBACK_PRICING_USD_PER_1M = { input: 1.25, output: 10 };
+
+/**
+ * Note on completion_tokens: for reasoning models it includes reasoning tokens,
+ * which are billed at the output rate even though they never reach us. That is
+ * why every call below caps max_completion_tokens.
+ */
+function computeCostUsd(model: string, usage: OpenAI.CompletionUsage | undefined): number {
+  if (!usage) return 0;
+  const price = MODEL_PRICING_USD_PER_1M[model] ?? FALLBACK_PRICING_USD_PER_1M;
+  return (
+    (usage.prompt_tokens / 1_000_000) * price.input +
+    (usage.completion_tokens / 1_000_000) * price.output
+  );
+}
+
+// ----------------------------------------------------------------------------
 // Public types (re-exported from prompts/schemas)
 // ----------------------------------------------------------------------------
 
@@ -67,6 +107,13 @@ export async function analyzeMeeting(transcript: string): Promise<AnalysisResult
   const client = getClient();
   const response = await client.chat.completions.create({
     model: env.OPENAI_MODEL_PRIMARY,
+    // Extraction against a strict schema, not a reasoning problem: "low" is the
+    // lowest the installed SDK's ReasoningEffort union accepts (no "minimal"),
+    // and without it GPT-5 silently defaults to medium. The cap bounds an
+    // otherwise unlimited reasoning run that bills at the output rate; a summary
+    // with chapters and action items lands well inside it.
+    reasoning_effort: "low",
+    max_completion_tokens: 8000,
     messages: [
       { role: "system", content: PROMPTS.MEETING_ANALYSIS_SYSTEM },
       { role: "user", content: PROMPTS.meetingAnalysisUser(transcript) },
@@ -85,10 +132,7 @@ export async function analyzeMeeting(transcript: string): Promise<AnalysisResult
   if (!raw) throw new Error("OpenAI returned no content");
   const parsed = JSON.parse(raw) as AnalysisStructured;
 
-  const usage = response.usage;
-  const cost_usd = usage
-    ? (usage.prompt_tokens / 1_000_000) * 5 + (usage.completion_tokens / 1_000_000) * 15
-    : 0;
+  const cost_usd = computeCostUsd(env.OPENAI_MODEL_PRIMARY, response.usage);
 
   return {
     summary: parsed.summary,
@@ -122,6 +166,10 @@ export async function generateFlashcards(
   const client = getClient();
   const response = await client.chat.completions.create({
     model: env.OPENAI_MODEL_PRIMARY,
+    // See analyzeMeeting. 8–15 self-contained cards fit inside this cap with
+    // room left for low-effort reasoning tokens.
+    reasoning_effort: "low",
+    max_completion_tokens: 8000,
     messages: [
       { role: "system", content: PROMPTS.FLASHCARDS_SYSTEM },
       { role: "user", content: PROMPTS.flashcardsUser(transcript, title) },
@@ -140,10 +188,7 @@ export async function generateFlashcards(
   if (!raw) throw new Error("OpenAI returned no content");
   const parsed = JSON.parse(raw) as FlashcardsStructured;
 
-  const usage = response.usage;
-  const cost_usd = usage
-    ? (usage.prompt_tokens / 1_000_000) * 5 + (usage.completion_tokens / 1_000_000) * 15
-    : 0;
+  const cost_usd = computeCostUsd(env.OPENAI_MODEL_PRIMARY, response.usage);
 
   return { cards: parsed.cards, cost_usd };
 }
@@ -176,6 +221,9 @@ export async function scoreMeeting(
   const client = getClient();
   const response = await client.chat.completions.create({
     model: env.OPENAI_MODEL_LIGHT,
+    // See analyzeMeeting. Output here is six numbers and a short explanation.
+    reasoning_effort: "low",
+    max_completion_tokens: 4000,
     messages: [
       { role: "system", content: PROMPTS.SCORE_SYSTEM },
       { role: "user", content: PROMPTS.scoreUser(transcript, speakerStats, actionItemCount) },
@@ -194,10 +242,7 @@ export async function scoreMeeting(
   if (!raw) throw new Error("OpenAI returned no content for score");
   const score = JSON.parse(raw) as MeetingScore;
 
-  const usage = response.usage;
-  const cost_usd = usage
-    ? (usage.prompt_tokens / 1_000_000) * 0.5 + (usage.completion_tokens / 1_000_000) * 2
-    : 0;
+  const cost_usd = computeCostUsd(env.OPENAI_MODEL_LIGHT, response.usage);
 
   return { score, cost_usd };
 }
@@ -222,6 +267,12 @@ export async function streamGroundedAnswer(params: {
   const stream = await client.chat.completions.create({
     model: env.OPENAI_MODEL_PRIMARY,
     stream: true,
+    // Same reasoning-token bill applies to streamed calls, and at medium effort
+    // GPT-5 also holds the first token back while it thinks. Grounded Q&A over
+    // supplied context does not need more than "low"; 4000 tokens is far more
+    // than any answer we render.
+    reasoning_effort: "low",
+    max_completion_tokens: 4000,
     messages: [
       { role: "system", content: params.systemContext },
       ...params.history.map((m) => ({ role: m.role, content: m.content })),
@@ -265,6 +316,9 @@ export async function generateEmail(params: {
   const stream = await client.chat.completions.create({
     model: env.OPENAI_MODEL_PRIMARY,
     stream: true,
+    // See streamGroundedAnswer. A recap email is a few hundred tokens.
+    reasoning_effort: "low",
+    max_completion_tokens: 4000,
     messages: [
       { role: "system", content: PROMPTS.emailSystem(params.type, params.tone) },
       {

@@ -93,7 +93,9 @@ export function getEnv(): Env {
   if (cached.NODE_ENV === "development") {
     console.log("[ENV] Configuration loaded:");
     console.log("  - NODE_ENV:", cached.NODE_ENV);
-    console.log("  - DB pool size:", process.env.DB_POOL_SIZE || "100 (default)");
+    // Must track the default in src/server/db/index.ts — a boot log that reports
+    // a pool size the process is not using is worse than no log at all.
+    console.log("  - DB pool size:", process.env.DB_POOL_SIZE || "12 (default)");
     console.log("  - Worker concurrency:", process.env.WORKER_CONCURRENCY || "10 (default)");
     console.log(
       "  - Export worker concurrency:",
