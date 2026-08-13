@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 
+import { useUpdatePreferences } from "@/lib/api/preferences";
 import { haptics } from "@/lib/haptics";
 import { pluralize } from "@/lib/format";
 import {
   MAX_VOCABULARY_TERMS,
   addVocabularyTerm,
+  getPreferences,
   removeVocabularyTerm,
   usePreferences,
 } from "@/components/settings/preferences";
@@ -29,6 +31,7 @@ import { Footnote, SettingsScroll } from "@/components/settings/screen";
  */
 export default function VocabularyScreen() {
   const preferences = usePreferences();
+  const sync = useUpdatePreferences();
   const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -40,6 +43,10 @@ export default function VocabularyScreen() {
     if (!canAdd) return;
 
     const result = addVocabularyTerm(draft);
+    // Pushed AFTER the local add so the list the server receives is the one the
+    // user can see. The store is synchronous, so reading it back here is not a
+    // race.
+    if (result === "added") void sync.mutateAsync({ vocabulary: getPreferences().vocabulary });
 
     if (result === "added") {
       haptics.tap();
@@ -64,7 +71,10 @@ export default function VocabularyScreen() {
         title="Add a term"
         footer="Spell it the way it should appear in a transcript. Case is preserved."
       >
-        <View className="flex-row items-center gap-3 px-4 py-2" style={{ minHeight: ROW_MIN_HEIGHT }}>
+        <View
+          className="flex-row items-center gap-3 px-4 py-2"
+          style={{ minHeight: ROW_MIN_HEIGHT }}
+        >
           <TextInput
             keyboardAppearance="dark"
             className="flex-1 py-2 text-[17px] text-label"
@@ -125,6 +135,7 @@ export default function VocabularyScreen() {
                     onPress={() => {
                       haptics.tap();
                       removeVocabularyTerm(term);
+                      void sync.mutateAsync({ vocabulary: getPreferences().vocabulary });
                     }}
                     hitSlop={12}
                     accessibilityRole="button"

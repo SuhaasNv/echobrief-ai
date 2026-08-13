@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 
+import { useUpdatePreferences } from "@/lib/api/preferences";
 import { haptics } from "@/lib/haptics";
 import { pluralize } from "@/lib/format";
 import {
@@ -21,6 +22,7 @@ import { Footnote, SettingsScroll } from "@/components/settings/screen";
  */
 export default function TranscriptionScreen() {
   const preferences = usePreferences();
+  const sync = useUpdatePreferences();
 
   return (
     <SettingsScroll>
@@ -38,6 +40,12 @@ export default function TranscriptionScreen() {
             onPress={() => {
               haptics.select();
               setPreference("language", choice.value);
+              // The worker reads this: null means "detect it", which the API
+              // spells "auto" because NULL there means "never chosen" and the
+              // two must not collapse. See migration 0015.
+              void sync.mutateAsync({
+                transcription_language: choice.value ?? "auto",
+              });
             }}
           />
         ))}
@@ -61,7 +69,7 @@ export default function TranscriptionScreen() {
 
       <Section
         title="Speakers"
-        footer="Names you assign to a speaker are reused the next time that voice appears in this workspace."
+        footer="Names apply to the meeting you set them in. Telling one voice from another across different meetings needs stored voice prints, which EchoBrief does not keep — so the next recording starts from Speaker A again."
       >
         <ToggleRow
           icon="person.2"

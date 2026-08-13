@@ -1,6 +1,9 @@
 import { router } from "expo-router";
 
-import { labelFor, RETENTION_WINDOWS, setPreference, usePreferences } from "@/components/settings/preferences";
+import {
+  setPreference,
+  usePreferences,
+} from "@/components/settings/preferences";
 import { openWeb } from "@/components/settings/links";
 import { Row, Section, ToggleRow } from "@/components/settings/rows";
 import { Footnote, SettingsScroll } from "@/components/settings/screen";
@@ -34,14 +37,11 @@ export default function PrivacyScreen() {
           onPress={() => openWeb("/app/settings")}
           hint="Opens your account settings on the web"
         />
+        {/* The real window, not the stored preference — see account/recording. */}
         <Row
           icon="clock"
           label="Audio retention"
-          value={
-            preferences.keepAudioAfterProcessing
-              ? labelFor(RETENTION_WINDOWS, preferences.retentionDays)
-              : "Not kept"
-          }
+          value="7 days"
           onPress={() => router.push("/(app)/account/recording")}
         />
       </Section>
@@ -76,8 +76,8 @@ export default function PrivacyScreen() {
       </Section>
 
       <Footnote>
-        Audio you record is sent to AssemblyAI for transcription, and transcripts are sent to
-        OpenAI to produce summaries and action items. Recordings are stored on Cloudflare R2.
+        Audio you record is sent to AssemblyAI for transcription, and transcripts are sent to OpenAI
+        to produce summaries and action items. Recordings are stored on Cloudflare R2.
       </Footnote>
     </SettingsScroll>
   );

@@ -305,6 +305,18 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
+/**
+ * The current values, synchronously.
+ *
+ * `usePreferences()` returns a render snapshot, which is one render behind a
+ * write made in the same handler. Anything that mutates and then has to send
+ * the result — the server write-through in lib/api/preferences — needs the
+ * state as it is now, not as it was when the component last rendered.
+ */
+export function getPreferences(): Preferences {
+  return getSnapshot();
+}
+
 function getSnapshot(): Preferences {
   return state;
 }

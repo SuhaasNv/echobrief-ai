@@ -1,6 +1,7 @@
 import { Stack, usePathname } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { usePreferenceSync } from "@/lib/api/preferences";
 import { useTabBarInset } from "@/lib/layout";
 import { stackScreenOptions } from "@/lib/screen-options";
 import { CrashScreen, ErrorBoundary } from "@/components/error-boundary";
@@ -30,6 +31,16 @@ const SUB_SCREENS: readonly { name: string; title: string }[] = [
 ];
 
 export default function AccountStack() {
+  /**
+   * Seed the device store from the server once, here rather than at the app
+   * root.
+   *
+   * These three preferences are only ever EDITED under this stack, so this is
+   * the last moment the seed can still win — and mounting it at the root would
+   * fire the request on every cold start for a user who never opens settings.
+   */
+  usePreferenceSync();
+
   const queryClient = useQueryClient();
   const pathname = usePathname();
   const tabBarInset = useTabBarInset();
@@ -58,7 +69,11 @@ export default function AccountStack() {
       <Stack screenOptions={stackScreenOptions}>
         <Stack.Screen name="index" options={{ title: "Account" }} />
         {SUB_SCREENS.map(({ name, title }) => (
-          <Stack.Screen key={name} name={name} options={{ title, headerLargeTitleEnabled: false }} />
+          <Stack.Screen
+            key={name}
+            name={name}
+            options={{ title, headerLargeTitleEnabled: false }}
+          />
         ))}
       </Stack>
     </ErrorBoundary>
