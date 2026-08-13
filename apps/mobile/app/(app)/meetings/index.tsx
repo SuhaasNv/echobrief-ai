@@ -1,208 +1,297 @@
-import { useCallback, useState, useSyncExternalStore } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, Text, View } from "react-native";
-import { FlashList } from "@shopify/flash-list";
-import { onlineManager } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { RefreshControl, SectionList, Text, View } from "react-native";
+import { router, Stack } from "expo-router";
 
+import { describeError, useOnline } from "@/lib/api/errors";
 import { useMeetings, type MeetingSummary } from "@/lib/api/meetings";
-import { formatDuration, formatListDate, pluralize } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
-import { StatusBadge } from "@/components/status-badge";
+import { useTabBarInset } from "@/lib/layout";
+import { ErrorState, StaleNotice } from "@/components/error-state";
+import { ListEndCap } from "@/components/meetings/end-cap";
+import { LibraryEmpty, NoResults } from "@/components/meetings/empty-state";
+import { MeetingRow } from "@/components/meetings/meeting-row";
+import { MeetingsSkeleton } from "@/components/meetings/skeleton";
+import { StatHeader } from "@/components/meetings/stat-header";
 
-function MeetingRow({ meeting }: { meeting: MeetingSummary }) {
-  const duration = formatDuration(meeting.duration_sec);
-  const date = formatListDate(meeting.recorded_at ?? meeting.created_at);
+/**
+ * Day grouping.
+ *
+ * Every iOS library — Mail, Files, Photos, Voice Memos — groups by day rather
+ * than showing a flat list. It gives the screen rhythm, and it lets each row
+ * drop its date down to a time, which removes a column of near-identical text.
+ */
+function sectionTitle(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const days = Math.round((startOfToday.getTime() - startOfDate.getTime()) / 86_400_000);
 
-  const meta = [
-    duration,
-    meeting.participant_count ? pluralize(meeting.participant_count, "speaker") : null,
-    meeting.action_item_count ? pluralize(meeting.action_item_count, "task") : null,
-  ].filter(Boolean) as string[];
-
-  // One label for the whole row, so VoiceOver reads it as a single cell rather
-  // than four disconnected fragments.
-  const a11yLabel = [meeting.title, date, ...meta].filter(Boolean).join(", ");
-
-  return (
-    <Pressable
-      onPress={() => {
-        haptics.select();
-        router.push(`/(app)/meetings/${meeting.id}`);
-      }}
-      // Cards on the dark ground rather than flat rows on one surface. A plain
-      // list needs a visible separator to read as a list at all; at this
-      // palette's contrast, cards carry the structure more reliably and match
-      // the web app's language.
-      className="rounded-card bg-surface px-4 py-3.5 active:bg-elevated"
-      style={{ borderCurve: "continuous" }}
-      accessibilityRole="button"
-      accessibilityLabel={a11yLabel}
-      accessibilityHint="Opens the summary and transcript"
-    >
-      <View className="flex-row items-start gap-3">
-        <View className="flex-1">
-          <View className="flex-row items-baseline gap-2">
-            <Text
-              className="flex-1 text-[17px] font-semibold text-label"
-              numberOfLines={2}
-            >
-              {meeting.title}
-            </Text>
-            {date ? (
-              <Text
-                className="shrink-0 text-[13px] text-label-secondary"
-                maxFontSizeMultiplier={1.6}
-              >
-                {date}
-              </Text>
-            ) : null}
-          </View>
-
-          {meeting.summary_excerpt ? (
-            <Text className="mt-1 text-[15px] text-label-secondary" numberOfLines={2}>
-              {meeting.summary_excerpt}
-            </Text>
-          ) : null}
-
-          {meta.length > 0 ? (
-            <Text
-              // label-secondary, not tertiary: tertiary on the background is
-              // 4.17:1 and fails AA at this size.
-              className="mt-1.5 text-[13px] text-label-secondary"
-              style={{ fontVariant: ["tabular-nums"] }}
-              maxFontSizeMultiplier={1.6}
-            >
-              {meta.join(" · ")}
-            </Text>
-          ) : null}
-        </View>
-
-        <StatusBadge status={meeting.status} />
-      </View>
-    </Pressable>
-  );
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return date.toLocaleDateString(undefined, { weekday: "long" });
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+  }
+  return date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
 }
 
-function EmptyState() {
+function timeOfDay(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+interface Section {
+  title: string;
+  /** Index of this section's first row in the flattened list, for stagger. */
+  offset: number;
+  first: boolean;
+  data: MeetingSummary[];
+}
+
+/**
+ * Section heading.
+ *
+ * Title case, not ALL CAPS: iOS 26 moved its own headings to title case, and
+ * tracked-out capitals now date a screen the way a bevelled button would.
+ *
+ * The count sits beside the title rather than trailing at the right margin —
+ * flush right it reads as a separate column of unrelated numbers, and at the
+ * baseline of the heading it reads as part of the phrase.
+ */
+function SectionHeader({ title, count, first }: { title: string; count: number; first: boolean }) {
   return (
-    <View className="items-center px-8 pt-24">
-      <Text className="text-center text-[20px] font-semibold text-label">
-        No meetings yet
+    <View
+      className={`flex-row items-baseline gap-2 bg-background px-4 pb-2.5 ${
+        first ? "pt-1" : "pt-6"
+      }`}
+    >
+      <Text className="text-[15px] font-semibold text-label" maxFontSizeMultiplier={1.5}>
+        {title}
       </Text>
-      <Text className="mt-2 text-center text-[15px] text-label-secondary">
-        Record a conversation and EchoBrief turns it into a summary, action items, and a
-        searchable transcript.
-      </Text>
-      <Pressable
-        onPress={() => router.push("/(app)/record")}
-        accessibilityRole="button"
-        className="mt-6 min-h-[50px] justify-center rounded-full bg-label px-6 active:opacity-80"
+      <Text
+        className="text-[13px] text-label-tertiary"
+        style={{ fontVariant: ["tabular-nums"] }}
+        maxFontSizeMultiplier={1.4}
       >
-        <Text className="text-[17px] font-semibold text-background">Start recording</Text>
-      </Pressable>
+        {count}
+      </Text>
     </View>
   );
 }
 
+/** Keystrokes are not queries. Long enough to skip the noise, short enough
+    that a finished word resolves before the finger leaves the keyboard. */
+const SEARCH_DEBOUNCE_MS = 250;
+
 export default function MeetingsScreen() {
+  const tabBarInset = useTabBarInset();
+  const [searchInput, setSearchInput] = useState("");
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (searchInput === query) return;
+    const id = setTimeout(() => setQuery(searchInput), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [searchInput, query]);
+
   const {
     data,
     isLoading,
     isError,
+    isPaused,
+    isFetching,
     error,
     refetch,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useMeetings();
+  } = useMeetings(query);
 
   // Tracked separately from isRefetching, which is true for ANY background
-  // refetch — including the 15s poll. Binding the control to that makes the
-  // spinner drop down and spin unprompted four times a minute.
+  // refetch — including the poll. Binding the control to that makes the spinner
+  // drop down unprompted every 15 seconds.
   const [isManualRefresh, setIsManualRefresh] = useState(false);
 
-  const isOnline = useSyncExternalStore(
-    (cb) => onlineManager.subscribe(cb),
-    () => onlineManager.isOnline(),
-    () => true,
-  );
+  const isOnline = useOnline();
+
+  /**
+   * What a failed pull to refresh says.
+   *
+   * It said nothing at all: the refetch was awaited inside try/finally with no
+   * catch, so the spinner retracted on a failure exactly as it does on a
+   * success and the list went on showing the same rows as though they had just
+   * been confirmed as current. The list is still worth showing, so this is a
+   * line above it rather than a screen replacing it.
+   */
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   const onRefresh = useCallback(async () => {
+    // Offline, React Query PARKS the refetch rather than running it, and a
+    // parked fetch never settles: awaiting it would leave the spinner turning
+    // until the network came back. The offline line above says why instead.
+    if (!isOnline) {
+      haptics.warning();
+      return;
+    }
+
     setIsManualRefresh(true);
     try {
-      await refetch();
+      // refetch() resolves with the failure rather than throwing, so the result
+      // has to be read. The catch covers a throw from elsewhere in the chain.
+      const result = await refetch();
+      if (result.isError) {
+        haptics.error();
+        setRefreshError(
+          describeError(result.error, { online: isOnline, subject: "your meetings" }).body,
+        );
+      } else {
+        setRefreshError(null);
+      }
+    } catch (thrown) {
+      haptics.error();
+      setRefreshError(describeError(thrown, { online: isOnline, subject: "your meetings" }).body);
     } finally {
       setIsManualRefresh(false);
     }
-  }, [refetch]);
+  }, [refetch, isOnline]);
 
-  const renderItem = useCallback(
-    ({ item }: { item: MeetingSummary }) => <MeetingRow meeting={item} />,
-    [],
+  const items = useMemo(() => data?.pages.flatMap((p) => p.items) ?? [], [data]);
+  const total = data?.pages[0]?.total ?? items.length;
+  const searching = query.trim().length > 0;
+
+  const sections = useMemo<Section[]>(() => {
+    const groups = new Map<string, MeetingSummary[]>();
+    for (const meeting of items) {
+      const when = meeting.recorded_at ?? meeting.created_at;
+      const title = sectionTitle(when);
+      const bucket = groups.get(title);
+      if (bucket) bucket.push(meeting);
+      else groups.set(title, [meeting]);
+    }
+
+    // The stagger has to run down the SCREEN, not restart inside each day, or
+    // the second group appears before the tail of the first and the list
+    // assembles out of order.
+    let offset = 0;
+    return Array.from(groups.entries()).map(([title, data], i) => {
+      const section = { title, data, offset, first: i === 0 };
+      offset += data.length;
+      return section;
+    });
+  }, [items]);
+
+  const failure = describeError(error, { online: isOnline, subject: "your meetings" });
+
+  const empty = isLoading ? (
+    <MeetingsSkeleton header={!searching} rows={searching ? 3 : 4} />
+  ) : isError || isPaused ? (
+    // Offline gets no button. React Query pauses a refetch while the device is
+    // off the network, so "Try again" there is a control that cannot succeed,
+    // and the state is better told than offered.
+    <View className="pt-8">
+      <ErrorState
+        title={failure.title}
+        body={failure.body}
+        detail={error?.message}
+        onRetry={failure.retryable ? () => void refetch() : undefined}
+        busy={isFetching && !isManualRefresh}
+      />
+    </View>
+  ) : searching ? (
+    <NoResults query={query.trim()} />
+  ) : (
+    <LibraryEmpty />
   );
-
-  const items = data?.pages.flatMap((p) => p.items) ?? [];
-
-  if (isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator accessibilityLabel="Loading meetings" />
-      </View>
-    );
-  }
-
-  if (isError && items.length === 0) {
-    // A connection failure and a server failure need different copy — one is
-    // the user's problem to fix, the other isn't.
-    const offline = !isOnline;
-    return (
-      <View className="flex-1 items-center justify-center bg-background px-8">
-        <Text className="text-center text-[17px] font-semibold text-label">
-          {offline ? "You're offline." : "Can't load your meetings."}
-        </Text>
-        <Text className="mt-2 text-center text-[15px] text-label-secondary">
-          {offline
-            ? "Your meetings will appear once you're back online."
-            : (error as Error).message}
-        </Text>
-        <Pressable
-          onPress={() => void refetch()}
-          className="mt-6 min-h-[50px] justify-center rounded-full bg-label px-6 active:opacity-80"
-          accessibilityRole="button"
-        >
-          <Text className="text-[17px] font-semibold text-background">Try again</Text>
-        </Pressable>
-      </View>
-    );
-  }
 
   return (
     <View className="flex-1 bg-background">
+      <Stack.Screen
+        options={{
+          headerSearchBarOptions: {
+            placeholder: "Search meetings",
+            // Pinned rather than hiding on scroll: the show/hide animation is
+            // what makes the field lurch when it gains focus.
+            hideWhenScrolling: false,
+            // Every colour on the field is set explicitly. UISearchBar in a dark
+            // navigation bar leaves its placeholder and magnifier on a
+            // low-opacity system grey, which over this near-black canvas
+            // measures well under AA and reads as an empty field with no hint
+            // at all.
+            //
+            // Placeholder and glyph are label-secondary (#9CA1A9), not
+            // label-tertiary (#6E727A). Against the field's own dark fill
+            // (#1C1F25 in our ramp, and iOS composites its tertiary system fill
+            // over #06070A to roughly the same value) that is 6.4:1, and 5.4:1
+            // even against a considerably lighter #2C2C2E field. The previous
+            // tertiary grey managed 2.6:1.
+            //
+            // The container stays dark on purpose: lightening the field to fix
+            // a text problem would put a grey slab in the navigation bar.
+            textColor: "#F4F5F7",
+            hintTextColor: "#9CA1A9",
+            headerIconColor: "#9CA1A9",
+            tintColor: "#4C99F8",
+            onChangeText: (e) => setSearchInput(e.nativeEvent.text),
+            onClose: () => setSearchInput(""),
+          },
+        }}
+      />
+
       {!isOnline ? (
-        <View className="bg-fill px-4 py-2">
-          <Text className="text-center text-[13px] text-label-secondary">
-            Offline — showing your last synced meetings
-          </Text>
-        </View>
+        <StaleNotice>Offline. Showing your last synced meetings.</StaleNotice>
+      ) : refreshError ? (
+        <StaleNotice>{`Could not refresh. ${refreshError}`}</StaleNotice>
       ) : null}
 
-      <FlashList
-        data={items}
-        renderItem={renderItem}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={EmptyState}
-        ItemSeparatorComponent={() => <View className="h-2.5" />}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+        renderItem={({ item, index, section }) => (
+          <View className="px-4 pb-2.5">
+            <MeetingRow
+              meeting={item}
+              time={timeOfDay(item.recorded_at ?? item.created_at)}
+              index={section.offset + index}
+            />
+          </View>
+        )}
+        renderSectionHeader={({ section }) => (
+          <SectionHeader
+            title={section.title}
+            count={section.data.length}
+            first={section.first}
+          />
+        )}
+        ListHeaderComponent={
+          items.length > 0 && !searching ? <StatHeader meetings={items} total={total} /> : null
+        }
+        // Held in a variable rather than passed as a function: an inline
+        // component is a new type on every render, which remounts the skeleton
+        // and restarts its pulse from the top several times a second.
+        ListEmptyComponent={empty}
+        stickySectionHeadersEnabled={false}
         // Required for the large title to collapse and for the iOS 26 scroll
-        // edge effect to have something to blur. React Native defaults this to
-        // 'never', which is NOT the UIKit default.
+        // edge effect to have something to blur. RN defaults this to 'never',
+        // which is NOT the UIKit default.
         contentInsetAdjustmentBehavior="automatic"
+        // flexGrow lets the empty and error states own the screen instead of
+        // clinging to the top of a zero-height content view.
+        contentContainerStyle={{ paddingTop: 8, paddingBottom: tabBarInset, flexGrow: 1 }}
+        keyboardDismissMode="on-drag"
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
         }}
         onEndReachedThreshold={0.6}
         ListFooterComponent={
-          isFetchingNextPage ? <ActivityIndicator className="py-4" /> : null
+          isFetchingNextPage ? (
+            // Continues the list in its own shape rather than interrupting it
+            // with a spinner.
+            <View className="pt-1">
+              <MeetingsSkeleton rows={1} header={false} heading={false} />
+            </View>
+          ) : items.length > 0 && !hasNextPage && !searching ? (
+            <ListEndCap total={total} onRecord={() => router.push("/(app)/record")} />
+          ) : null
         }
         refreshControl={
           <RefreshControl

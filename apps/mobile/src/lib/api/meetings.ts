@@ -1,4 +1,22 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useCallback, useSyncExternalStore } from "react";
+import { Alert } from "react-native";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+} from "@tanstack/react-query";
+import { ApiError } from "@echobrief/shared/api";
+
+import { haptics } from "@/lib/haptics";
+// Imported from the leaf module rather than the @/lib/notifications barrel on
+// purpose. The barrel is side-effecting by design — importing it evaluates
+// ./task and ./lifecycle, which registers the background TaskManager task — and
+// pulling that into the module every meetings screen imports would run
+// notification plumbing far earlier and far wider than intended. src/lib/audio/
+// upload.ts does exactly the same thing for exactly the same call.
+import { forgetMeeting } from "@/lib/notifications/store";
 
 import { api } from "./client";
 
@@ -14,6 +32,12 @@ export interface MeetingSummary {
   recorded_at: string | null;
   created_at: string;
   tags: string[] | null;
+  /**
+   * Present only on a search response. Matched terms are wrapped in [[…]] as
+   * plain text rather than HTML, because this feeds a React Native list and
+   * there is no markup renderer in the row.
+   */
+  match_snippet?: string | null;
 }
 
 export interface MeetingListResponse {
@@ -26,7 +50,18 @@ export interface MeetingListResponse {
 const PAGE_SIZE = 20;
 
 export const qk = {
+  /** Every list variant. Prefix-matched by `qk.allMeetings` below. */
   meetings: (search: string) => ["meetings", { search }] as const,
+  /** The prefix every search variant shares, for cancel / invalidate / write. */
+  allMeetings: ["meetings"] as const,
+  /**
+   * The detail query's key.
+   *
+   * Declared here rather than in meeting-detail.ts because that module already
+   * imports from this one; putting it the other way round would make the two
+   * files circular.
+   */
+  meeting: (id: string) => ["meeting", id] as const,
 };
 
 /** A meeting is still moving through the pipeline. */
@@ -55,5 +90,231 @@ export function useMeetings(search = "") {
       query.state.data?.pages.some((p) => p.items.some((m) => isProcessing(m.status)))
         ? 15_000
         : false,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Rename — PATCH /meetings/:id
+// ---------------------------------------------------------------------------
+
+/**
+ * The server accepts `{ title }` on PATCH /meetings/:id and answers `{ ok: true }`
+ * with no body worth reading, so the caches are patched rather than refetched.
+ *
+ * The list is deliberately NOT invalidated: it is an infinite query, and
+ * invalidating it refetches every page the user has already scrolled through
+ * over a cellular connection to change one string. The detail query IS
+ * invalidated, because it is a single cheap request and it is the screen the
+ * user is looking at.
+ */
+export function useRenameMeeting(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (title: string) =>
+      api.apiRequest(`/meetings/${id}`, { method: "PATCH", body: { title } }),
+
+    onSuccess: (_data, title) => {
+      // Typed structurally on the one field being written. The spread preserves
+      // every other field of the real cached object; narrowing the generic here
+      // only limits what this function is allowed to touch.
+      queryClient.setQueryData<{ title: string }>(qk.meeting(id), (old) =>
+        old ? { ...old, title } : old,
+      );
+
+      queryClient.setQueriesData<InfiniteData<MeetingListResponse>>(
+        { queryKey: qk.allMeetings },
+        (old) =>
+          old
+            ? {
+                ...old,
+                pages: old.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((m) => (m.id === id ? { ...m, title } : m)),
+                })),
+              }
+            : old,
+      );
+
+      void queryClient.invalidateQueries({ queryKey: qk.meeting(id) });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Delete — DELETE /meetings/:id, deferred behind a real undo window
+// ---------------------------------------------------------------------------
+
+/**
+ * Deletion is genuinely deferred, not fired and reverted.
+ *
+ * DELETE /meetings/:id destroys the audio object in R2 and cascades the row
+ * away. There is no server-side restore, so an "undo" that fires the request
+ * immediately and then re-creates a row from a cache snapshot would be a lie:
+ * the recording would already be gone. So the request does not leave the device
+ * until the undo window closes.
+ *
+ * The registry lives at module scope rather than in a component because the
+ * commit has to survive the row unmounting — the user deletes from the detail
+ * screen and immediately navigates back, or scrolls the row out of a
+ * virtualized list. A `useMutation` tied to a screen would be torn down first.
+ *
+ * The QueryClient is passed in by the caller (which has it from context) rather
+ * than reached for globally, so there is exactly one client and no import cycle
+ * back into the provider.
+ */
+export const DELETE_UNDO_MS = 5_000;
+
+interface PendingDelete {
+  title: string;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const pendingDeletes = new Map<string, PendingDelete>();
+const pendingListeners = new Set<() => void>();
+
+function notifyPendingChanged(): void {
+  for (const listener of pendingListeners) listener();
+}
+
+function subscribeToPending(onChange: () => void): () => void {
+  pendingListeners.add(onChange);
+  return () => {
+    pendingListeners.delete(onChange);
+  };
+}
+
+/**
+ * True while `id` is inside its undo window.
+ *
+ * Subscribed per id so the snapshot is a boolean. Returning the Map itself
+ * would defeat useSyncExternalStore's Object.is check — the Map is mutated in
+ * place, so its identity never changes and nothing would ever re-render.
+ */
+export function useMeetingDeletePending(id: string): boolean {
+  const getSnapshot = useCallback(() => pendingDeletes.has(id), [id]);
+  return useSyncExternalStore(subscribeToPending, getSnapshot, getSnapshot);
+}
+
+/**
+ * Start the undo window. The row stays in the cache untouched for the whole
+ * window: nothing has happened yet, so there is nothing to roll back if the
+ * user changes their mind or the app is killed.
+ */
+export function scheduleMeetingDelete(
+  id: string,
+  title: string,
+  queryClient: QueryClient,
+): void {
+  if (pendingDeletes.has(id)) return;
+
+  const timer = setTimeout(() => {
+    void commitMeetingDelete(id, queryClient);
+  }, DELETE_UNDO_MS);
+
+  pendingDeletes.set(id, { title, timer });
+  notifyPendingChanged();
+}
+
+/** Cancel before the window closes. No request was sent, so this is free. */
+export function undoMeetingDelete(id: string): void {
+  const entry = pendingDeletes.get(id);
+  if (!entry) return;
+
+  clearTimeout(entry.timer);
+  pendingDeletes.delete(id);
+  notifyPendingChanged();
+}
+
+async function commitMeetingDelete(id: string, queryClient: QueryClient): Promise<void> {
+  const entry = pendingDeletes.get(id);
+  // Undone in the gap between the timer firing and this running.
+  if (!entry) return;
+
+  const { title } = entry;
+  pendingDeletes.delete(id);
+  notifyPendingChanged();
+
+  // Cancel FIRST, then snapshot. Snapshotting before the cancel captures state
+  // that an in-flight refetch is about to overwrite, and that refetch — which
+  // still carries the meeting, because the server has not been told yet —
+  // lands after the optimistic write and puts the row straight back.
+  await queryClient.cancelQueries({ queryKey: qk.allMeetings });
+
+  const snapshot = queryClient.getQueriesData<InfiniteData<MeetingListResponse>>({
+    queryKey: qk.allMeetings,
+  });
+
+  queryClient.setQueriesData<InfiniteData<MeetingListResponse>>(
+    { queryKey: qk.allMeetings },
+    (old) => {
+      if (!old) return old;
+
+      let removed = false;
+      const pages = old.pages.map((page) => {
+        const items = page.items.filter((m) => m.id !== id);
+        // Same length means this page never held the row; returning the original
+        // object keeps its reference stable so untouched pages do not re-render.
+        if (items.length === page.items.length) return page;
+        removed = true;
+        return { ...page, items };
+      });
+
+      if (!removed) return old;
+
+      // `total` is a count of the whole collection repeated on every page, not a
+      // per-page figure. Decrementing only the page that held the row leaves the
+      // list header — which reads page[0].total — reporting a meeting that is no
+      // longer there whenever the deleted row was on page two or later.
+      return {
+        ...old,
+        pages: pages.map((page) => ({ ...page, total: Math.max(0, page.total - 1) })),
+      };
+    },
+  );
+
+  try {
+    await api.apiRequest(`/meetings/${id}`, { method: "DELETE" });
+  } catch (error) {
+    // 404 is success in disguise. The endpoint scopes by user_id and
+    // workspace_id, so "already deleted" and "not yours" are the same response,
+    // and in both cases the row must stay gone — restoring it would put a
+    // meeting in the library that cannot be opened.
+    const alreadyGone = error instanceof ApiError && error.status === 404;
+
+    if (!alreadyGone) {
+      // Restore from the snapshot first: it is immediate and it works offline,
+      // which matters because "no network" is the most likely reason this
+      // failed. Then invalidate to reconcile with the server once it is
+      // reachable again — that also repairs the rare case where a second delete
+      // committed between this snapshot and this restore, whose removal the
+      // snapshot would otherwise undo.
+      for (const [key, data] of snapshot) {
+        if (data !== undefined) queryClient.setQueryData(key, data);
+      }
+      void queryClient.invalidateQueries({ queryKey: qk.allMeetings });
+
+      haptics.error();
+      Alert.alert(
+        "Could not delete that meeting",
+        `"${title}" is still in your library. ${
+          error instanceof Error ? error.message : "Try again in a moment."
+        }`,
+      );
+      return;
+    }
+  }
+
+  // The detail query is removed rather than invalidated: invalidating refetches
+  // a row that no longer exists and lands the detail screen on a 404.
+  queryClient.removeQueries({ queryKey: qk.meeting(id) });
+  void queryClient.invalidateQueries({ queryKey: qk.allMeetings });
+
+  // Drop the notification dedupe record. Without this the "already notified"
+  // ledger grows for the life of the install and never sheds ids that can never
+  // notify again.
+  void forgetMeeting(id).catch(() => {
+    // Best effort. A stale ledger entry is a leak, not a failure the user can
+    // act on, and surfacing it after a successful delete would be noise.
   });
 }

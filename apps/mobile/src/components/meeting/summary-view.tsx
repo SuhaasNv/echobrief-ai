@@ -2,104 +2,27 @@ import { Text, View } from "react-native";
 
 import type { MeetingDetail } from "@/lib/api/meeting-detail";
 import { formatClock, formatDuration, pluralize } from "@/lib/format";
-import { displayNumber } from "@/lib/type";
 
-/** Uppercase micro-eyebrow — the most portable piece of the web app's identity. */
-function Eyebrow({ children }: { children: string }) {
-  return (
-    <Text
-      className="text-[11px] font-semibold uppercase text-label-secondary"
-      style={{ letterSpacing: 0.8 }}
-      maxFontSizeMultiplier={1.4}
-    >
-      {children}
-    </Text>
-  );
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <View
-      className="gap-3 rounded-card bg-surface p-5"
-      style={{ borderCurve: "continuous" }}
-    >
-      {children}
-    </View>
-  );
-}
+import { useFirstView } from "./first-view";
+import { Eyebrow, EmptyPane, Meter, Notice, SectionCard } from "./primitives";
+import { ScoreCard } from "./score-card";
 
 /**
- * Meeting score.
+ * The summary pane.
  *
- * Deliberately the visual anchor of the screen: one large number carries more
- * weight than a paragraph, and it is the only place the app makes a judgement
- * rather than a transcription. Score is out of 10, not 100.
+ * Order is an argument: the judgement first, then the model's prose, then the
+ * structured extractions, then who actually spoke. Every block is optional and
+ * every one of them is skipped rather than rendered empty, because a card with
+ * a heading and no content reads as a bug in the pipeline.
  */
-function ScoreCard({ score }: { score: NonNullable<MeetingDetail["meeting_score"]> }) {
-  const pct = Math.max(0, Math.min(1, score.total / 10));
 
-  return (
-    <Card>
-      <Eyebrow>Meeting score</Eyebrow>
-
-      <View className="flex-row items-end gap-1.5">
-        <Text className="text-[52px] leading-[56px] text-label" style={displayNumber}>
-          {score.total.toFixed(1)}
-        </Text>
-        <Text className="pb-2 text-[17px] text-label-tertiary">/ 10</Text>
-      </View>
-
-      {/* Data as decoration — the bar gives the number somewhere to live. */}
-      <View className="h-1.5 overflow-hidden rounded-full bg-fill">
-        <View className="h-full rounded-full bg-tint" style={{ width: `${pct * 100}%` }} />
-      </View>
-
-      <Text className="text-[15px] leading-[21px] text-label-secondary" selectable>
-        {score.explanation}
-      </Text>
-    </Card>
-  );
-}
-
-/** Talk-time distribution — turns speaker data into the screen's second visual. */
-function SpeakersCard({ speakers }: { speakers: MeetingDetail["transcript"] }) {
-  if (!speakers || speakers.speakers.length === 0) return null;
-
-  const total = speakers.speakers.reduce((sum, s) => sum + s.talk_time_sec, 0);
-  if (total <= 0) return null;
-
-  const BAR = ["bg-speaker-a", "bg-speaker-b", "bg-speaker-c", "bg-speaker-d", "bg-speaker-e"];
-
-  return (
-    <Card>
-      <Eyebrow>Who talked</Eyebrow>
-      <View className="gap-3">
-        {speakers.speakers.map((s, i) => {
-          const share = s.talk_time_sec / total;
-          return (
-            <View key={s.id} className="gap-1.5">
-              <View className="flex-row items-baseline justify-between">
-                <Text className="text-[15px] font-medium text-label">{s.label}</Text>
-                <Text
-                  className="text-[13px] text-label-secondary"
-                  style={{ fontVariant: ["tabular-nums"] }}
-                >
-                  {Math.round(share * 100)}% · {formatDuration(s.talk_time_sec) ?? "—"}
-                </Text>
-              </View>
-              <View className="h-1.5 overflow-hidden rounded-full bg-fill">
-                <View
-                  className={`h-full rounded-full ${BAR[i % BAR.length]}`}
-                  style={{ width: `${Math.max(share * 100, 2)}%` }}
-                />
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </Card>
-  );
-}
+const SPEAKER_BARS = [
+  "bg-speaker-a",
+  "bg-speaker-b",
+  "bg-speaker-c",
+  "bg-speaker-d",
+  "bg-speaker-e",
+] as const;
 
 function BulletList({ items, tone }: { items: string[]; tone: "tint" | "violet" }) {
   return (
@@ -107,7 +30,7 @@ function BulletList({ items, tone }: { items: string[]; tone: "tint" | "violet" 
       {items.map((item, i) => (
         <View key={i} className="flex-row gap-2.5">
           <View
-            className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${
+            className={`mt-[8px] h-1.5 w-1.5 shrink-0 rounded-full ${
               tone === "tint" ? "bg-tint" : "bg-violet"
             }`}
           />
@@ -120,86 +43,233 @@ function BulletList({ items, tone }: { items: string[]; tone: "tint" | "violet" 
   );
 }
 
+/** Talk-time distribution — the one visual the transcript itself cannot give you. */
+function SpeakersCard({
+  speakers,
+  animate,
+  index,
+}: {
+  speakers: NonNullable<MeetingDetail["transcript"]>["speakers"];
+  animate: boolean;
+  index: number;
+}) {
+  const total = speakers.reduce((sum, s) => sum + Math.max(0, s.talk_time_sec), 0);
+
+  return (
+    <SectionCard animate={animate} index={index}>
+      <Eyebrow>Who talked</Eyebrow>
+      <View className="gap-3">
+        {speakers.map((speaker, i) => {
+          const share = total > 0 ? Math.max(0, speaker.talk_time_sec) / total : 0;
+          const percent = Math.round(share * 100);
+          const duration = formatDuration(speaker.talk_time_sec);
+
+          return (
+            <View
+              key={speaker.id}
+              className="gap-1.5"
+              accessible
+              accessibilityLabel={`${speaker.label}, ${percent} percent${
+                duration ? `, ${duration}` : ""
+              }`}
+            >
+              <View className="flex-row items-baseline justify-between gap-3">
+                <Text
+                  className="flex-1 text-[15px] font-medium text-label"
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={1.6}
+                >
+                  {speaker.label}
+                </Text>
+                <Text
+                  className="text-[13px] text-label-secondary"
+                  style={{ fontVariant: ["tabular-nums"] }}
+                  maxFontSizeMultiplier={1.4}
+                >
+                  {percent}%{duration ? `  ·  ${duration}` : ""}
+                </Text>
+              </View>
+              <Meter
+                value={share}
+                tone={SPEAKER_BARS[i % SPEAKER_BARS.length] ?? "bg-fill"}
+                animate={animate}
+                delay={i * 55}
+              />
+            </View>
+          );
+        })}
+      </View>
+    </SectionCard>
+  );
+}
+
 export function SummaryView({ meeting }: { meeting: MeetingDetail }) {
+  // Count-ups and meter fills mark the reveal of the analysis. They run once per
+  // meeting per session, never again on a tab flip.
+  const animate = useFirstView(meeting.id);
+
   const summary = meeting.summary;
+  const score = meeting.meeting_score;
+  const speakers = meeting.transcript?.speakers ?? [];
+  const segments = meeting.transcript?.segments ?? [];
+
+  const executive = summary?.executive?.trim();
+  const topics = summary?.key_topics ?? [];
+  const decisions = summary?.decisions ?? [];
+  const questions = summary?.open_questions ?? [];
+  const chapters = summary?.chapters ?? [];
+
+  const hasSummary = Boolean(
+    executive || topics.length || decisions.length || questions.length || chapters.length,
+  );
+  const hasSpeakers = speakers.length > 0;
+
+  // Nothing at all. This happens when a meeting completes but analysis produced
+  // no output, and it must not render as a screen of empty cards.
+  if (!score && !hasSummary && !hasSpeakers) {
+    return (
+      <EmptyPane
+        title="No analysis"
+        detail={
+          segments.length > 0
+            ? "The model did not return a summary for this meeting. The transcript is still there to read."
+            : "The model did not return a summary for this meeting."
+        }
+      />
+    );
+  }
+
+  // Chapter clocks share the transcript's gutter rule, so the two panes line up.
+  const chapterGutter = chapters.reduce((max, ch) => Math.max(max, ch.start_sec), 0) >= 3600
+    ? 58
+    : 44;
+
+  const cards: React.ReactNode[] = [];
+  const next = () => cards.length;
+
+  if (score) {
+    cards.push(<ScoreCard key="score" score={score} animate={animate} index={next()} />);
+  }
+
+  if (executive) {
+    cards.push(
+      <SectionCard key="executive" animate={animate} index={next()}>
+        {/* Violet reads as "the model produced this" in this palette, and appears
+            nowhere else in the app. */}
+        <View className="flex-row items-center gap-2">
+          <View className="h-1.5 w-1.5 rounded-full bg-violet" />
+          <Eyebrow>AI summary</Eyebrow>
+        </View>
+        <Text className="text-[17px] leading-[25px] text-label" selectable>
+          {executive}
+        </Text>
+      </SectionCard>,
+    );
+  }
+
+  if (topics.length) {
+    cards.push(
+      <SectionCard key="topics" animate={animate} index={next()}>
+        <Eyebrow>Topics</Eyebrow>
+        <View className="flex-row flex-wrap gap-2">
+          {topics.map((topic) => (
+            <View
+              key={topic}
+              className="rounded-chip bg-fill px-2.5 py-1.5"
+              style={{ borderCurve: "continuous" }}
+            >
+              <Text className="text-[13px] text-label-secondary" maxFontSizeMultiplier={1.6}>
+                {topic}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </SectionCard>,
+    );
+  }
+
+  if (decisions.length) {
+    cards.push(
+      <SectionCard key="decisions" animate={animate} index={next()}>
+        <Eyebrow>Decisions</Eyebrow>
+        <BulletList items={decisions} tone="tint" />
+      </SectionCard>,
+    );
+  }
+
+  if (questions.length) {
+    cards.push(
+      <SectionCard key="questions" animate={animate} index={next()}>
+        <Eyebrow>Open questions</Eyebrow>
+        <BulletList items={questions} tone="violet" />
+      </SectionCard>,
+    );
+  }
+
+  if (chapters.length) {
+    cards.push(
+      <SectionCard key="chapters" animate={animate} index={next()}>
+        <Eyebrow>Chapters</Eyebrow>
+        <View className="gap-3.5">
+          {chapters.map((chapter) => (
+            <View key={`${chapter.start_sec}-${chapter.title}`} className="flex-row gap-3">
+              <Text
+                className="shrink-0 pt-px text-[13px] text-tint"
+                style={{ width: chapterGutter, fontVariant: ["tabular-nums"] }}
+                maxFontSizeMultiplier={1.2}
+              >
+                {formatClock(chapter.start_sec)}
+              </Text>
+              <View className="flex-1 gap-1">
+                <Text className="text-[15px] font-semibold text-label" selectable>
+                  {chapter.title}
+                </Text>
+                {chapter.summary?.trim() ? (
+                  <Text
+                    className="text-[14px] leading-[20px] text-label-secondary"
+                    selectable
+                  >
+                    {chapter.summary}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </View>
+      </SectionCard>,
+    );
+  }
+
+  if (hasSpeakers) {
+    cards.push(
+      <SpeakersCard key="speakers" speakers={speakers} animate={animate} index={next()} />,
+    );
+  }
 
   return (
     <View className="gap-3 px-4 pb-8">
-      {meeting.meeting_score ? <ScoreCard score={meeting.meeting_score} /> : null}
+      {cards}
 
-      {summary?.executive ? (
-        <Card>
-          {/* Violet reads as "the AI did something" in this palette. */}
-          <View className="flex-row items-center gap-2">
-            <View className="h-1.5 w-1.5 rounded-full bg-violet" />
-            <Eyebrow>AI summary</Eyebrow>
-          </View>
-          <Text className="text-[17px] leading-[25px] text-label" selectable>
-            {summary.executive}
-          </Text>
-        </Card>
+      {/* Partial result: the pipeline scored the meeting but returned no prose.
+          Saying so is better than a stack that just stops. */}
+      {!hasSummary ? (
+        <Notice
+          title="No written summary"
+          detail={
+            segments.length > 0
+              ? "Only the score came back for this meeting. The transcript is still there to read."
+              : "Only the score came back for this meeting."
+          }
+        />
       ) : null}
 
-      {summary?.key_topics.length ? (
-        <Card>
-          <Eyebrow>Topics</Eyebrow>
-          <View className="flex-row flex-wrap gap-2">
-            {summary.key_topics.map((topic) => (
-              <View
-                key={topic}
-                className="rounded-chip bg-fill px-2.5 py-1.5"
-                style={{ borderCurve: "continuous" }}
-              >
-                <Text className="text-[13px] text-label-secondary">{topic}</Text>
-              </View>
-            ))}
-          </View>
-        </Card>
-      ) : null}
-
-      {summary?.decisions.length ? (
-        <Card>
-          <Eyebrow>Decisions</Eyebrow>
-          <BulletList items={summary.decisions} tone="tint" />
-        </Card>
-      ) : null}
-
-      {summary?.open_questions.length ? (
-        <Card>
-          <Eyebrow>Open questions</Eyebrow>
-          <BulletList items={summary.open_questions} tone="violet" />
-        </Card>
-      ) : null}
-
-      {summary?.chapters.length ? (
-        <Card>
-          <Eyebrow>Chapters</Eyebrow>
-          <View className="gap-3">
-            {summary.chapters.map((ch) => (
-              <View key={`${ch.start_sec}-${ch.title}`} className="flex-row gap-3">
-                <Text
-                  className="w-[52px] shrink-0 text-[13px] text-tint"
-                  style={{ fontVariant: ["tabular-nums"] }}
-                >
-                  {formatClock(ch.start_sec)}
-                </Text>
-                <View className="flex-1 gap-0.5">
-                  <Text className="text-[15px] font-medium text-label">{ch.title}</Text>
-                  <Text className="text-[14px] leading-[20px] text-label-secondary">
-                    {ch.summary}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </Card>
-      ) : null}
-
-      <SpeakersCard speakers={meeting.transcript} />
-
-      {meeting.transcript?.segments.length ? (
-        <Text className="px-1 text-[13px] text-label-tertiary">
-          {pluralize(meeting.transcript.segments.length, "transcript segment")}
+      {segments.length > 0 ? (
+        <Text
+          className="px-1 pt-1 text-[13px] text-label-tertiary"
+          style={{ fontVariant: ["tabular-nums"] }}
+        >
+          {pluralize(segments.length, "transcript segment")}
+          {hasSpeakers ? `  ·  ${pluralize(speakers.length, "speaker")}` : ""}
         </Text>
       ) : null}
     </View>

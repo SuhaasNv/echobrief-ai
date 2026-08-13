@@ -1,5 +1,7 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 
+import { useNotificationLifecycle } from "@/lib/notifications";
+
 /**
  * Native tab bar — a real UITabBar via react-native-screens.
  *
@@ -13,6 +15,18 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
  * try to paint it.
  */
 export default function AppLayout() {
+  // Notification plumbing for the whole signed-in app: routes a tap to its
+  // meeting (cold start included), clears the badge on foreground, catches up
+  // on anything that finished while the app was away, and dismisses banners for
+  // meetings the user has already opened.
+  //
+  // Mounted here rather than in the root layout only because this is the
+  // highest file in the tree this change owns. See the note in
+  // src/lib/notifications/index.ts: moving the import one level up to
+  // app/_layout.tsx would make the background task's handler available on a
+  // background launch that never renders the tab tree.
+  useNotificationLifecycle();
+
   return (
     <NativeTabs
       // Drives the Liquid Glass selection glow on iOS 26.
@@ -30,7 +44,11 @@ export default function AppLayout() {
 
       <NativeTabs.Trigger name="ask">
         <NativeTabs.Trigger.Label>Ask</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="sparkle.magnifyingglass" />
+        {/* Not sparkle.magnifyingglass. The sparkle is the generic "AI did
+            something" glyph every product shipped in the same eighteen months,
+            and it says nothing this tab does not already say in a word. This
+            searches the TEXT of every meeting, which is what the symbol shows. */}
+        <NativeTabs.Trigger.Icon sf="text.magnifyingglass" />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="record">

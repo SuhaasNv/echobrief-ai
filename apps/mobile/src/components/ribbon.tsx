@@ -26,6 +26,8 @@ import type { Speaker, TranscriptSegment } from "@/lib/api/meeting-detail";
 /** Matches SPEAKER_CLASSES in lib/api/meeting-detail, as resolved hex. */
 const SPEAKER_HEX = ["#4C99F8", "#A27DFA", "#2FC183", "#E6AC3D", "#7A869F"] as const;
 const UNKNOWN_HEX = "#2E3138";
+/** --label, dark ramp. The app is locked to dark (app.json userInterfaceStyle). */
+const PLAYHEAD_HEX = "#F4F5F7";
 
 export interface RibbonBand {
   /** 0..1 start position along the meeting. */
@@ -33,6 +35,36 @@ export interface RibbonBand {
   /** 0..1 end position. */
   end: number;
   color: string;
+}
+
+export interface RibbonSpan {
+  /** Wall-clock second drawn at x = 0. */
+  origin: number;
+  /** Seconds covered by the full width. */
+  span: number;
+}
+
+/**
+ * The stretch of the recording the strip actually draws.
+ *
+ * Normalised against the span covered by speech, not against zero. Speech
+ * rarely starts at 0.0s, and anchoring to zero left a dead gap at the left edge
+ * that looked like a bug rather than silence.
+ *
+ * Exported because the scrubber has to map a touch back through exactly this
+ * transform. Two copies of it would drift, and the symptom would be a playhead
+ * that sits a few seconds off the words being spoken — which reads as broken
+ * diarization rather than as a mapping bug.
+ */
+export function ribbonSpan(segments: TranscriptSegment[]): RibbonSpan | null {
+  const first = segments[0];
+  const last = segments[segments.length - 1];
+  if (!first || !last) return null;
+
+  const span = last.end_sec - first.start_sec;
+  if (span <= 0) return null;
+
+  return { origin: first.start_sec, span };
 }
 
 /**
@@ -50,28 +82,42 @@ export function buildBands(
 ): RibbonBand[] {
   if (segments.length === 0) return [];
 
-  const total = segments[segments.length - 1]?.end_sec ?? 0;
-  if (total <= 0) return [];
+  const bounds = ribbonSpan(segments);
+  if (!bounds) return [];
 
-  const colorFor = (speakerId: string | null): string => {
-    if (!speakerId) return UNKNOWN_HEX;
-    const i = speakers.findIndex((s) => s.id === speakerId);
-    return i >= 0 ? (SPEAKER_HEX[i % SPEAKER_HEX.length] ?? UNKNOWN_HEX) : UNKNOWN_HEX;
-  };
+  const origin = bounds.origin;
+  const total = bounds.span;
+
+  // One pass to build the lookup instead of a findIndex per segment: at 800+
+  // segments the linear scan is the most expensive thing in this function.
+  const colors = new Map<string, string>();
+  speakers.forEach((speaker, i) => {
+    colors.set(speaker.id, SPEAKER_HEX[i % SPEAKER_HEX.length] ?? UNKNOWN_HEX);
+  });
+  const colorFor = (speakerId: string | null): string =>
+    (speakerId ? colors.get(speakerId) : undefined) ?? UNKNOWN_HEX;
 
   const merged: RibbonBand[] = [];
-  for (const seg of segments) {
-    const color = colorFor(seg.speaker);
-    const start = seg.start_sec / total;
-    const end = seg.end_sec / total;
-    const last = merged[merged.length - 1];
+  // Runs merge on speaker IDENTITY, not on colour. Past five speakers the
+  // palette wraps, and merging by colour would silently glue speaker A to
+  // speaker F and report a monologue that never happened.
+  let runSpeaker: string | null | undefined;
 
-    // Same speaker continuing, or a gap small enough not to matter.
-    if (last && last.color === color) {
-      last.end = end;
+  for (const seg of segments) {
+    const start = (seg.start_sec - origin) / total;
+    // Defensive against unordered or zero-length segments: a band that ends
+    // before it starts draws as a negative-width rect, which some renderers
+    // simply drop and others draw as a full-width smear.
+    const end = Math.max(start, (seg.end_sec - origin) / total);
+    const previous = merged[merged.length - 1];
+
+    if (previous && seg.speaker === runSpeaker) {
+      // Same speaker continuing. Short silences inside a turn stay filled.
+      previous.end = Math.max(previous.end, end);
     } else {
-      merged.push({ start, end, color });
+      merged.push({ start, end, color: colorFor(seg.speaker) });
     }
+    runSpeaker = seg.speaker;
   }
 
   // Absorb slivers into whichever neighbour is longer, so the strip stays
@@ -81,7 +127,7 @@ export function buildBands(
     const width = band.end - band.start;
     const prev = bands[bands.length - 1];
     if (width < minWidth && prev) {
-      prev.end = band.end;
+      prev.end = Math.max(prev.end, band.end);
       continue;
     }
     bands.push({ ...band });
@@ -131,6 +177,8 @@ export function Ribbon({
       <View
         className="w-full bg-fill"
         style={{ height, borderRadius: r }}
+        accessible
+        accessibilityRole="image"
         accessibilityLabel={a11yLabel}
       />
     );
@@ -138,8 +186,12 @@ export function Ribbon({
 
   return (
     <View
-      className="w-full overflow-hidden"
+      // The track is filled rather than transparent, so the gaps between turns
+      // read as silence in the conversation instead of holes in the graphic.
+      className="w-full overflow-hidden bg-fill"
       style={{ height, borderRadius: r }}
+      accessible
+      accessibilityRole="image"
       accessibilityLabel={a11yLabel}
     >
       {/* viewBox in 0..1000 so the SVG scales to whatever width the row gives
@@ -163,7 +215,7 @@ export function Ribbon({
             y={0}
             width={2}
             height={height}
-            fill="#F4F5F7"
+            fill={PLAYHEAD_HEX}
           />
         ) : null}
       </Svg>

@@ -1,0 +1,8 @@
+{
+  "name": "echobrief-live-activity",
+  "version": "1.0.0",
+  "description": "Starts, updates and ends the recording Live Activity from JS.",
+  "private": true,
+  "author": "",
+  "license": "UNLICENSED"
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AudioModule,
   RecordingPresets,
@@ -42,6 +42,8 @@ export interface Recorder {
   resume: () => void;
   /** Resolves with the recording's file URI, or null if nothing was captured. */
   stop: () => Promise<string | null>;
+  /** Clears the timer and waveform. Tab screens stay mounted, so state persists. */
+  reset: () => void;
 }
 
 export function useRecorder(): Recorder {
@@ -132,5 +134,18 @@ export function useRecorder(): Recorder {
     return recorder.uri ?? null;
   }, [recorder]);
 
-  return { state, duration, bars, level, start, pause, resume, stop };
+  const reset = useCallback(() => {
+    setDuration(0);
+    setLevel(0);
+    setBars(Array<number>(BAR_COUNT).fill(0));
+  }, []);
+
+  // Memoised because callers put this object in dependency arrays. Returning a
+  // fresh literal each render made a useFocusEffect re-fire every render, which
+  // called reset(), which set state, which re-rendered — an infinite loop that
+  // crashed the app on launch.
+  return useMemo(
+    () => ({ state, duration, bars, level, start, pause, resume, stop, reset }),
+    [state, duration, bars, level, start, pause, resume, stop, reset],
+  );
 }

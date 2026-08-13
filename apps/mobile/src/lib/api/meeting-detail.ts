@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "./client";
-import { isProcessing, type MeetingSummary } from "./meetings";
+import { isProcessing, qk, type MeetingSummary } from "./meetings";
 
 export interface TranscriptSegment {
   speaker: string | null;
@@ -60,7 +60,9 @@ export interface MeetingDetail {
 
 export function useMeetingDetail(id: string) {
   return useQuery({
-    queryKey: ["meeting", id],
+    // Shared with the delete and rename paths, which have to address this exact
+    // key to remove or patch it. An inline literal here drifted from theirs.
+    queryKey: qk.meeting(id),
     queryFn: () => api.apiRequest<MeetingDetail>(`/meetings/${id}`),
     // The detail screen is where someone actively watches a meeting process, so
     // it polls tighter than the list's 15s.

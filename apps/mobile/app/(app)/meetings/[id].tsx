@@ -1,14 +1,21 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 
-import { useMeetingDetail } from "@/lib/api/meeting-detail";
+import { useMeetingDetail, type TranscriptSegment } from "@/lib/api/meeting-detail";
 import { isProcessing } from "@/lib/api/meetings";
+import { useMeetingPlayback } from "@/lib/audio/playback";
 import { formatDuration, formatListDate } from "@/lib/format";
+import { displayTitle } from "@/components/meetings/meeting-row";
 import { haptics } from "@/lib/haptics";
 import { SPRING, TIMING } from "@/lib/motion";
-import { Ribbon } from "@/components/ribbon";
+import { ribbonSpan } from "@/components/ribbon";
+import { useFollowScroll } from "@/components/player/follow-scroll";
+import { PlayerBar } from "@/components/player/player-bar";
+import { RibbonScrubber } from "@/components/player/ribbon-scrubber";
+import { MeetingMenuButton } from "@/components/meeting/meeting-menu";
+import { ProcessingView } from "@/components/meeting/processing-view";
 import { SummaryView } from "@/components/meeting/summary-view";
 import { TranscriptView } from "@/components/meeting/transcript-view";
 
@@ -55,6 +62,11 @@ function Segmented({ value, onChange }: { value: Tab; onChange: (t: Tab) => void
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             className="flex-1 items-center justify-center py-2"
+            // py-2 around a 15pt line gave a ~36pt target, under the 44pt
+            // minimum. Stated as a floor rather than as more padding so the
+            // segment cannot fall back under it at a smaller Dynamic Type size.
+            // Same fix as the Actions filter, which had the identical bug.
+            style={{ minHeight: 44 }}
           >
             {active ? (
               <Animated.View
@@ -82,31 +94,35 @@ function Segmented({ value, onChange }: { value: Tab; onChange: (t: Tab) => void
   );
 }
 
-function ProcessingBody({ status }: { status: string }) {
-  const LABEL: Record<string, string> = {
-    queued: "Queued — waiting for a free worker",
-    transcribing: "Transcribing audio",
-    analyzing: "Extracting summary and action items",
-    indexing: "Indexing for search",
-  };
-
-  return (
-    <Animated.View entering={FadeIn.duration(TIMING.crossfade.duration)} className="px-8 py-20">
-      <ActivityIndicator />
-      <Text className="mt-4 text-center text-[17px] font-semibold text-label">
-        {LABEL[status] ?? "Processing"}
-      </Text>
-      <Text className="mt-2 text-center text-[15px] text-label-secondary">
-        You can close the app — we&apos;ll keep working.
-      </Text>
-    </Animated.View>
-  );
-}
+/** Stable empty identity, so the span memo does not recompute on every poll. */
+const NO_SEGMENTS: TranscriptSegment[] = [];
 
 export default function MeetingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: meeting, isLoading, isError } = useMeetingDetail(id);
   const [tab, setTab] = useState<Tab>("summary");
+
+  /**
+   * Playback.
+   *
+   * Both of these are external stores rather than React state, so nothing they
+   * do re-renders this screen — which matters because this render includes the
+   * whole transcript. See the notes in lib/audio/playback and
+   * components/player/follow-scroll.
+   *
+   * Declared above the early returns because hooks cannot be conditional, and
+   * fed defaults until the meeting arrives.
+   */
+  const segments = meeting?.transcript?.segments ?? NO_SEGMENTS;
+  const span = useMemo(() => ribbonSpan(segments), [segments]);
+  const playback = useMeetingPlayback({
+    meetingId: id,
+    hasAudio: meeting?.has_audio ?? false,
+    durationSec: meeting?.duration_sec ?? null,
+    ribbonOrigin: span?.origin ?? 0,
+    ribbonSpan: span?.span ?? 0,
+  });
+  const follow = useFollowScroll({ hasPlayer: meeting?.has_audio ?? false });
 
   if (isLoading) {
     return (
@@ -134,12 +150,53 @@ export default function MeetingDetailScreen() {
     .join(" · ");
 
   const processing = isProcessing(meeting.status);
+  const title = displayTitle(meeting.title);
+
+  /**
+   * Leave the screen as soon as the undo window opens.
+   *
+   * The request itself is deferred, so the meeting is still readable for a few
+   * more seconds — but sitting on the detail view of something you just deleted,
+   * watching it work, is not a state worth offering. The undo affordance is
+   * waiting on the row in the list behind this screen.
+   *
+   * `canGoBack` because this route is reachable from a notification tap on a
+   * cold start, where there is no list underneath and `back()` would do nothing.
+   */
+  const leaveAfterDelete = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(app)/meetings");
+  };
+
+  // The ribbon reads a CONVERSATION. With a single speaker it degenerates into
+  // a plain bar that carries no information and looks like a stalled progress
+  // indicator, so it only earns its place from two speakers up.
+  const speakerCount = meeting.transcript?.speakers.length ?? 0;
+  const showRibbon = speakerCount >= 2 && (meeting.transcript?.segments.length ?? 0) > 0;
 
   return (
     <View className="flex-1 bg-background">
-      <Stack.Screen options={{ title: meeting.title }} />
+      <Stack.Screen
+        options={{
+          title,
+          headerRight: () => (
+            <MeetingMenuButton
+              id={meeting.id}
+              title={title}
+              onDeleteScheduled={leaveAfterDelete}
+            />
+          ),
+        }}
+      />
 
-      <ScrollView contentInsetAdjustmentBehavior="automatic">
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        // Clears the floating player card and the tab bar beneath it, so the
+        // last lines of a transcript are readable rather than parked under the
+        // transport.
+        contentContainerStyle={{ paddingBottom: follow.bottomInset }}
+        {...follow.scrollProps}
+      >
         <View className="gap-3 px-4 pb-4 pt-1">
           <Text
             className="text-[13px] text-label-secondary"
@@ -151,14 +208,18 @@ export default function MeetingDetailScreen() {
           {/* The signature, at hero size. Only meaningful once diarization has
               produced segments, so it holds a placeholder bar while processing
               rather than disappearing and shifting the layout. */}
-          {meeting.transcript?.segments.length || processing ? (
+          {showRibbon ? (
             <View className="gap-2">
-              <Ribbon
+              {/* Scrubbable when there is audio, identical to before when there
+                  is not. Dragging along the bands is the point of the feature:
+                  the colours say WHO you are scrubbing to, which is the one
+                  thing an amplitude waveform can never tell you. */}
+              <RibbonScrubber
+                playback={playback}
                 segments={meeting.transcript?.segments ?? []}
                 speakers={meeting.transcript?.speakers ?? []}
                 height={28}
-                radius={6}
-                placeholder={processing}
+                radius={8}
               />
               {meeting.transcript?.speakers.length ? (
                 <View className="flex-row flex-wrap gap-x-4 gap-y-1">
@@ -177,7 +238,7 @@ export default function MeetingDetailScreen() {
         </View>
 
         {processing ? (
-          <ProcessingBody status={meeting.status} />
+          <ProcessingView meeting={meeting} />
         ) : meeting.status === "failed" ? (
           <View className="mx-4 gap-2 rounded-card bg-surface p-5" style={{ borderCurve: "continuous" }}>
             <Text className="text-[17px] font-semibold text-danger">Processing failed</Text>
@@ -200,12 +261,16 @@ export default function MeetingDetailScreen() {
               {tab === "summary" ? (
                 <SummaryView meeting={meeting} />
               ) : (
-                <TranscriptView meeting={meeting} />
+                <TranscriptView meeting={meeting} playback={playback} follow={follow} />
               )}
             </Animated.View>
           </>
         )}
       </ScrollView>
+
+      {/* Renders nothing for a transcript-only meeting. A play button that
+          cannot play is worse than no player at all. */}
+      {processing ? null : <PlayerBar meeting={meeting} playback={playback} follow={follow} />}
     </View>
   );
 }

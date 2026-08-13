@@ -66,6 +66,17 @@ export function createQueryClient(): QueryClient {
       },
       mutations: {
         retry: false,
+        // React Query's default networkMode PAUSES a mutation when it believes
+        // the device is offline: no error, no timeout, nothing to press, and the
+        // parked mutation dies with the process while the UI still shows
+        // `isPending`. Sign-in and sign-up spun forever with their fields locked
+        // because of exactly this.
+        //
+        // Set here rather than per-hook. It was applied to two hooks
+        // individually and every mutation added since inherited the hang, which
+        // is the failure mode a default exists to prevent. Let the request fail
+        // for real and let each screen say so.
+        networkMode: "always",
       },
     },
   });

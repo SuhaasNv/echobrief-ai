@@ -1,6 +1,8 @@
 import { File, UploadType } from "expo-file-system";
 
 import { api } from "@/lib/api/client";
+import { addPendingMeeting, forgetMeeting } from "@/lib/notifications/store";
+import { syncBackgroundTaskRegistration } from "@/lib/notifications/task";
 
 /**
  * Recording upload — three hops, and the middle one does not touch our API.
@@ -101,6 +103,9 @@ export async function uploadRecording(
     await api
       .apiRequest(`/meetings/${presigned.meeting_id}`, { method: "DELETE" })
       .catch(() => undefined);
+    // The row is gone, so nothing should ever notify about it. Cheap insurance
+    // against a retry that reuses the id.
+    await forgetMeeting(presigned.meeting_id).catch(() => undefined);
     throw error;
   }
 
@@ -109,6 +114,20 @@ export async function uploadRecording(
     method: "POST",
     body: { meeting_id: presigned.meeting_id },
   });
+
+  // Processing has started, so this meeting is now something the user is
+  // waiting on. Recorded BEFORE returning, because the whole point is that they
+  // can leave the app at this instant — the pending list is what the background
+  // task reads once no React state exists any more.
+  //
+  // Neither call may break a successful upload: the recording is safely on the
+  // server by here, and failing now would tell the user otherwise.
+  await addPendingMeeting({
+    id: presigned.meeting_id,
+    title: opts.title,
+  }).catch(() => undefined);
+
+  await syncBackgroundTaskRegistration();
 
   return { meetingId: presigned.meeting_id };
 }

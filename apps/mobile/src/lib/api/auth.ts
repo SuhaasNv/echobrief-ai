@@ -37,6 +37,11 @@ interface Workspace {
   id: string;
 }
 
+/** Like the other list endpoints, this returns { items }, not a bare array. */
+interface WorkspaceListResponse {
+  items: Workspace[];
+}
+
 /**
  * Adopt a session: persist the token, then pick a workspace.
  *
@@ -48,9 +53,10 @@ async function adoptSession(token: string): Promise<void> {
   tokenStore.setToken(token);
 
   try {
-    const workspaces = await api.apiRequest<Workspace[]>("/workspaces");
-    if (workspaces.length > 0 && workspaces[0]) {
-      tokenStore.setWorkspaceId(workspaces[0].id);
+    const res = await api.apiRequest<WorkspaceListResponse>("/workspaces");
+    const first = res?.items?.[0];
+    if (first) {
+      tokenStore.setWorkspaceId(first.id);
     }
   } catch {
     // Leave the header unset and let the server choose.

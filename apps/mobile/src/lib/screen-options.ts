@@ -23,8 +23,21 @@ type StackScreenOptions = NonNullable<ComponentProps<typeof Stack>["screenOption
  */
 export const stackScreenOptions = {
   headerLargeTitleEnabled: true,
-  headerTransparent: true,
-  headerBlurEffect: "systemChromeMaterial",
+  headerTransparent: false,
+  // No blur. A material needs content behind it to blur; ours sits below the
+  // header at rest, so the effect resolved to a flat grey panel with a hard
+  // bottom edge — the "grey slab" across the top of every screen. Painting the
+  // canvas colour makes the header disappear into the background instead.
+  headerStyle: { backgroundColor: "#06070A" },
+  // Belt and braces over the navigation theme: this is the same colour the
+  // theme already gives every screen container, stated per-stack so a screen
+  // that opts out of the theme still paints on the canvas.
+  //
+  // It is NOT what fixed the white band under the search field or the back
+  // button that flashed white — those came from the navigator's own container
+  // view, which no per-screen style can reach. See src/lib/navigation-theme.ts.
+  contentStyle: { backgroundColor: "#06070A" },
+  headerShadowVisible: false,
   headerLargeTitleShadowVisible: false,
   // Back chevron and header buttons.
   headerTintColor: "#4C99F8",

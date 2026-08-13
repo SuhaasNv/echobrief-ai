@@ -17,6 +17,13 @@
  * ------------------------------------------------------------------------- */
 
 @theme inline {
+  /* Display face. Space Grotesk carries large titles, hero numerals, and the
+     record timer; body text stays on the system font so Dynamic Type, optical
+     sizing, and non-Latin fallback keep working. */
+  --font-display: "SpaceGrotesk_700Bold";
+  --font-display-medium: "SpaceGrotesk_500Medium";
+  --font-display-semibold: "SpaceGrotesk_600SemiBold";
+
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);
@@ -29,6 +36,21 @@
 
   --color-separator: var(--separator);
   --color-separator-opaque: var(--separator-opaque);
+
+  /* Edge ramp. Dark UI carries depth on EDGES, not surface value alone — the
+     canvas-to-surface step here is only 5 luminance points, which is invisible
+     without a border. Radix and Primer both ship a white-alpha border ramp
+     separate from their surface ramp; this had neither. */
+  --color-edge: var(--edge);
+  --color-edge-strong: var(--edge-strong);
+  --color-highlight: var(--highlight);
+
+  /* Recessed. Wells go DOWN while cards go up — Primer's dark inset is darker
+     than its canvas for exactly this reason. Bidirectional depth is cheap
+     richness the palette was not using. */
+  --color-inset: var(--inset);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
 
   --color-tint: var(--tint);
   --color-tint-label: var(--tint-label);
@@ -75,6 +97,14 @@
   --separator: #dde0e4;
   --separator-opaque: #c9cdd3;
 
+  --edge: rgba(9, 11, 15, 0.08);
+  --edge-strong: rgba(9, 11, 15, 0.16);
+  --highlight: rgba(255, 255, 255, 0.9);
+
+  --inset: #eef0f3;
+  --surface-2: #ffffff;
+  --surface-3: #ffffff;
+
   --tint: #1779e1;
   --tint-label: #0b69c7;
   --tint-pressed: #1265be;
@@ -106,7 +136,13 @@
 
     --label: #f4f5f7;
     --label-secondary: #9ca1a9;
-    --label-tertiary: #6e727a;
+    /* Raised from #6E727A. That value was 4.03:1 on --background and 3.42:1 on
+       --fill, and this token is not used at large sizes: it carries 11px
+       eyebrows, 13px metadata and 17px placeholders. Roughly 20 distinct text
+       roles across the app were below AA. #787C85 measures 4.82:1 on
+       --background and 4.65:1 on --surface. Anything on --fill still has to use
+       --label-secondary; this token cannot clear AA there. */
+    --label-tertiary: #787c85;
     --label-quaternary: #4a4e56;
 
     /* Raised from #22252B, which computed to 1.31:1 against the background —
@@ -115,6 +151,15 @@
        undifferentiated black wall with no row boundaries. */
     --separator: #2e3138;
     --separator-opaque: #3a3e46;
+
+    --edge: rgba(255, 255, 255, 0.09);
+    --edge-strong: rgba(255, 255, 255, 0.14);
+    /* Top-edge only, to read as a light source above rather than a border. */
+    --highlight: rgba(255, 255, 255, 0.16);
+
+    --inset: #030407;
+    --surface-2: #191c21;
+    --surface-3: #22262c;
 
     --tint: #4c99f8;
     --tint-label: #4c99f8;
