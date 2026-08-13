@@ -57,3 +57,6 @@ __pycache__/
 
 # Generated test recordings (scripts/make-test-audio.sh) — regenerate, never commit
 test-audio/
+
+# Transient design-review screenshots
+.judge-shots/
