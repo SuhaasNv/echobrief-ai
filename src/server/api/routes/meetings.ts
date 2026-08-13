@@ -55,6 +55,59 @@ function sanitizeRecordedAt(value: string | undefined): string | null {
   return new Date(ts).toISOString();
 }
 
+/** Escape LIKE/ILIKE wildcards so user search text matches literally. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/**
+ * True when a search string carries at least one term to match ON, rather than
+ * only terms to exclude.
+ *
+ * websearch_to_tsquery turns `-budget` into `!'budget'`, a query that matches
+ * every document NOT containing the word. GIN cannot seek on a pure negation,
+ * so it answers by scanning the whole index and letting the recheck throw rows
+ * away — across every tenant's transcripts, for a query that by definition
+ * cannot be selective. One-character input like `-` is all it takes.
+ *
+ * When nothing positive is left we skip the tsquery branches entirely and fall
+ * back to the title match, which is exactly what this endpoint did before
+ * full-text search existed. Users get a defensible result and the database
+ * never gets asked the unanswerable question.
+ */
+export function hasPositiveSearchTerm(value: string): boolean {
+  const withoutExclusions = value
+    // -"quoted phrase" first, so its inner words aren't counted as positive.
+    .replace(/-"[^"]*"/g, " ")
+    // \S* not \S+: a bare "-" is punctuation, not something to match on.
+    .replace(/(^|\s)-\S*/g, " ");
+  return /\S/.test(withoutExclusions);
+}
+
+/**
+ * ts_headline options for a match excerpt.
+ *
+ * MaxFragments=1 keeps it to a single run of text. The [[...]] markers around
+ * matched lexemes are plain text on purpose — this response feeds a React
+ * Native list, and shipping HTML into it would be someone else's XSS problem.
+ */
+const HEADLINE_OPTS = "StartSel=[[,StopSel=]],MaxFragments=1,MaxWords=24,MinWords=10,ShortWord=2";
+
+/**
+ * How much transcript ts_headline is allowed to read.
+ *
+ * ts_headline re-parses the document it is given; on a full 70KB transcript
+ * that measured ~10ms, and this runs once per row on the page. Capping the
+ * input to the first ~16K characters costs ~3ms instead. The trade is that a
+ * term appearing ONLY past that point yields a leading excerpt without the
+ * highlight rather than no row at all — the row still matched, because
+ * matching is decided by the GIN index over the whole (500K-capped) vector.
+ */
+const HEADLINE_SOURCE_CHARS = 16000;
+
+/** Hard cap on the excerpt returned to the client. */
+const SNIPPET_MAX_CHARS = 240;
+
 /**
  * Reject an R2 object key that does not live under the caller's own prefix.
  *
@@ -275,15 +328,125 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
 
   const offset = (q.page - 1) * q.limit;
 
+  // ------------------------------------------------------------------
+  // Search
+  //
+  // People search for what was SAID, not for the title they typed weeks
+  // ago — "R2 credentials" has to find the meeting where someone said it.
+  // The stored tsvectors (0014) carry title at weight A, summary at B and
+  // transcript at D; this query concatenates them at read time, which
+  // preserves per-lexeme weights, and ranks the result with ts_rank_cd.
+  //
+  // websearch_to_tsquery, not to_tsquery or plainto_tsquery: it hands users
+  // "quoted phrases" and -exclusions for free, and it never raises. to_tsquery
+  // answers `foo & | bar` with a syntax error, which is a 500 served to a user
+  // whose only crime was a typo.
+  // ------------------------------------------------------------------
+  const searchText = q.q; // zod: trimmed, <= 200 chars
+  // Escape LIKE metacharacters: an unescaped '%' turns every search into a full
+  // table scan of the user's meetings, and '_' silently widens matches.
+  const likePattern = searchText ? `%${escapeLike(searchText)}%` : "";
+  const useFts = searchText !== undefined && hasPositiveSearchTerm(searchText);
+  // Interpolated as a bound parameter by postgres.js, never as SQL text —
+  // transcripts and search boxes are untrusted input and sql.unsafe() is not
+  // in this file for a reason.
+  const tsQuery = sql`websearch_to_tsquery('english', ${searchText ?? ""})`;
+
   // Build dynamic conditions via postgres.js helper composability.
-  const conditions = [sql`user_id = ${user.id}`, sql`workspace_id = ${workspaceId}`];
-  if (q.status) conditions.push(sql`status = ${q.status}`);
-  if (q.tag) conditions.push(sql`${q.tag} = ANY(tags)`);
-  if (q.from) conditions.push(sql`created_at >= ${q.from}`);
-  if (q.to) conditions.push(sql`created_at <= ${q.to}`);
-  if (q.q) conditions.push(sql`title ILIKE ${`%${q.q}%`}`);
+  const conditions = [sql`m.user_id = ${user.id}`, sql`m.workspace_id = ${workspaceId}`];
+  if (q.status) conditions.push(sql`m.status = ${q.status}`);
+  if (q.tag) conditions.push(sql`${q.tag} = ANY(m.tags)`);
+  if (q.from) conditions.push(sql`m.created_at >= ${q.from}`);
+  if (q.to) conditions.push(sql`m.created_at <= ${q.to}`);
+
+  if (searchText) {
+    // One index-driven branch per place text lives, UNIONed into an id set,
+    // rather than OR-ing across LEFT JOINs. An OR spanning three tables cannot
+    // use any of the three GIN indexes: Postgres would walk every transcript
+    // the user owns and detoast each vector, so search would get slower with
+    // every meeting they record. Each branch here can be answered by an index.
+    //
+    // Tenant scoping lives on the OUTER query (m.user_id / m.workspace_id, ANDed
+    // with this id set), which is what makes the result safe. The summary and
+    // transcript branches deliberately do NOT re-join meetings to re-check the
+    // owner: an earlier revision did, and it cost 100x. Adding the join let the
+    // planner hash-join instead of seeking, and a "cheap" Seq Scan on
+    // transcripts — cheap in its model because raw_text and search_tsv are both
+    // TOASTed out of the main heap, so the planner never charges for
+    // detoasting — took 317ms against 3ms for the plan that uses the GIN index
+    // (15k meetings, 376MB of transcripts, measured). Ids from another tenant
+    // can appear in this set; not one of them can survive the outer WHERE.
+    const branches = [
+      // Substring on title: FTS matches whole stemmed words only, so without
+      // this, typing "roadm" would stop finding "Roadmap review" — a
+      // regression against the behaviour this endpoint shipped with.
+      sql`
+        SELECT sm.id FROM meetings sm
+         WHERE sm.user_id = ${user.id} AND sm.workspace_id = ${workspaceId}
+           AND sm.title ILIKE ${likePattern} ESCAPE '\\'`,
+    ];
+    if (useFts) {
+      branches.push(
+        sql`
+        SELECT sm.id FROM meetings sm
+         WHERE sm.user_id = ${user.id} AND sm.workspace_id = ${workspaceId}
+           AND sm.search_tsv @@ ${tsQuery}`,
+        sql`
+        SELECT ss.meeting_id FROM summaries ss
+         WHERE ss.search_tsv @@ ${tsQuery}`,
+        sql`
+        SELECT st.meeting_id FROM transcripts st
+         WHERE st.search_tsv @@ ${tsQuery}`,
+      );
+    }
+    const matchedIds = branches.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc} UNION ${cur}`));
+    conditions.push(sql`m.id IN (${matchedIds})`);
+  }
 
   const whereClause = conditions.reduce((acc, cur, i) => (i === 0 ? cur : sql`${acc} AND ${cur}`));
+
+  // Ranking.
+  //
+  // A title hit sorts above every body hit, unconditionally. setweight() alone
+  // does not deliver that: ts_rank_cd sums cover densities, so a transcript
+  // saying the word forty times at weight D scores 8.0 against a title's 1.0
+  // (measured). Someone searching a meeting by its name would find it on page
+  // three. Weights still order everything below that first key.
+  const ftsTitleHit = useFts ? sql` OR m.search_tsv @@ ${tsQuery}` : sql``;
+  const titleHit = sql`(m.title ILIKE ${likePattern} ESCAPE '\\'${ftsTitleHit})`;
+  const rankExpr = useFts
+    ? sql`ts_rank_cd(
+        m.search_tsv
+          || COALESCE(s.search_tsv, ''::tsvector)
+          || COALESCE(t.search_tsv, ''::tsvector),
+        ${tsQuery})`
+    : sql`0::float4`;
+  // Joined only when ranking needs it. Without a query this join would be
+  // dead weight on the recency listing, which is the hot path.
+  const searchJoin = useFts ? sql`LEFT JOIN transcripts t ON t.meeting_id = m.id` : sql``;
+  // Recency order is preserved exactly when there is no query: without a
+  // search, title_hit is FALSE and rank is 0 for every row, so the sort
+  // collapses to created_at DESC — the ordering this endpoint always had.
+  const titleHitSelect = searchText ? titleHit : sql`FALSE`;
+  const orderClause = searchText
+    ? sql`${titleHit} DESC, ${rankExpr} DESC, m.created_at DESC`
+    : sql`m.created_at DESC`;
+
+  // The excerpt that tells the user WHY this meeting matched. Computed in the
+  // outer SELECT, over the page CTE, so ts_headline runs on the <=limit rows
+  // being returned instead of on every row the ORDER BY had to consider.
+  const snippetExpr = useFts
+    ? sql`COALESCE(
+        (SELECT left(ts_headline('english', left(st.raw_text, ${HEADLINE_SOURCE_CHARS}),
+                                 ${tsQuery}, ${HEADLINE_OPTS}), ${SNIPPET_MAX_CHARS})
+           FROM transcripts st
+          WHERE st.meeting_id = p.id AND st.search_tsv @@ ${tsQuery}),
+        (SELECT left(ts_headline('english', COALESCE(ss.executive, ''),
+                                 ${tsQuery}, ${HEADLINE_OPTS}), ${SNIPPET_MAX_CHARS})
+           FROM summaries ss
+          WHERE ss.meeting_id = p.id AND ss.search_tsv @@ ${tsQuery})
+      )`
+    : sql`NULL::text`;
 
   const rows = await sql<
     Array<{
@@ -298,19 +461,43 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       summary_excerpt: string | null;
       action_item_count: number;
       participant_count: number;
+      match_snippet: string | null;
     }>
   >`
+    WITH page AS (
+      SELECT
+        m.id,
+        m.title,
+        m.status,
+        m.duration_sec,
+        m.tags,
+        m.created_at,
+        m.recorded_at,
+        m.processed_at,
+        s.executive AS summary_excerpt,
+        -- Carried out of the CTE so the outer SELECT can re-apply the same
+        -- order. A CTE's internal ORDER BY is not a promise about the order
+        -- rows leave the outer query in.
+        ${titleHitSelect} AS title_hit,
+        ${rankExpr} AS rank
+      FROM meetings m
+      LEFT JOIN summaries s ON s.meeting_id = m.id
+      ${searchJoin}
+      WHERE ${whereClause}
+      ORDER BY ${orderClause}
+      LIMIT ${q.limit} OFFSET ${offset}
+    )
     SELECT
-      m.id,
-      m.title,
-      m.status,
-      m.duration_sec,
-      m.tags,
-      m.created_at,
-      m.recorded_at,
-      m.processed_at,
-      s.executive AS summary_excerpt,
-      (SELECT COUNT(*)::int FROM action_items ai WHERE ai.meeting_id = m.id) AS action_item_count,
+      p.id,
+      p.title,
+      p.status,
+      p.duration_sec,
+      p.tags,
+      p.created_at,
+      p.recorded_at,
+      p.processed_at,
+      p.summary_excerpt,
+      (SELECT COUNT(*)::int FROM action_items ai WHERE ai.meeting_id = p.id) AS action_item_count,
       -- speakers is stored double-encoded (a JSONB *string* holding an array)
       -- for every row the worker has ever written, so an 'array' check alone
       -- always reported 0 participants. Handle both shapes.
@@ -322,17 +509,15 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
           ELSE 0
         END
         FROM transcripts t
-        WHERE t.meeting_id = m.id
-      ), 0)::int AS participant_count
-    FROM meetings m
-    LEFT JOIN summaries s ON s.meeting_id = m.id
-    WHERE ${whereClause}
-    ORDER BY m.created_at DESC
-    LIMIT ${q.limit} OFFSET ${offset}
+        WHERE t.meeting_id = p.id
+      ), 0)::int AS participant_count,
+      ${snippetExpr} AS match_snippet
+    FROM page p
+    ORDER BY p.title_hit DESC, p.rank DESC, p.created_at DESC
   `;
 
   const [{ total }] = await sql<[{ total: number }]>`
-    SELECT COUNT(*)::int AS total FROM meetings WHERE ${whereClause}
+    SELECT COUNT(*)::int AS total FROM meetings m WHERE ${whereClause}
   `;
 
   return c.json({
@@ -348,6 +533,13 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       action_item_count: r.action_item_count,
       participant_count: r.participant_count,
       summary_excerpt: r.summary_excerpt,
+      /**
+       * Why this meeting matched, when the match was in the body. NULL when
+       * there is no query, or when only the title matched (self-evident).
+       * Additive and optional — existing clients that don't know the field
+       * keep working unchanged.
+       */
+      match_snippet: r.match_snippet ?? null,
     })),
     total,
     page: q.page,

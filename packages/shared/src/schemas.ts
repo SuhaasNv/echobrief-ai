@@ -74,6 +74,12 @@ export const MeetingSummary = z.object({
   action_item_count: z.number().int().default(0),
   participant_count: z.number().int().default(0),
   summary_excerpt: z.string().nullable(),
+  /**
+   * Why this meeting matched the search, with matched terms wrapped in [[…]].
+   * Only present on a search response, and null when only the title matched
+   * (a title hit is self-evident from the title itself).
+   */
+  match_snippet: z.string().nullable().optional(),
 });
 export type MeetingSummary = z.infer<typeof MeetingSummary>;
 
