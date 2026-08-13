@@ -26,6 +26,7 @@ import adminRoutes from "./routes/admin";
 import authRoutes from "./routes/auth";
 import googleAuthRoutes from "./routes/auth-google";
 import healthRoutes from "./routes/health";
+import revenueCatWebhookRoutes from "./routes/webhooks-revenuecat";
 import docsRoutes from "./routes/docs";
 import meetingsRoutes from "./routes/meetings";
 import actionItemsRoutes from "./routes/action-items";
@@ -67,6 +68,10 @@ api.use(
     // search answer rendered with zero sources.
     exposeHeaders: [
       "x-citations",
+      // Same class of bug as x-citations: an Ask turn that resolved to an
+      // action carries its whole payload here and an empty body, so a browser
+      // stripping this header would render the instruction as a blank answer.
+      "x-ask-action",
       "x-request-id",
       "retry-after",
       "x-ratelimit-limit",
@@ -91,10 +96,18 @@ api.route("/docs", docsRoutes);
 // per-(IP+email) counters inside the handlers — see checkAuthRateLimit.
 api.use("/auth/*", rateLimit("auth_ip"));
 api.use("/share/*", rateLimit("share"));
+// Its own bucket, NOT `general` — general is the sole fail-open bucket, and an
+// unauthenticated endpoint that writes subscription tiers must refuse rather
+// than wave traffic through when Redis is unreachable.
+api.use("/webhooks/*", rateLimit("webhook"));
 
 api.route("/auth", authRoutes);
 api.route("/auth", googleAuthRoutes);
 api.route("/share", shareRoutes);
+// Public by necessity: RevenueCat's servers hold no session. Every guard the
+// missing auth would have provided lives inside the handler — shared-secret
+// verification, environment separation, idempotency and ordering.
+api.route("/webhooks", revenueCatWebhookRoutes);
 
 // Protected routes
 const protectedApi = new Hono<AppBindings>();
@@ -156,6 +169,32 @@ protectedApi.use("/action-items/:id/export", requireProfessionalWorkspace());
 // answered without checking them. Rate limits bound requests per minute; these
 // bound usage per billing period, so both are needed.
 protectedApi.use("/meetings/upload-url", requireTranscriptionQuota);
+/**
+ * The SEGMENTED path — the one the mobile app actually records through.
+ *
+ * These were missing, so the app's primary recording route was metered by
+ * nothing at all: not the transcription quota, and not the `upload` rate bucket
+ * that rate-limit.ts calls "a money budget, not a traffic budget". It sat inside
+ * `general` alone, which is 100/min AND the only fail-open bucket in the system.
+ *
+ * The exposure was not theoretical. A single 500 MiB segmented recording at the
+ * recorder's own 64 kbps is roughly 18 hours of audio — about 3.6x the entire
+ * free-tier monthly allowance, committed in one uncounted meeting.
+ *
+ * `/segmented` is where the meeting is created, so it is the admission point and
+ * gets both gates. `/segments/complete` is where the transcription is actually
+ * queued, so it gets the quota too — a client that skipped straight to finalize
+ * would otherwise still buy a pipeline run.
+ */
+protectedApi.use("/meetings/segmented", requireTranscriptionQuota);
+protectedApi.use("/meetings/segmented", rateLimit("upload"));
+protectedApi.use("/meetings/:id/segments/complete", requireTranscriptionQuota);
+/**
+ * Retry re-runs the whole pipeline — transcription included — so it spends real
+ * money. The route caps attempts at 3 per meeting, which bounds it per meeting
+ * but not per account.
+ */
+protectedApi.use("/meetings/:id/retry", requireTranscriptionQuota);
 protectedApi.use("/streaming/*", requireTranscriptionQuota);
 protectedApi.use("/meetings/:id/chat", requireAIQueryQuota);
 protectedApi.use("/search", requireAIQueryQuota);

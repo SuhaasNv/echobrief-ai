@@ -136,10 +136,10 @@ describe("requireTranscriptionQuota middleware", () => {
     proUser = await createUserWithTier("pro");
   });
 
-  it("allows transcription when free tier under limit (< 300 min)", async () => {
+  it("allows transcription when free tier under limit (< 120 min)", async () => {
     const app = createTestApp(requireTranscriptionQuota);
 
-    // Log 100 minutes (well under 300 limit)
+    // Log 100 minutes (under the 120 limit)
     await logUsageDirectly(freeUser.userId, freeUser.workspaceId, "transcription", 100);
 
     const res = await app.request("/test", {
@@ -154,12 +154,12 @@ describe("requireTranscriptionQuota middleware", () => {
     expect(res.status).toBe(200);
   });
 
-  it("blocks transcription when free tier at limit (300 min)", async () => {
+  it("blocks transcription when free tier at limit (120 min)", async () => {
     const testUser = await createUserWithTier("free");
     const app = createTestApp(requireTranscriptionQuota);
 
-    // Log exactly 300 minutes
-    await logUsageDirectly(testUser.userId, testUser.workspaceId, "transcription", 300);
+    // Log exactly 120 minutes
+    await logUsageDirectly(testUser.userId, testUser.workspaceId, "transcription", 120);
 
     const res = await app.request("/test", {
       method: "POST",
@@ -174,8 +174,8 @@ describe("requireTranscriptionQuota middleware", () => {
     const body = await res.json();
     expect(body.error).toBe("quota_exceeded");
     expect(body.tier).toBe("free");
-    expect(body.current).toBe(300);
-    expect(body.limit).toBe(300);
+    expect(body.current).toBe(120);
+    expect(body.limit).toBe(120);
   });
 
   it("blocks transcription when free tier over limit", async () => {
@@ -199,11 +199,13 @@ describe("requireTranscriptionQuota middleware", () => {
     expect(body.current).toBeGreaterThanOrEqual(350);
   });
 
-  it("allows transcription for pro tier even with high usage", async () => {
+  it("allows pro tier well past the free ceiling", async () => {
     const app = createTestApp(requireTranscriptionQuota);
 
-    // Log 1000 minutes (would exceed free tier)
-    await logUsageDirectly(proUser.userId, proUser.workspaceId, "transcription", 1000);
+    // 500 minutes: four times the free allowance, comfortably inside pro's 900.
+    // Pro is no longer unlimited, so this asserts headroom rather than absence
+    // of a limit — 1000 would now legitimately be refused.
+    await logUsageDirectly(proUser.userId, proUser.workspaceId, "transcription", 500);
 
     const res = await app.request("/test", {
       method: "POST",
@@ -221,8 +223,8 @@ describe("requireTranscriptionQuota middleware", () => {
     const testUser = await createUserWithTier("free");
     const app = createTestApp(requireTranscriptionQuota);
 
-    // Log 299 minutes
-    await logUsageDirectly(testUser.userId, testUser.workspaceId, "transcription", 299);
+    // Log 119 minutes
+    await logUsageDirectly(testUser.userId, testUser.workspaceId, "transcription", 119);
 
     // Request 90 seconds (2 minutes after ceiling)
     const res = await app.request("/test", {
@@ -234,7 +236,7 @@ describe("requireTranscriptionQuota middleware", () => {
       body: JSON.stringify({ duration_sec: 90 }), // 1.5 min → ceil to 2
     });
 
-    // 299 + 2 = 301, exceeds 300 limit
+    // 119 + 2 = 121, exceeds the 120 limit
     expect(res.status).toBe(429);
   });
 });
@@ -248,7 +250,7 @@ describe("requireAIQueryQuota middleware", () => {
     studentUser = await createUserWithTier("student");
   });
 
-  it("allows AI query when free tier under limit (< 10 queries)", async () => {
+  it("allows AI query when free tier under limit (< 25 queries)", async () => {
     const app = createTestApp(requireAIQueryQuota);
 
     // Log 5 queries
@@ -268,12 +270,12 @@ describe("requireAIQueryQuota middleware", () => {
     expect(res.status).toBe(200);
   });
 
-  it("blocks AI query when free tier at limit (10 queries)", async () => {
+  it("blocks AI query when free tier at limit (25 queries)", async () => {
     const testUser = await createUserWithTier("free");
     const app = createTestApp(requireAIQueryQuota);
 
-    // Log exactly 10 queries
-    for (let i = 0; i < 10; i++) {
+    // Log exactly 25 queries
+    for (let i = 0; i < 25; i++) {
       await logUsageDirectly(testUser.userId, testUser.workspaceId, "ai_query", 1);
     }
 
@@ -289,8 +291,8 @@ describe("requireAIQueryQuota middleware", () => {
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.error).toBe("quota_exceeded");
-    expect(body.current).toBe(10);
-    expect(body.limit).toBe(10);
+    expect(body.current).toBe(25);
+    expect(body.limit).toBe(25);
   });
 
   it("allows AI query for student tier with unlimited quota", async () => {
@@ -394,7 +396,7 @@ describe("quota middleware error responses", () => {
     const app = createTestApp(requireAIQueryQuota);
 
     // Exceed AI query limit
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 25; i++) {
       await logUsageDirectly(testUser.userId, testUser.workspaceId, "ai_query", 1);
     }
 
@@ -423,7 +425,7 @@ describe("quota middleware error responses", () => {
   it("includes upgrade suggestion in error message", async () => {
     const app = createTestApp(requireTranscriptionQuota);
 
-    await logUsageDirectly(testUser.userId, testUser.workspaceId, "transcription", 300);
+    await logUsageDirectly(testUser.userId, testUser.workspaceId, "transcription", 120);
 
     const res = await app.request("/test", {
       method: "POST",

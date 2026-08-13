@@ -41,12 +41,12 @@ describe("TIER_FEATURES configuration", () => {
   describe("free tier restrictions", () => {
     const free = TIER_FEATURES.free;
 
-    it("has limited transcription minutes (300)", () => {
-      expect(free.transcription_minutes).toBe(300);
+    it("has limited transcription minutes (120)", () => {
+      expect(free.transcription_minutes).toBe(120);
     });
 
     it("has limited AI queries (10)", () => {
-      expect(free.ai_queries).toBe(10);
+      expect(free.ai_queries).toBe(25);
     });
 
     it("has limited flashcards per lecture (3)", () => {
@@ -129,12 +129,15 @@ describe("TIER_FEATURES configuration", () => {
   describe("pro tier features", () => {
     const pro = TIER_FEATURES.pro;
 
-    it("has unlimited transcription minutes", () => {
-      expect(pro.transcription_minutes).toBeNull();
+    // Pro is NOT unlimited any more. The ceilings exist so one account cannot
+    // run an unbounded AssemblyAI bill against a $9 subscription; they are far
+    // above real usage and the copy calls them fair use, not a product limit.
+    it("has a fair-use transcription ceiling", () => {
+      expect(pro.transcription_minutes).toBe(900);
     });
 
-    it("has unlimited AI queries", () => {
-      expect(pro.ai_queries).toBeNull();
+    it("has a fair-use AI query ceiling", () => {
+      expect(pro.ai_queries).toBe(500);
     });
 
     it("has unlimited workspaces", () => {
@@ -226,10 +229,10 @@ describe("TIER_PRICING configuration", () => {
   it("defines pricing for pro tier", () => {
     const pro = TIER_PRICING.pro;
 
-    expect(pro.name).toBe("Professional");
-    expect(pro.price_usd).toBe(14);
-    expect(pro.annual_price_usd).toBe(168);
-    expect(pro.description).toContain("integrations");
+    expect(pro.name).toBe("Pro");
+    // $9/$72 — the decided prices. $14/$168 was never charged to anyone.
+    expect(pro.price_usd).toBe(9);
+    expect(pro.annual_price_usd).toBe(72);
     expect(pro.cta).toContain("Pro");
   });
 
@@ -243,22 +246,21 @@ describe("TIER_PRICING configuration", () => {
     expect(team.cta).toContain("Team");
   });
 
-  it("annual pricing equals 12 * monthly (no discount for now)", () => {
-    const tiers = ["student", "pro", "team"] as const;
-
-    tiers.forEach((tier) => {
-      const pricing = TIER_PRICING[tier];
-      expect(pricing.annual_price_usd).toBe(pricing.price_usd * 12);
-    });
+  // Annual now carries a real discount: $72 against $108 at the monthly rate,
+  // which is the "$6/month billed annually" the paywall states. The old
+  // assertion required annual === 12 x monthly, i.e. no reason at all to pay up
+  // front, and it would have blocked the discount from ever being introduced.
+  it("prices annual below twelve months of monthly", () => {
+    const pro = TIER_PRICING.pro;
+    expect(pro.annual_price_usd).toBeLessThan(pro.price_usd * 12);
+    // And not so far below that the annual plan undercuts its own COGS.
+    expect(pro.annual_price_usd).toBeGreaterThan(pro.price_usd * 6);
   });
 
-  it("has incremental pricing (student < pro < team)", () => {
-    const student = TIER_PRICING.student.price_usd;
-    const pro = TIER_PRICING.pro.price_usd;
-    const team = TIER_PRICING.team.price_usd;
-
-    expect(student).toBeLessThan(pro);
-    expect(pro).toBeLessThan(team);
+  // student and team are hidden from sale but still defined, so their prices are
+  // no longer required to bracket pro. Only the sold tier is asserted.
+  it("prices the sold tier above zero", () => {
+    expect(TIER_PRICING.pro.price_usd).toBeGreaterThan(0);
   });
 });
 
@@ -299,7 +301,7 @@ describe("hasFeature() helper", () => {
 
   describe("numeric features (null = unlimited)", () => {
     it("returns false for free tier transcription_minutes (limited)", () => {
-      // Free tier has 300 minutes (not null), so returns true because value is not null
+      // Free tier has 120 minutes (not null), so returns true because value is not null
       expect(hasFeature("free", "transcription_minutes")).toBe(true);
     });
 

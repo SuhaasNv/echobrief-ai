@@ -29,8 +29,11 @@ export interface TierFeatures {
 
 export const TIER_FEATURES: Record<SubscriptionTier, TierFeatures> = {
   free: {
-    transcription_minutes: 300, // 5 hours/month
-    ai_queries: 10,
+    // Mirrors TIER_LIMITS in server/services/usage-tracker.ts. These two tables
+    // are read by different layers and drifting them means the pricing page
+    // advertises an allowance the enforcement layer does not give.
+    transcription_minutes: 120, // 2 hours/month
+    ai_queries: 25,
     flashcards_per_lecture: 3,
     workspaces: 1,
     integrations: false,
@@ -53,8 +56,8 @@ export const TIER_FEATURES: Record<SubscriptionTier, TierFeatures> = {
     history_retention_days: 365, // 1 year
   },
   pro: {
-    transcription_minutes: null,
-    ai_queries: null,
+    transcription_minutes: 900, // 15 hours — fair-use ceiling, not "unlimited"
+    ai_queries: 500,
     flashcards_per_lecture: null,
     workspaces: null,
     integrations: true,
@@ -99,6 +102,8 @@ export interface TierPricing {
 }
 
 export const TIER_PRICING: Record<Exclude<SubscriptionTier, "free">, TierPricing> = {
+  // Hidden from sale — not returned by GET /subscription/plans. Kept so an
+  // existing account on this tier still resolves to a name and a price.
   student: {
     name: "Student",
     price_usd: 7,
@@ -106,11 +111,20 @@ export const TIER_PRICING: Record<Exclude<SubscriptionTier, "free">, TierPricing
     description: "Unlimited transcription, AI queries, and flashcards for students.",
     cta: "Upgrade to Student",
   },
+  /**
+   * $9 / $72. These are the DECIDED prices (see MONETIZATION.md) and they
+   * replace $14/$168, which was never charged to anyone.
+   *
+   * Used for the web pricing page only. The iOS paywall does NOT read these —
+   * it takes localised prices straight from StoreKit, because the same product
+   * costs a different amount in every storefront and a hardcoded dollar figure
+   * is wrong everywhere except the US.
+   */
   pro: {
-    name: "Professional",
-    price_usd: 14,
-    annual_price_usd: 168,
-    description: "Everything in Student, plus integrations and email generation.",
+    name: "Pro",
+    price_usd: 9,
+    annual_price_usd: 72,
+    description: "Keep your audio, 15 hours of recording, and 500 questions a month.",
     cta: "Upgrade to Pro",
   },
   team: {

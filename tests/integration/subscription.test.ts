@@ -120,8 +120,8 @@ describe("GET /subscription", () => {
 
     expect(body.subscription.tier).toBe("free");
     expect(body.subscription.status).toBe("active");
-    expect(body.limits.transcription_minutes).toBe(300);
-    expect(body.limits.ai_queries).toBe(10);
+    expect(body.limits.transcription_minutes).toBe(120);
+    expect(body.limits.ai_queries).toBe(25);
     expect(body.features.integrations).toBe(false);
     expect(body.features.history_retention_days).toBe(30);
   });
@@ -186,39 +186,36 @@ describe("GET /subscription/pricing", () => {
     testUser = await createUserDirect("free");
   });
 
-  it("returns pricing for all tiers", async () => {
+  // Only the SOLD tiers are listed. student and team still exist and still work
+  // for any account already on one, but a pricing endpoint that advertises them
+  // would be offering plans nobody can buy — and `team` would be selling shared
+  // workspaces that do not exist.
+  it("returns only the tiers that are for sale", async () => {
     const res = await get("/subscription/pricing", testUser.token);
 
     expect(res.status).toBe(200);
     const body = await res.json();
 
-    // Check all tiers present
     expect(body.free).toBeDefined();
-    expect(body.student).toBeDefined();
     expect(body.pro).toBeDefined();
-    expect(body.team).toBeDefined();
+    expect(body.student).toBeUndefined();
+    expect(body.team).toBeUndefined();
 
-    // Check pricing values
     expect(body.free.price_usd).toBe(0);
-    expect(body.student.price_usd).toBe(7);
-    expect(body.pro.price_usd).toBe(14);
-    expect(body.team.price_usd).toBe(29);
+    expect(body.pro.price_usd).toBe(9);
+    expect(body.pro.annual_price_usd).toBe(72);
   });
 
-  it("includes features for each tier", async () => {
+  it("includes features for each sold tier", async () => {
     const res = await get("/subscription/pricing", testUser.token);
     const body = await res.json();
 
     expect(body.free.features).toBeDefined();
-    expect(body.student.features).toBeDefined();
     expect(body.pro.features).toBeDefined();
-    expect(body.team.features).toBeDefined();
 
-    // Verify feature structure
-    expect(body.free.features.transcription_minutes).toBe(300);
-    expect(body.student.features.transcription_minutes).toBeNull();
+    expect(body.free.features.transcription_minutes).toBe(120);
+    expect(body.pro.features.transcription_minutes).toBe(900);
     expect(body.pro.features.integrations).toBe(true);
-    expect(body.team.features.shared_workspaces).toBe(true);
   });
 });
 
@@ -261,18 +258,23 @@ describe("POST /subscription/upgrade", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns placeholder message for upgrade", async () => {
+  // Upgrades moved to Apple IAP: the purchase happens in the StoreKit sheet and
+  // entitlement arrives by webhook, so there is no server-side checkout to
+  // start. Asserting 410 rather than the old 200 + "Stripe integration pending"
+  // string, which made the stub impossible to change without failing CI.
+  it("reports upgrade as gone, pointing at in-app purchase", async () => {
     const res = await postJson(
       "/subscription/upgrade",
       { tier: "pro", billing_interval: "monthly" },
       testUser.token,
     );
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(410);
     const body = await res.json();
-    expect(body.message).toContain("Stripe integration pending");
-    expect(body.tier).toBe("pro");
-    expect(body.billing_interval).toBe("monthly");
+    expect(body.error).toBe("gone");
+    // The message has to tell someone where to actually go. A bare "gone" is a
+    // dead end on the one screen where money is being asked for.
+    expect(body.message).toMatch(/App Store/i);
   });
 });
 

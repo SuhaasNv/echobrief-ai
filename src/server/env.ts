@@ -31,6 +31,14 @@ const EnvSchema = z.object({
   // --- Email ---
   RESEND_API_KEY: z.string().optional(),
 
+  // --- Payments (Apple IAP via RevenueCat) ---
+  // Shared secret RevenueCat sends in the webhook's Authorization header. This
+  // is the ONLY thing standing between the internet and an endpoint that writes
+  // `subscriptions.tier` — the webhook fails closed when it is unset, because a
+  // route that grants Pro without verifying is a free-Pro endpoint for anyone
+  // who finds the URL.
+  REVENUECAT_WEBHOOK_SECRET: z.string().optional(),
+
   // --- Audio storage (Cloudflare R2 / S3-compatible) ---
   R2_ACCOUNT_ID: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),

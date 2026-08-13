@@ -62,6 +62,12 @@ const LIMITS = {
   auth_account: { max: 10, window_sec: 60 * 15 },
   signup: { max: 3, window_sec: 60 * 60 },
   share: { max: 60, window_sec: 60 },
+  // Its OWN bucket, and deliberately not `general` — general is the one
+  // fail-open bucket in the system, and an unauthenticated endpoint that writes
+  // subscription tiers must never fall open when Redis is unreachable. Sized for
+  // real traffic: RevenueCat retries with backoff, and a handful of paying users
+  // produces a few events a day, not a few a second.
+  webhook: { max: 120, window_sec: 60 },
 } satisfies Record<string, BucketConfig>;
 
 export type RateLimitBucket = keyof typeof LIMITS;
@@ -75,6 +81,8 @@ const TIER_LIMITS: Record<SubscriptionTier, Partial<Record<RateLimitBucket, Buck
     general: { max: 100, window_sec: 60 },
     ai: { max: 10, window_sec: 60 },
   },
+  // Not sold (see SELLABLE_TIERS) but still resolvable, so an existing account
+  // on one of these keeps its budget rather than falling back to the base limit.
   student: {
     general: { max: 300, window_sec: 60 },
     ai: { max: 50, window_sec: 60 },

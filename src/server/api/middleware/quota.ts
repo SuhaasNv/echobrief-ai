@@ -20,6 +20,43 @@ interface QuotaRequestBody {
 }
 
 /**
+ * The 429 body, built in one place.
+ *
+ * Three call sites emitted this object literal identically, and the fields are a
+ * WIRE CONTRACT: the mobile client classifies on `error` and `kind` and renders
+ * the reset date rather than a retry button. Three hand-maintained copies is how
+ * one of them quietly loses a field and one screen silently degrades to "try
+ * again" for a wait that is up to 31 days long.
+ */
+function quotaExceeded(result: {
+  reason: string;
+  tier: string;
+  current: number;
+  limit: number;
+  kind: string;
+  resets_on: string;
+}): HTTPException {
+  return new HTTPException(429, {
+    message: result.reason,
+    res: new Response(
+      JSON.stringify({
+        error: "quota_exceeded",
+        message: result.reason,
+        tier: result.tier,
+        current: result.current,
+        limit: result.limit,
+        // Which allowance ran out, and when it comes back. Clients switch on
+        // these instead of pattern-matching the prose, so rewording `message`
+        // can never silently downgrade a screen's behaviour.
+        kind: result.kind,
+        resets_on: result.resets_on,
+      }),
+      { status: 429, headers: { "content-type": "application/json" } },
+    ),
+  });
+}
+
+/**
  * Check if user has remaining transcription quota.
  *
  * SECURITY: This middleware expects the route to validate the body FIRST using
@@ -80,22 +117,7 @@ export const requireTranscriptionQuota = createMiddleware<AppBindings>(async (c,
   const result = await checkQuota(user.id, "transcription", minutes);
 
   if (!result.allowed) {
-    throw new HTTPException(429, {
-      message: result.reason,
-      res: new Response(
-        JSON.stringify({
-          error: "quota_exceeded",
-          message: result.reason,
-          tier: result.tier,
-          current: result.current,
-          limit: result.limit,
-        }),
-        {
-          status: 429,
-          headers: { "content-type": "application/json" },
-        },
-      ),
-    });
+    throw quotaExceeded(result);
   }
 
   await next();
@@ -113,22 +135,7 @@ export const requireAIQueryQuota = createMiddleware<AppBindings>(async (c, next)
   const result = await checkQuota(user.id, "ai_query", 1);
 
   if (!result.allowed) {
-    throw new HTTPException(429, {
-      message: result.reason,
-      res: new Response(
-        JSON.stringify({
-          error: "quota_exceeded",
-          message: result.reason,
-          tier: result.tier,
-          current: result.current,
-          limit: result.limit,
-        }),
-        {
-          status: 429,
-          headers: { "content-type": "application/json" },
-        },
-      ),
-    });
+    throw quotaExceeded(result);
   }
 
   await next();
@@ -146,22 +153,7 @@ export const requireFlashcardQuota = createMiddleware<AppBindings>(async (c, nex
   const result = await checkQuota(user.id, "flashcard", 1);
 
   if (!result.allowed) {
-    throw new HTTPException(429, {
-      message: result.reason,
-      res: new Response(
-        JSON.stringify({
-          error: "quota_exceeded",
-          message: result.reason,
-          tier: result.tier,
-          current: result.current,
-          limit: result.limit,
-        }),
-        {
-          status: 429,
-          headers: { "content-type": "application/json" },
-        },
-      ),
-    });
+    throw quotaExceeded(result);
   }
 
   await next();

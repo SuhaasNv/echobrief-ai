@@ -259,21 +259,21 @@ describe("checkQuota - transcription", () => {
 
     expect(result.allowed).toBe(true);
     expect(result.current).toBe(100);
-    expect(result.limit).toBe(300);
+    expect(result.limit).toBe(120);
   });
 
   it("denies transcription when at limit", async () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
 
-    // Log exactly 300 minutes (at limit) — durationSec = 300 * 60 = 18000
-    await logTranscription(user.id, workspace, 18000);
+    // Log exactly 120 minutes (at limit) — durationSec = 120 * 60 = 7200
+    await logTranscription(user.id, workspace, 7200);
 
     const result = await checkQuota(user.id, "transcription");
 
     expect(result.allowed).toBe(false);
-    expect(result.current).toBe(300);
-    expect(result.limit).toBe(300);
+    expect(result.current).toBe(120);
+    expect(result.limit).toBe(120);
   });
 
   it("denies transcription when over limit", async () => {
@@ -289,45 +289,64 @@ describe("checkQuota - transcription", () => {
     expect(result.current).toBe(350);
   });
 
-  it("allows unlimited transcription for paid tiers", async () => {
-    const student = await createTestUser("student");
+  /**
+   * Pro is generous, not infinite.
+   *
+   * The old version logged 10,000 minutes and asserted `limit` was null for
+   * every paid tier. Pro now carries a 900-minute fair-use ceiling, so that
+   * assertion described a product decision that has been reversed. What matters
+   * is that Pro clears usage which would stop a free account many times over —
+   * and that going past the ceiling is refused rather than silently unmetered.
+   */
+  it("allows pro far past the free ceiling, and stops at its own", async () => {
     const pro = await createTestUser("pro");
-    const team = await createTestUser("team");
+    const workspace = await createTestWorkspace(pro.id);
 
-    const workspace1 = await createTestWorkspace(student.id);
-    const workspace2 = await createTestWorkspace(pro.id);
-    const workspace3 = await createTestWorkspace(team.id);
-
-    // Log massive amounts — these are seconds, so 600000s = 10000 min (way over free limit)
-    await logTranscription(student.id, workspace1, 600000);
-    await logTranscription(pro.id, workspace2, 600000);
-    await logTranscription(team.id, workspace3, 600000);
-
-    expect((await checkQuota(student.id, "transcription")).allowed).toBe(true);
+    // 500 minutes: over four times the free allowance, inside pro's 900.
+    await logTranscription(pro.id, workspace, 500 * 60);
     expect((await checkQuota(pro.id, "transcription")).allowed).toBe(true);
-    expect((await checkQuota(team.id, "transcription")).allowed).toBe(true);
 
-    // Verify limit is null (unlimited)
-    expect((await checkQuota(student.id, "transcription")).limit).toBeNull();
-    expect((await checkQuota(pro.id, "transcription")).limit).toBeNull();
+    // Past 900 it is refused, the same as any other limit.
+    await logTranscription(pro.id, workspace, 450 * 60);
+    const over = await checkQuota(pro.id, "transcription");
+    expect(over.allowed).toBe(false);
+    if (!over.allowed) {
+      expect(over.limit).toBe(900);
+      // And the copy must NOT tell a Pro user to upgrade — there is nowhere to go.
+      expect(over.reason).toMatch(/fair-use/i);
+      expect(over.reason).not.toMatch(/upgrade/i);
+    }
+  });
+
+  // student and team are hidden from sale but still resolve to real limits, so
+  // an account already on one keeps working rather than falling through to
+  // undefined.
+  it("still resolves hidden tiers to unlimited", async () => {
+    const student = await createTestUser("student");
+    const workspace = await createTestWorkspace(student.id);
+    await logTranscription(student.id, workspace, 600000);
+
+    const result = await checkQuota(student.id, "transcription");
+    expect(result.allowed).toBe(true);
+    expect(result.limit).toBeNull();
   });
 });
 
 describe("checkQuota - ai_query", () => {
-  it("denies AI queries when free tier at 10 queries", async () => {
+  it("denies AI queries when free tier at 25 queries", async () => {
     const user = await createTestUser("free");
     const workspace = await createTestWorkspace(user.id);
 
-    // Log 10 queries (at limit)
-    for (let i = 0; i < 10; i++) {
+    // Log 25 queries (at limit)
+    for (let i = 0; i < 25; i++) {
       await logAIQuery(user.id, workspace);
     }
 
     const result = await checkQuota(user.id, "ai_query");
 
     expect(result.allowed).toBe(false);
-    expect(result.current).toBe(10);
-    expect(result.limit).toBe(10);
+    expect(result.current).toBe(25);
+    expect(result.limit).toBe(25);
   });
 
   it("allows unlimited AI queries for paid tiers", async () => {

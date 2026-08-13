@@ -157,25 +157,33 @@ app.get("/", async (c) => {
 // GET /subscription/pricing — tier pricing info (for upgrade modal)
 // ---------------------------------------------------------------------------
 app.get("/pricing", async (c) => {
+  /**
+   * Only what is actually for sale.
+   *
+   * `student` and `team` still exist in the type and keep working for any
+   * account already on one — they are simply not offered. Listing a plan nobody
+   * can buy is a support ticket waiting to happen, and `team` in particular
+   * would be selling shared workspaces that do not exist.
+   *
+   * The Free description is generated from TIER_FEATURES rather than written
+   * out. It previously read "5 hours of transcription and 10 AI queries" — both
+   * numbers stale the moment the limits moved, which they just did, and a
+   * pricing page that misstates the free tier is the worst place to be wrong.
+   */
+  const freeMinutes = TIER_FEATURES.free.transcription_minutes;
+  const freeQueries = TIER_FEATURES.free.ai_queries;
+
   return c.json({
     free: {
       name: "Free",
       price_usd: 0,
       annual_price_usd: 0,
-      description: "5 hours of transcription and 10 AI queries per month.",
+      description: `${freeMinutes ? `${Math.round(freeMinutes / 60)} hours` : "Unlimited"} of transcription and ${freeQueries ?? "unlimited"} AI questions per month.`,
       features: TIER_FEATURES.free,
-    },
-    student: {
-      ...TIER_PRICING.student,
-      features: TIER_FEATURES.student,
     },
     pro: {
       ...TIER_PRICING.pro,
       features: TIER_FEATURES.pro,
-    },
-    team: {
-      ...TIER_PRICING.team,
-      features: TIER_FEATURES.team,
     },
   });
 });
@@ -188,23 +196,29 @@ const UpgradeRequest = z.object({
   billing_interval: z.enum(["monthly", "annual"]),
 });
 
-app.post("/upgrade", zValidator("json", UpgradeRequest), async (c) => {
-  const { tier, billing_interval } = c.req.valid("json");
-  const user = c.get("user");
-
-  // TODO: Integrate Stripe Checkout
-  // 1. Create or retrieve Stripe customer
-  // 2. Create Stripe Checkout session
-  // 3. Return session URL
-  //
-  // For now, return a placeholder response.
-
-  return c.json({
-    message: "Stripe integration pending. Manual upgrade required.",
-    tier,
-    billing_interval,
-    user_id: user.id,
-  });
+/**
+ * Gone, and answering 410 rather than 200.
+ *
+ * This used to return `{ message: "Stripe integration pending" }` with a 200,
+ * which is the worst of both worlds: a client cannot tell success from
+ * not-implemented, and an integration test asserting that exact string made the
+ * stub load-bearing — the string could not be changed without failing CI, so it
+ * looked maintained.
+ *
+ * Upgrades happen through Apple IAP now. The purchase is made by the StoreKit
+ * sheet on the device and entitlement arrives via the RevenueCat webhook; there
+ * is no server-initiated checkout to start, and there must not be one. Selling a
+ * subscription for iOS content outside Apple's IAP is an App Store rejection.
+ */
+app.post("/upgrade", zValidator("json", UpgradeRequest), (c) => {
+  return c.json(
+    {
+      error: "gone",
+      message:
+        "Upgrades are handled in the app through the App Store. Open Account > Plan to subscribe.",
+    },
+    410,
+  );
 });
 
 // ---------------------------------------------------------------------------
