@@ -221,9 +221,17 @@ export default function AccountScreen() {
           label="Transcription"
           onPress={() => router.push("/(app)/account/transcription")}
         />
+        {/* Capture blue, like the rest of this section.
+            This was a FILLED violet chip — the "a model produced this" tone —
+            and it measured L 0.681 against roughly 0.25 for every chip beside
+            it, so it was the brightest object on the screen and the eye landed
+            on the fourth-most-important row first. A rule that costs the
+            section its shape is not paying for itself here; violet still means
+            model output where it has room to, on the summary card and the
+            score. */}
         <Row
           icon="doc.plaintext"
-          iconTone="violet"
+          iconTone="tint"
           label="Summaries"
           onPress={() => router.push("/(app)/account/summaries")}
         />
