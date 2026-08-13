@@ -57,8 +57,11 @@ export async function exportUserAccount(job: ExportJob): Promise<void> {
   // ---- 1. Query all user data -----------------------------------------------
   const [user, workspaces, meetings, transcripts, summaries, actionItems, pipelineLogs] =
     await Promise.all([
-      sql<Array<{ id: string; email: string; full_name: string | null; created_at: Date }>>`
-      SELECT id, email, full_name, created_at FROM users WHERE id = ${user_id} LIMIT 1
+      // `name`, not `full_name`. Second wrong column in this file: the export
+      // has never completed for anyone, so there is no prior output shape to
+      // stay compatible with, and the honest column name wins.
+      sql<Array<{ id: string; email: string; name: string | null; created_at: Date }>>`
+      SELECT id, email, name, created_at FROM users WHERE id = ${user_id} LIMIT 1
     `,
       sql<Array<{ workspace_id: string; workspace_name: string; role: string; joined_at: Date }>>`
       SELECT w.id as workspace_id, w.name as workspace_name, wm.role, wm.created_at as joined_at
@@ -124,12 +127,15 @@ export async function exportUserAccount(job: ExportJob): Promise<void> {
           assignee_name: string | null;
           due_date: string | null;
           timestamp_sec: number | null;
-          status: string;
+          // `completed`, not `status`. action_items has never had a status
+          // column, so this query errored for every user and took the whole
+          // account export down with it.
+          completed: boolean;
           completed_at: Date | null;
           created_at: Date;
         }>
       >`
-      SELECT id, meeting_id, description, assignee_name, due_date, timestamp_sec, status, completed_at, created_at
+      SELECT id, meeting_id, description, assignee_name, due_date, timestamp_sec, completed, completed_at, created_at
       FROM action_items
       WHERE user_id = ${user_id}
       ORDER BY created_at DESC
