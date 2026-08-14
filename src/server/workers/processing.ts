@@ -103,7 +103,12 @@ async function applyGeneratedTitle(
     UPDATE meetings
     SET title = ${title}
     WHERE id = ${meetingId}
-      AND (title = '' OR title ~* ${PLACEHOLDER_TITLE_PATTERN})
+      AND (title = ''
+        -- Also a placeholder: the segmented-open handler used to store this
+        -- literal for an un-named recording, and the guard has to see it as
+        -- replaceable or the generated title never lands.
+        OR title = 'Untitled recording'
+        OR title ~* ${PLACEHOLDER_TITLE_PATTERN})
   `;
 }
 

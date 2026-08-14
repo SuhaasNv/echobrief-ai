@@ -395,7 +395,12 @@ app.post("/segmented", zValidator("json", SegmentedRecordingRequest), async (c) 
       ${meetingId},
       ${user.id},
       ${workspaceId},
-      ${body.title || "Untitled recording"},
+      -- Empty, not "Untitled recording", when the user did not name it. An empty
+      -- title is what displayTitle turns into the recording's date, and what the
+      -- worker's rename guard (title = '') replaces with the generated title once
+      -- analysis finishes. Storing a literal "Untitled recording" looked
+      -- user-chosen to that guard, so the AI name never landed.
+      ${body.title || ""},
       ${body.content_type},
       ${body.language},
       ${sql.array(body.tags)},
