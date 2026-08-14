@@ -1,13 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import Animated, {
-  FadeIn,
-  FadeOut,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 import type { MeetingDetail } from "@/lib/api/meeting-detail";
 import {
@@ -18,15 +11,14 @@ import {
 } from "@/lib/audio/playback";
 import { formatClock } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
-import { SPRING } from "@/lib/motion";
 import { useColorTokens } from "@/lib/tokens";
 
 import { ChevronDownGlyph, PauseGlyph, PlayGlyph, SkipBackGlyph, SkipForwardGlyph } from "./glyphs";
 import { useFollowState, type FollowScroll } from "./follow-scroll";
 import {
-  PLAYER_BAR_HEIGHT,
-  PLAYER_SKIP_ROW_HEIGHT,
+  PLAYER_SCRUBBER_ROW,
   PLAYER_TAB_BAR_GAP,
+  PLAYER_TRANSPORT_ROW,
   useTabBarTopEdge,
 } from "./metrics";
 import { RibbonScrubber } from "./ribbon-scrubber";
@@ -34,37 +26,29 @@ import { RibbonScrubber } from "./ribbon-scrubber";
 /**
  * The transport.
  *
- * Floats above the tab bar rather than filling the width, because the native
- * UITabBar on iOS 26 is itself a floating glass element and a full-bleed bar
- * butted against it reads as two competing chromes. It shares that bar's 16pt
- * side margins and sits 6pt off its top edge, so the two read as one block of
- * chrome with one content inset below them rather than as two overlays with a
- * readable strip of live text stranded in between.
+ * Floats above the tab bar and shares its 16pt side margins, so the two read as
+ * one block of chrome with a single content inset below them.
  *
- * ONE ROW AT REST. The bar used to stack a scrub target, a time row and a
- * transport row into 128pt; with the tab bar under it that is a quarter of the
- * screen permanently spent on chrome, and it cut summary lines in half. Now the
- * things you touch constantly — play, position, elapsed — share a single 56pt
- * row, and skip opens on a tap.
+ * TWO FIXED ROWS. A thin scrubber line — elapsed, the diarization ribbon, total —
+ * over a transport row where skip-15 and skip-30 flank a 52pt play button.
  *
- * It shrinks rather than hiding on scroll. Hiding would have matched the tab
- * bar's own minimizeBehavior, but a transport that is gone while you read the
- * transcript it is playing is unavailable exactly when it is wanted; and driving
- * it from scroll direction would fight follow-scroll, which issues its own
- * programmatic scrolls and would collapse the bar every time it revealed a line.
- * Shrinking is unconditional: no state machine, no gesture arbitration, and one
- * constant for the scroll inset.
+ * Skip is PERMANENT here, not hidden behind a disclosure chevron. The
+ * tap-to-reveal band was the thing that read as clunky, and it was also what
+ * grew the card by 44pt and parked the last line of the transcript underneath
+ * it. A card that never changes height is the whole fix for both: the controls
+ * are always where the thumb expects them, and the scroll inset below can
+ * reserve the card exactly once.
  *
- * Skip is 15 back and 30 forward. That asymmetry is the podcast convention and
- * it is not arbitrary: you skip back to re-hear a sentence, and forward to get
- * past a stretch you do not need, and those are different distances.
+ * Skip is 15 back and 30 forward — the podcast convention, and not arbitrary:
+ * you skip back to re-hear a sentence and forward to get past a stretch, and
+ * those are different distances.
  *
- * This component subscribes to playback state; the meeting screen does not.
- * That is what keeps a play tap from re-rendering an 800 row transcript.
+ * This component subscribes to playback state; the meeting screen does not. That
+ * is what keeps a play tap from re-rendering an 800-row transcript.
  */
 
-/** Diameter of the primary control. Apple's minimum, exactly. */
-const PLAY_SIZE = 44;
+/** Diameter of the primary control — the one filled element, so it reads as the hero. */
+const PLAY_SIZE = 52;
 
 /**
  * Advance of one tabular figure at 12px, rounded up. A floor for the elapsed
@@ -112,8 +96,7 @@ function TransportButton({
  *
  * It re-renders once a second. Reading the position stream here rather than in
  * the bar keeps that tick off the transport controls and the scrubber, and
- * formatClock has one second of resolution anyway, so a faster update would
- * change nothing on screen.
+ * formatClock has one second of resolution anyway.
  */
 function Elapsed({ playback, total }: { playback: PlaybackController; total: number }) {
   const [seconds, setSeconds] = useState(() => Math.floor(playback.getPosition()));
@@ -134,59 +117,13 @@ function Elapsed({ playback, total }: { playback: PlaybackController; total: num
       style={{
         fontVariant: ["tabular-nums"],
         // Floored to the widest clock this meeting can print, so the ribbon
-        // beside it does not jump left when 9:59 becomes 10:00. Tabular figures
-        // fix the width WITHIN a digit count; they do nothing about gaining one.
+        // beside it does not jump left when 9:59 becomes 10:00.
         minWidth: formatClock(total).length * DIGIT_ADVANCE,
       }}
       maxFontSizeMultiplier={1.3}
     >
       {formatClock(seconds)}
     </Text>
-  );
-}
-
-/**
- * Skip disclosure.
- *
- * A rotating chevron rather than a labelled button: it is the same affordance
- * the settings groups use to open, so it does not have to be learned twice. The
- * rotation is a transform on a shared value, so opening the band never asks the
- * JS thread for a frame.
- */
-function SkipDisclosure({ expanded, onPress }: { expanded: boolean; onPress: () => void }) {
-  const reduceMotion = useReducedMotion();
-  const spin = useSharedValue(expanded ? 1 : 0);
-
-  useEffect(() => {
-    spin.value = reduceMotion ? (expanded ? 1 : 0) : withSpring(expanded ? 1 : 0, SPRING.chrome);
-  }, [expanded, reduceMotion, spin]);
-
-  // Points up while closed (the band opens upward), down while open.
-  const style = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${180 - spin.value * 180}deg` }],
-  }));
-
-  return (
-    <Pressable
-      onPress={() => {
-        haptics.tap();
-        onPress();
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={expanded ? "Hide skip controls" : "Show skip controls"}
-      accessibilityState={{ expanded }}
-      // Grows into the card's own right padding only. Slop on the LEFT would
-      // reach back over the ribbon and, being later in the tree, would win the
-      // touch, quietly stealing the last few percent of the timeline.
-      hitSlop={{ top: 6, bottom: 6, left: 0, right: 12 }}
-      className="h-11 w-8 items-center justify-center"
-    >
-      {({ pressed }) => (
-        <Animated.View style={[style, { opacity: pressed ? 0.45 : 1 }]}>
-          <ChevronDownGlyph size={14} />
-        </Animated.View>
-      )}
-    </Pressable>
   );
 }
 
@@ -201,15 +138,12 @@ const TOKENS = ["--label", "--label-quaternary"] as const;
 export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
   const state = usePlaybackState(playback);
   const followState = useFollowState(follow);
-  const reduceMotion = useReducedMotion();
-  const [expanded, setExpanded] = useState(false);
   // Transport colour for the two states this bar sets by hand: the skip pair
   // greys out with no audio to skip through, and the spinner replaces the play
   // glyph, so both need the value the glyphs would otherwise read themselves.
   const [glyph, glyphDim] = useColorTokens(TOKENS);
-  // Sits ON the tab bar. Six points of seam, measured from the bar's real top
-  // edge rather than from an inset that counted it twice — see
-  // PLAYER_TAB_BAR_GAP and useTabBarTopEdge.
+  // Sits on the tab bar. Six points of seam, measured from the bar's real top
+  // edge rather than from an inset that counted it twice.
   const bottom = useTabBarTopEdge() + PLAYER_TAB_BAR_GAP;
 
   // A transcript-only meeting gets no transport at all. A play button that
@@ -221,6 +155,7 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
   const speakers = meeting.transcript?.speakers ?? [];
   const busy = state.phase === "loading" || state.buffering;
   const showJump = followState.canJump && !followState.following;
+  const canSkip = total > 0;
 
   return (
     <View
@@ -267,44 +202,57 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
         className="mx-4 overflow-hidden rounded-card border border-edge bg-elevated"
         style={{ borderCurve: "continuous" }}
       >
-        {/* Skip band. Grows UPWARD, because the card is anchored to the bottom
-            of an absolutely positioned container — so opening it never moves the
-            row the finger is already on. */}
-        {expanded ? (
-          <Animated.View
-            entering={reduceMotion ? undefined : FadeIn.duration(160)}
-            // No exiting animation, deliberately. Reanimated holds an exiting
-            // view at its last frame RELATIVE TO ITS PARENT, and this parent is
-            // bottom-anchored, so the card's top edge drops 44pt the instant the
-            // band unmounts and a fading copy of the skip buttons would be
-            // dragged down on top of the transport row. The rule that exits are
-            // faster than entrances, taken to its limit.
-            // Centred pair, not spread to the edges. The total duration used to
-            // sit between these two and justify the spread; with it moved down
-            // to the transport row, `justify-between` would have pushed the two
-            // glyphs into opposite corners with a void between them.
-            className="flex-row items-center justify-center gap-14 px-6"
-            style={{ height: PLAYER_SKIP_ROW_HEIGHT }}
+        {/* Scrubber line. Position and length flank the ribbon, which reads as
+            one fact — this much audio, this long — with the progress between
+            them. On error this row carries the message instead; the play button
+            below stays, as the retry. */}
+        <View className="flex-row items-center gap-2.5 px-4" style={{ height: PLAYER_SCRUBBER_ROW }}>
+          {state.error ? (
+            <Text
+              className="flex-1 text-[12px] leading-[16px] text-danger"
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.3}
+            >
+              {state.error}
+            </Text>
+          ) : (
+            <>
+              <Elapsed playback={playback} total={total} />
+
+              <View className="flex-1">
+                <RibbonScrubber
+                  playback={playback}
+                  segments={segments}
+                  speakers={speakers}
+                  height={8}
+                />
+              </View>
+
+              <Text
+                className="text-[12px] text-label-secondary"
+                style={{ fontVariant: ["tabular-nums"] }}
+                maxFontSizeMultiplier={1.3}
+              >
+                {formatClock(total)}
+              </Text>
+            </>
+          )}
+        </View>
+
+        {/* Transport. skip-15 · play/pause · skip-30, centred as one cluster.
+            Skip greys out when there is nothing to skip through. */}
+        <View
+          className="flex-row items-center justify-center gap-8 px-4"
+          style={{ height: PLAYER_TRANSPORT_ROW }}
+        >
+          <TransportButton
+            onPress={() => playback.skip(-SKIP_BACK_SEC)}
+            label={`Skip back ${SKIP_BACK_SEC} seconds`}
+            disabled={!canSkip}
           >
-            <TransportButton
-              onPress={() => playback.skip(-SKIP_BACK_SEC)}
-              label={`Skip back ${SKIP_BACK_SEC} seconds`}
-              disabled={total <= 0}
-            >
-              <SkipBackGlyph seconds={SKIP_BACK_SEC} color={total > 0 ? glyph : glyphDim} />
-            </TransportButton>
+            <SkipBackGlyph seconds={SKIP_BACK_SEC} color={canSkip ? glyph : glyphDim} />
+          </TransportButton>
 
-            <TransportButton
-              onPress={() => playback.skip(SKIP_FORWARD_SEC)}
-              label={`Skip forward ${SKIP_FORWARD_SEC} seconds`}
-              disabled={total <= 0}
-            >
-              <SkipForwardGlyph seconds={SKIP_FORWARD_SEC} color={total > 0 ? glyph : glyphDim} />
-            </TransportButton>
-          </Animated.View>
-        ) : null}
-
-        <View className="flex-row items-center gap-3 px-3" style={{ height: PLAYER_BAR_HEIGHT }}>
           <Pressable
             onPress={() => {
               haptics.tap();
@@ -320,68 +268,23 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
             {({ pressed }) => (
               <View style={{ opacity: pressed ? 0.5 : 1 }}>
                 {busy ? (
-                  // Replaces the glyph rather than sitting beside it: the
-                  // control has one job at a time, and a spinner next to a play
-                  // triangle reads as two states at once.
                   <ActivityIndicator color={glyph} accessibilityLabel="Loading audio" />
                 ) : state.playing ? (
-                  <PauseGlyph size={24} />
+                  <PauseGlyph size={26} />
                 ) : (
-                  <PlayGlyph size={24} />
+                  <PlayGlyph size={26} />
                 )}
               </View>
             )}
           </Pressable>
 
-          {state.error ? (
-            // Takes the position and the whole of the ribbon's slot. A failure
-            // is the only thing worth reading on this bar while it lasts, and
-            // giving it its own line would put the height back.
-            <Text
-              className="flex-1 text-[12px] leading-[16px] text-danger"
-              numberOfLines={2}
-              maxFontSizeMultiplier={1.3}
-            >
-              {state.error}
-            </Text>
-          ) : (
-            <>
-              <Elapsed playback={playback} total={total} />
-
-              {/* The same graphic as the hero ribbon, at 4pt. It is drawn small
-                  because at this size it reads as a fingerprint of the meeting
-                  rather than as a chart, and the 44pt target lives in the
-                  padding around it rather than in the strip — which is exactly
-                  why it can share a 56pt row with the play button instead of
-                  needing a band of its own. */}
-              <View className="flex-1">
-                <RibbonScrubber
-                  playback={playback}
-                  segments={segments}
-                  speakers={speakers}
-                  height={6}
-                />
-              </View>
-
-              {/* Total length, on the same line as the position.
-                  It used to live only inside the skip band, so how long a
-                  recording ran was invisible until you opened a disclosure —
-                  and once open, an unlabelled 0:16 sat centred in one row above
-                  an unlabelled 0:06 in another, which reads as two clocks
-                  rather than as position and length. Flanking the ribbon, the
-                  pair reads as one fact with the progress between them, which
-                  is the arrangement every audio player has settled on. */}
-              <Text
-                className="text-[12px] text-label-secondary"
-                style={{ fontVariant: ["tabular-nums"] }}
-                maxFontSizeMultiplier={1.3}
-              >
-                {formatClock(total)}
-              </Text>
-            </>
-          )}
-
-          <SkipDisclosure expanded={expanded} onPress={() => setExpanded((open) => !open)} />
+          <TransportButton
+            onPress={() => playback.skip(SKIP_FORWARD_SEC)}
+            label={`Skip forward ${SKIP_FORWARD_SEC} seconds`}
+            disabled={!canSkip}
+          >
+            <SkipForwardGlyph seconds={SKIP_FORWARD_SEC} color={canSkip ? glyph : glyphDim} />
+          </TransportButton>
         </View>
       </View>
     </View>

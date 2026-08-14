@@ -11,18 +11,20 @@ import { TAB_BAR_RESERVE } from "@/lib/layout";
  */
 
 /**
- * Height of the resting player card, excluding the gap above the tab bar.
+ * The player card, both rows, excluding the gap above the tab bar.
  *
- * One row, and the row is sized by its tallest child rather than by adding up
- * the things inside it: the play button is 44 (Apple's minimum) and the ribbon's
- * touch target is also 44, so 44 plus 6pt of air top and bottom is 56. Every
- * number here is a control's real size, not an estimate of one.
- *
- * The previous 128 stacked a 44pt scrub target, a time row, and a 58pt transport
- * row into three bands. Together with the tab bar beneath it that put a quarter
- * of the screen under permanent chrome, and it cut summary lines in half.
+ * Two fixed rows: a thin scrubber line over a transport row where skip-15 and
+ * skip-30 flank play PERMANENTLY, rather than hiding behind a disclosure that
+ * grew the card by a band and parked the last transcript line under it. The
+ * height never changes now, so the scroll inset below reserves it exactly once —
+ * which is the whole fix for that covered last line.
  */
-export const PLAYER_BAR_HEIGHT = 56;
+/** Top row: elapsed · ribbon scrubber · total. Thin; it carries no touch target of its own. */
+export const PLAYER_SCRUBBER_ROW = 26;
+/** Bottom row: skip-15 · play/pause · skip-30 — 44pt+ targets around a 52pt play. */
+export const PLAYER_TRANSPORT_ROW = 56;
+/** The whole card. What the scroll follower reserves below the transcript. */
+export const PLAYER_BAR_HEIGHT = PLAYER_SCRUBBER_ROW + PLAYER_TRANSPORT_ROW;
 
 /**
  * Air between the player card and the tab bar.
@@ -65,12 +67,3 @@ export function useTabBarTopEdge(): number {
   return useSafeAreaInsets().bottom + TAB_BAR_RESERVE;
 }
 
-/**
- * Height the skip band adds while it is revealed.
- *
- * Deliberately NOT part of the scroll inset. The band is opened by a tap and
- * grows upward from a bottom-anchored card, so it covers content for exactly as
- * long as the user asked it to. Reserving it permanently would give back most of
- * what collapsing the bar just won.
- */
-export const PLAYER_SKIP_ROW_HEIGHT = 44;

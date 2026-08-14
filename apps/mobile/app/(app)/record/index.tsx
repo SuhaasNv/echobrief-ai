@@ -33,6 +33,7 @@ import {
   type UploadSession,
 } from "@/lib/audio/segment-upload";
 import { qk } from "@/lib/api/meetings";
+import { ApiError } from "@echobrief/shared/api";
 import { ensureNotificationPermission } from "@/lib/notifications";
 import {
   endRecordingActivity,
@@ -554,14 +555,19 @@ export default function RecordScreen() {
     let meetingId: string;
     try {
       meetingId = await session.open();
-    } catch {
-      // No meeting row, so nowhere to send the user and nothing for a progress
-      // ring to attach to. The audio is safe on disk and the recovery sweep
-      // will offer it on the next launch, so this is the one failure that still
-      // belongs on THIS screen — the user has not gone anywhere yet.
+    } catch (err) {
+      // The audio is safe on disk either way and the recovery sweep will offer
+      // it on the next launch, so the alert's only job is to say WHY it did not
+      // open. A 401 means the session lapsed — the client is already signing us
+      // out — and calling that "could not reach" is the misread that made an
+      // auth problem look like a connection one. Everything else genuinely is
+      // "could not reach".
+      const signedOut = err instanceof ApiError && err.status === 401;
       Alert.alert(
-        "Could not reach EchoBrief",
-        "Your recording is saved on this iPhone. It will be uploaded the next time you open the app with a connection.",
+        signedOut ? "You're signed out" : "Could not reach EchoBrief",
+        signedOut
+          ? "Sign in again and this recording uploads on its own — it is saved on this iPhone until then."
+          : "Your recording is saved on this iPhone. It will be uploaded the next time you open the app with a connection.",
       );
       localIdRef.current = null;
       sessionRef.current = null;
