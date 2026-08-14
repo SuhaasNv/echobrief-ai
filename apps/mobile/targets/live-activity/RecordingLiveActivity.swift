@@ -300,8 +300,16 @@ private struct RecordingLockScreenView: View {
         .lineLimit(1)
         .frame(maxWidth: .infinity, alignment: .leading)
 
-        // The reported number, pinned to the trailing edge.
+        // The reported number, pinned to the trailing edge. The minWidth is
+        // load-bearing: the title beside it is `maxWidth: .infinity` and would
+        // otherwise squeeze this to nothing, and a squeezed `Text(timerInterval:)`
+        // — which carries a `minimumScaleFactor` the system cannot pre-measure at
+        // a scaled width — falls back to its dashed "1:--" placeholder. Reserving
+        // room (never `.fixedSize()`, which hands a self-updating timer an
+        // indeterminate ideal size and renders the whole card blank) is exactly
+        // how the Dynamic Island keeps its own clock ticking.
         ElapsedTime(state: context.state, size: 17, weight: .semibold)
+          .frame(minWidth: 72, alignment: .trailing)
       }
 
       ControlRow(isPaused: context.state.isPaused, height: 34)
