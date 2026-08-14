@@ -47,6 +47,7 @@ export default function SignUpScreen() {
 
   const onGoogle = () => {
     if (busy) return;
+    haptics.tap();
     googleSignIn.mutate(undefined, {
       onSuccess: (outcome) => {
         if (outcome.status !== "signed-in") return;
@@ -59,6 +60,8 @@ export default function SignUpScreen() {
 
   const onSubmit = () => {
     if (!canSubmit) return;
+    // Tap on the press; success()/warning()/error() land later on resolve.
+    haptics.tap();
 
     signUp.mutate(
       {

@@ -7,6 +7,66 @@ is fixed, and what remains.
 **Design judge:** 6/10 overall (two rounds — 5.5 on an incomplete set, 6 on the full one).
 **CEO / product:** *"Do not show this to a paying user yet."*
 
+---
+
+## UPDATE — design 9.0, and a product data-loss risk (latest pass)
+
+**Design judge is now 9.0/10**, up from 6, verified against fresh device
+screenshots after the custom tab bar and a fix pass. Four of the five top
+findings are resolved from the pixels (Record orb no longer bisects content, the
+"Record" caption is legible, the meetings list shows distinct summaries instead
+of three clones, "AI summary" → "Summary"), the fifth (red glow) is improved.
+The gap to 9.5 is polish, not architecture: the tab bar mixes labelled/unlabelled
+items, and the accent palette runs both blue (`--tint`) and violet (`--violet`)
+as if both were primary — the app's system is that violet means "model-produced"
+and blue means "interactive", which is defensible but reads as two primaries to
+fresh eyes. Committing to one and tightening the tab bar is the last mile.
+
+**CEO functional audit — the one that matters most is a data-loss hole.**
+
+1. **`meetings.status` can get stuck non-terminal, then the audio is deleted.**
+   The worker writes status in-band with no reconciler comparing it to queue
+   reality. A lost confirm call, an OOM/SIGKILL mid-job (`workers/main.ts` skips
+   `markFailed` for stalled failures below the attempt limit), or any
+   interruption leaves a meeting pinned in `queued`/`transcribing` with durable
+   audio in R2, no job, no route to `failed`, and no user-visible error — after
+   which retention (`cleanup-r2.ts`) deletes the audio. The R2 orphan reconciler
+   proves this pattern is understood for storage but it was never applied to
+   meeting status, and `captureException` is never called from any `workers/`
+   file, so these failures are silent to ops. **This is the #1 thing to fix
+   before a paying user — a recording app must never silently lose a recording.**
+   The fix is a status reconciler (find non-terminal meetings with no live job →
+   mark failed so the user gets a retry and retention does not treat the audio as
+   abandoned) plus error reporting from the workers. Deferred here because it is a
+   worker-lifecycle change that needs its own tests, not an overnight rush.
+
+2. **Integrations are fake.** "Export to Notion/Linear/Jira" returns a fabricated
+   id and sends nothing (`action-items.ts:241` TODO); OAuth stores placeholder
+   tokens (`integrations.ts:84` TODO); Slack isn't listed; Jira/Trello have blank
+   client ids. If integrations are marketed, this is a refund/trust problem.
+
+3. **No content export** (PDF/docx/txt/markdown). "Copy" copies a share link, not
+   the summary. Only a GDPR JSON ZIP exists.
+
+4. **Email is a stub** (`resend.ts` only console.logs) — no "your recording is
+   ready", no failure alerts, no workspace invites actually delivered.
+
+5. **No calendar / auto-join** — Granola/Otter's core hook. The Google Calendar
+   button is a dead OAuth handshake.
+
+**Genuinely strong, per the CEO:** live transcription, semantic search, grounded
+Ask, speaker labelling+renaming, and the entire admin suite (grant/revoke Pro
+with comped-vs-paying separation, revenue+margin, failed-job retry, system
+health). *"The founder can operate the business day-to-day; the gaps are in
+outbound user-facing value, not in the ability to run it."*
+
+**Launch-blocker order for a first paying user:** (1) the status-reconciler
+data-loss fix; (2) real content export (copy summary/transcript); (3) at least
+one real integration OR stop marketing them; (4) transactional email; (5) Google
+SSO's human OAuth round trip; (6) App Store products + a non-placeholder icon
+(needs `expo prebuild`). Calendar auto-join is the biggest competitive gap but is
+a v1.1, not a v1 blocker.
+
 Screenshot provenance matters here. Two earlier review rounds were invalidated because a
 drifting capture harness produced correctly-numbered, wrongly-named files. The harness now
 names every screenshot from the route the app itself reported at the instant of the

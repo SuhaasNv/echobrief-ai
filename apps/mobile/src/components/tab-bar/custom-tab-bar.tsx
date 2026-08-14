@@ -1,13 +1,14 @@
+import { useEffect } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
-  FadeIn,
-  FadeOut,
-  LinearTransition,
+  Easing,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -25,11 +26,16 @@ import { useColorTokens } from "@/lib/tokens";
  * The app's own bottom navigation, drawn rather than handed to UITabBar.
  *
  * This deliberately replaces `expo-router/unstable-native-tabs`. The native bar
- * gives Liquid Glass for free, but it cannot do the two things this design is
+ * gives Liquid Glass for free, but it cannot do the one thing this design is
  * built on: an ELEVATED centre action (Record, lifted into a circle above the
- * bar because it is the app's primary verb), and a SELECTED-PILL that expands to
- * show its label while the others collapse to icons. Both are custom-drawn by
+ * bar because it is the app's primary verb). That is custom-drawn by
  * definition, so the trade is glass-for-identity, made on purpose.
+ *
+ * The four flanking tabs are ICON-ONLY. An earlier version expanded the
+ * selected tab into a labelled pill while the others collapsed; it looked good
+ * static and stuttered in motion, because animating width is a layout pass. The
+ * selected state is now a highlight that fades under the icon — opacity and
+ * scale only — so the bar is smooth by construction. See TabItem.
  *
  * What the switch costs, and how it is paid:
  *
@@ -38,15 +44,12 @@ import { useColorTokens } from "@/lib/tokens";
  *     TAB_BAR_HEIGHT in lib/layout.ts — see the note there. Getting this wrong
  *     hides content behind the bar, so the constants live in ONE place.
  *
- *   - Accessibility. The collapse-to-icon pattern means an inactive tab shows no
- *     text, so every item carries an explicit accessibilityLabel and the
- *     `selected` state, and the pill's motion is the only thing gated on Reduce
- *     Motion — the labels and hit targets never depend on it.
+ *   - Accessibility. Icon-only tabs show no text, so every item carries an
+ *     explicit accessibilityLabel and the `selected` state; VoiceOver reads the
+ *     name the eye no longer sees.
  *
- *   - Reduce Motion. The width morph is a spring; under Reduce Motion the layout
- *     still changes (selected shows its label) but without the animated
- *     transition, so it reads as an instant, honest state change rather than a
- *     glitch.
+ *   - Reduce Motion. The highlight resolves instantly instead of animating, so
+ *     it reads as an honest state change rather than a glitch.
  */
 
 /**
@@ -123,6 +126,23 @@ export function CustomTabBar({ state, navigation }: TabBarProps) {
         alignItems: "center",
       }}
     >
+      {/*
+        Fades content out under the bar, and hides the gap beneath it.
+        A floating bar leaves a transparent band between itself and the screen
+        bottom, and the list scrolls its content the FULL height (its frame runs
+        edge to edge behind the bar), so a card's edge was showing through that
+        band — reported as a stray "layer" under the nav. This scrim runs from
+        transparent at the top to the canvas colour at the bottom, so content
+        dissolves as it passes behind the bar instead of poking out below it. It
+        is the same idea as iOS's own scroll-edge effect, and it sits behind the
+        pill (rendered first) so the bar itself is untouched.
+      */}
+      <LinearGradient
+        colors={["transparent", background ?? "#06070A"]}
+        locations={[0, 0.72]}
+        pointerEvents="none"
+        style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
+      />
       <View
         style={{
           flexDirection: "row",
@@ -200,13 +220,17 @@ export function CustomTabBar({ state, navigation }: TabBarProps) {
 }
 
 /**
- * A flanking tab: icon alone, or an icon+label pill when selected.
+ * A flanking tab: an icon over a highlight that fades in when it is selected.
  *
- * The expand/collapse is a LAYOUT spring, the same primitive the segmented
- * control uses, so selecting a tab redistributes width across the row with one
- * coherent motion rather than four independent resizes. `SPRING.chrome` is the
- * app's designated "tab icon / chip selection" curve — critically damped,
- * because a bar the thumb hits many times a session must not bounce.
+ * It used to EXPAND — collapsed to an icon, grew to an icon+label pill on
+ * select, driven by a LinearTransition layout spring. That looked good in a
+ * mockup and stuttered on a device: animating `flexGrow` and mounting a label
+ * makes all four items recompute layout on the shadow thread every tap, and no
+ * amount of spring tuning smooths a layout pass. The label is gone and the only
+ * thing that animates now is a highlight's opacity and scale — both transforms,
+ * both on the UI thread — so the bar is smooth by construction rather than by
+ * luck. VoiceOver still gets every tab's name; a tab icon is learned in a
+ * session, so the words cost little and bought the jank.
  */
 function TabItem({
   meta,
@@ -227,73 +251,80 @@ function TabItem({
 }) {
   const reduceMotion = useReducedMotion();
   const pressed = useSharedValue(0);
+  const active = useSharedValue(focused ? 1 : 0);
+
+  // The active state is a single shared value that drives the highlight's
+  // opacity and scale — nothing else. It is a TIMING, not a layout change: the
+  // old bar animated `flexGrow` through LinearTransition and mounted a label,
+  // so four items recomputed layout on the shadow thread on every tap, which is
+  // what made it stutter. This never leaves the UI thread.
+  useEffect(() => {
+    active.value = reduceMotion
+      ? focused
+        ? 1
+        : 0
+      : withTiming(focused ? 1 : 0, { duration: 220, easing: Easing.out(Easing.cubic) });
+  }, [focused, reduceMotion, active]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    opacity: active.value,
+    // Grows in from 82% so the highlight arrives with a little life rather than
+    // just fading — but scale is a transform, so it costs no layout.
+    transform: [{ scale: 0.82 + active.value * 0.18 }],
+  }));
 
   const pressStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - pressed.value * 0.06 }],
   }));
 
-  const layout = reduceMotion ? undefined : LinearTransition.springify().damping(22).stiffness(240);
-
   return (
-    <Animated.View layout={layout} style={[{ flexGrow: focused ? 0 : 1, flexShrink: 1 }]}>
-      <Pressable
-        onPress={onPress}
-        onLongPress={onLongPress}
-        onPressIn={() => {
-          pressed.value = withSpring(1, SPRING.pressIn);
-        }}
-        onPressOut={() => {
-          pressed.value = withSpring(0, SPRING.pressOut);
-        }}
-        accessibilityRole="tab"
-        accessibilityState={{ selected: focused }}
-        accessibilityLabel={meta.label}
-        // The whole bar is only ~56pt tall, so the row height carries most of
-        // the 44pt target; hitSlop tops it up at the narrow icon-only width.
-        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+    // Equal fixed width, no flexGrow toggle. All four flanking tabs share the
+    // row evenly and never resize — the smoothness comes from nothing moving.
+    <Pressable
+      style={{ flex: 1 }}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      onPressIn={() => {
+        pressed.value = withSpring(1, SPRING.pressIn);
+      }}
+      onPressOut={() => {
+        pressed.value = withSpring(0, SPRING.pressOut);
+      }}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: focused }}
+      // Icon-only, so the label is the accessible name VoiceOver reads. The
+      // words were removed from the bar deliberately: the expanding label was
+      // the thing that could not animate smoothly, and an icon a user taps many
+      // times a day is learned in a session.
+      accessibilityLabel={meta.label}
+      hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
+    >
+      <Animated.View
+        style={[{ height: 44, alignItems: "center", justifyContent: "center" }, pressStyle]}
       >
+        {/* The highlight, absolute so it never affects layout — it fades and
+            grows under the icon instead of a pill resizing the row. */}
         <Animated.View
+          pointerEvents="none"
           style={[
             {
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              height: 44,
-              paddingHorizontal: focused ? 14 : 10,
-              borderRadius: 22,
-              backgroundColor: focused ? pillColor : "transparent",
+              position: "absolute",
+              width: 48,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: pillColor,
             },
-            pressStyle,
+            pillStyle,
           ]}
-        >
-          <Image
-            source={`sf:${meta.icon}`}
-            tintColor={focused ? activeColor : inactiveColor}
-            style={{ width: 22, height: 22 }}
-            contentFit="contain"
-          />
-          {focused ? (
-            // Mounts only when selected; the layout spring above animates the
-            // width the label demands. Fades so it does not pop in after the
-            // pill has already grown.
-            <Animated.Text
-              entering={reduceMotion ? undefined : FadeIn.duration(160)}
-              exiting={reduceMotion ? undefined : FadeOut.duration(100)}
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.3}
-              style={{
-                marginLeft: 7,
-                color: activeColor,
-                fontSize: 15,
-                fontWeight: "600",
-              }}
-            >
-              {meta.label}
-            </Animated.Text>
-          ) : null}
-        </Animated.View>
-      </Pressable>
-    </Animated.View>
+        />
+        <Image
+          source={`sf:${meta.icon}`}
+          tintColor={focused ? activeColor : inactiveColor}
+          style={{ width: 24, height: 24 }}
+          contentFit="contain"
+        />
+      </Animated.View>
+    </Pressable>
   );
 }
 

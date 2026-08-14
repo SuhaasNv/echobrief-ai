@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Keyboard, ScrollView, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown, FadeOut, useReducedMotion } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
 import { useMeetings } from "@/lib/api/meetings";
@@ -10,6 +9,7 @@ import { haptics } from "@/lib/haptics";
 import { AskActionCard } from "@/components/ask/action";
 import { AnswerCard } from "@/components/ask/answer";
 import { Composer } from "@/components/ask/composer";
+import { useTabBarInset } from "@/lib/layout";
 import { AskEmptyState } from "@/components/ask/empty-state";
 import { AskFailureCard } from "@/components/ask/failure";
 import { PillButton, QuestionHeader } from "@/components/ask/question";
@@ -39,16 +39,18 @@ export default function AskScreen() {
   const search = useSearch();
   const { ask, stop, reset } = search;
   /**
-   * The composer sits ON the tab bar, 8pt off its top edge.
+   * The composer sits 8pt above the floating tab bar's top edge.
    *
-   * `insets.bottom` under native tabs is already the distance to the bar's top
-   * edge (49pt bar + 34pt home indicator on a 402x874 device);
-   * `useTabBarInset()` adds the bar's height a second time, which is what left
-   * the composer hanging 65pt above the bar with nothing in the band. Measured
-   * from device pixels; the same double count was leaving a 60pt hole under the
-   * player and 65pt under the record button. See components/player/metrics.
+   * This was `insets.bottom + 8`, which was right under the NATIVE tab bar —
+   * there `insets.bottom` (83) already reached the bar's top. The custom bar is
+   * a JS overlay UIKit does not report, so `insets.bottom` is now just the home
+   * indicator (~34), and `insets.bottom + 8` put the composer BEHIND the bar —
+   * the typing field vanished. `useTabBarInset()` returns the distance to the
+   * floating bar's top (home indicator + the bar's reserved height), so
+   * `useTabBarInset(8)` parks the composer 8pt above it. One source of truth,
+   * lib/layout.ts.
    */
-  const composerInset = useSafeAreaInsets().bottom + 8;
+  const composerInset = useTabBarInset(8);
   const reduceMotion = useReducedMotion();
 
   const [input, setInput] = useState("");

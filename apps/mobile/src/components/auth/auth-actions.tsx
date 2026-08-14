@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { haptics } from "@/lib/haptics";
 import { SPRING, TIMING } from "@/lib/motion";
 import { useColorToken } from "@/lib/tokens";
 import { AUTH_ERROR_IN, AUTH_ERROR_OUT } from "./motion";
@@ -159,9 +160,20 @@ type AuthFooterLinkProps = {
 );
 
 export function AuthFooterLink({ prompt, action, href, onPress }: AuthFooterLinkProps) {
+  // A tap on the way off the screen too, so the one control that moves you
+  // between sign-in and sign-up is not the one that feels dead. The onPress
+  // form buzzes here; the href form buzzes from the Link's onPress below,
+  // because asChild replaces this Pressable's own handler with navigation.
   const trigger = (
     <Pressable
-      onPress={onPress}
+      onPress={
+        onPress
+          ? () => {
+              haptics.tap();
+              onPress();
+            }
+          : undefined
+      }
       accessibilityRole="link"
       accessibilityLabel={action}
       hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
@@ -175,7 +187,7 @@ export function AuthFooterLink({ prompt, action, href, onPress }: AuthFooterLink
     <View className="flex-row flex-wrap items-center justify-center gap-1">
       <Text className="text-[15px] text-label-secondary">{prompt}</Text>
       {href ? (
-        <Link href={href} asChild>
+        <Link href={href} asChild onPress={() => haptics.tap()}>
           {trigger}
         </Link>
       ) : (

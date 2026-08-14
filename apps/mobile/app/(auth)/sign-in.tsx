@@ -41,6 +41,9 @@ export default function SignInScreen() {
 
   const onSubmit = () => {
     if (!canSubmit) return;
+    // Tap on the deliberate press, before the request. success()/error() land
+    // later when it resolves, so the two never fire on the same frame.
+    haptics.tap();
     signIn.mutate(
       { email: email.trim(), password },
       {
@@ -55,6 +58,7 @@ export default function SignInScreen() {
 
   const onGoogle = () => {
     if (busy) return;
+    haptics.tap();
     googleSignIn.mutate(undefined, {
       onSuccess: (outcome) => {
         // "cancelled" is the user backing out of the consent sheet. No haptic,

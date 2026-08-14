@@ -42,6 +42,7 @@ import {
   type RecordingControl,
 } from "@/lib/live-activity";
 import { formatClock, isPlaceholderTitle } from "@/lib/format";
+import { useTabBarInset } from "@/lib/layout";
 import { useColorToken } from "@/lib/tokens";
 import { RecordOrb, type OrbPhase } from "@/components/record-orb";
 
@@ -311,17 +312,11 @@ export default function RecordScreen() {
   const topPad = insets.top + 12;
 
   /**
-   * Bottom inset, measured the same way as the top one.
-   *
-   * `insets.bottom` on a screen inside the native tab bar is ALREADY the
-   * distance to the bar's top edge: 83pt here, being the 49pt bar plus the 34pt
-   * home indicator. `useTabBarInset()` adds the bar's height again, which put
-   * this screen's padding at 148 for a requested 16 and left the Start button
-   * hanging 65pt above the tab bar with nothing in between. Confirmed in device
-   * pixels; the player and the Ask composer had the same 49pt hole for the same
-   * reason. See components/player/metrics for the full note.
+   * Bottom inset. Uses useTabBarInset now that the tab bar is a JS overlay:
+   * `insets.bottom` is just the home indicator, so the bar's height has to be
+   * added explicitly or the Start button parks behind the floating bar.
    */
-  const bottomPad = insets.bottom + 16;
+  const bottomPad = useTabBarInset(16);
 
   /**
    * The orb takes what is left, and what is left is arithmetic.

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
+import { haptics } from "@/lib/haptics";
 import { TIMING } from "@/lib/motion";
 import { useColorToken } from "@/lib/tokens";
 
@@ -114,7 +115,10 @@ export function AuthField({
 
         {secure ? (
           <Pressable
-            onPress={() => setReveal((v) => !v)}
+            onPress={() => {
+              haptics.tap();
+              setReveal((v) => !v);
+            }}
             hitSlop={12}
             className="px-4 py-2 active:opacity-40"
             accessibilityRole="button"

@@ -222,6 +222,11 @@ export function PaywallSheet({ visible, trigger, usage, onDismiss }: PaywallShee
     if (state.phase === "active") {
       void haptics.success();
       onDismiss();
+    } else if (state.phase === "failed") {
+      // The failure twin of the success above. "cancelled" (the user backed out)
+      // and "slow" (paid, entitlement just late) are NOT failures, so only a real
+      // failure earns the error notification — a purchase is a terminal outcome.
+      void haptics.error();
     }
   }, [state.phase, onDismiss]);
 
