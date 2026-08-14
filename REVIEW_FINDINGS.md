@@ -45,8 +45,14 @@ fresh eyes. Committing to one and tightening the tab bar is the last mile.
    tokens (`integrations.ts:84` TODO); Slack isn't listed; Jira/Trello have blank
    client ids. If integrations are marketed, this is a refund/trust problem.
 
-3. **No content export** (PDF/docx/txt/markdown). "Copy" copies a share link, not
-   the summary. Only a GDPR JSON ZIP exists.
+3. ~~**No content export** (PDF/docx/txt/markdown). "Copy" copies a share link, not
+   the summary.~~ **FIXED.** Mobile already copied and shared the WHOLE summary as
+   plain text (`share-meeting.ts` — title, executive, decisions, action items with
+   owner/due/done). The gap was web-only: the viewer's "Copy" copied the share
+   *link*. Added a "Copy summary" to the web AI Summary panel using the same block
+   format (`buildSummaryText` in `app.meetings_.$id.tsx`), so a meeting copied from
+   either surface reads identically. Still open: PDF/docx/markdown files and a
+   transcript-only export — the plain-text summary is the launch-critical path.
 
 4. **Email is a stub** (`resend.ts` only console.logs) — no "your recording is
    ready", no failure alerts, no workspace invites actually delivered.
@@ -60,11 +66,12 @@ with comped-vs-paying separation, revenue+margin, failed-job retry, system
 health). *"The founder can operate the business day-to-day; the gaps are in
 outbound user-facing value, not in the ability to run it."*
 
-**Launch-blocker order for a first paying user:** (1) the status-reconciler
-data-loss fix; (2) real content export (copy summary/transcript); (3) at least
-one real integration OR stop marketing them; (4) transactional email; (5) Google
-SSO's human OAuth round trip; (6) App Store products + a non-placeholder icon
-(needs `expo prebuild`). Calendar auto-join is the biggest competitive gap but is
+**Launch-blocker order for a first paying user:** (1) ~~the status-reconciler
+data-loss fix~~ **DONE**; (2) ~~real content export (copy summary)~~ **DONE** (web
++ mobile copy the summary as text); (3) at least one real integration OR stop
+marketing them; (4) transactional email; (5) Google SSO's human OAuth round trip;
+(6) App Store products + a non-placeholder icon (needs `expo prebuild`). Calendar
+auto-join is the biggest competitive gap but is
 a v1.1, not a v1 blocker.
 
 Screenshot provenance matters here. Two earlier review rounds were invalidated because a
