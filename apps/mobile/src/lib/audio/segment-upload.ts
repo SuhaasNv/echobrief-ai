@@ -260,7 +260,10 @@ class UploadSession {
            * somebody later has to pattern-match. displayTitle renders the
            * recording's own date, in the user's locale, until the model names it.
            */
-          title: isPlaceholderTitle(this.manifest.title) ? "" : this.manifest.title.trim(),
+          // undefined, not "": an absent field is unambiguously "no title" and
+          // survives any server-side min-length check; the server defaults it to
+          // "Untitled recording". (Sending "" tripped a schema min(1) and 400'd.)
+          title: isPlaceholderTitle(this.manifest.title) ? undefined : this.manifest.title.trim(),
           content_type: CONTENT_TYPE,
           recorded_at: this.manifest.recordedAt,
         },

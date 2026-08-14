@@ -263,7 +263,12 @@ export type ConcatenableMime = z.infer<typeof ConcatenableMime>;
  * after which the meeting is indistinguishable from a single-file upload.
  */
 export const SegmentedRecordingRequest = z.object({
-  title: z.string().trim().min(1).max(200).optional(),
+  // NOT min(1): the recorder sends "" for an unnamed recording (an untouched
+  // placeholder title), and an empty string is a valid "no title" — the handler
+  // turns it into "Untitled recording". min(1) rejected "" as a 400, which the
+  // app surfaced as "Could not reach EchoBrief", so every un-renamed recording
+  // failed to open.
+  title: z.string().trim().max(200).optional(),
   /** Container for EVERY segment of this recording. Pinned here, not per segment. */
   content_type: ConcatenableMime,
   language: z.string().min(2).max(10).default("en"),

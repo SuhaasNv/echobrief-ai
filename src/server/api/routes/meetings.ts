@@ -395,7 +395,7 @@ app.post("/segmented", zValidator("json", SegmentedRecordingRequest), async (c) 
       ${meetingId},
       ${user.id},
       ${workspaceId},
-      ${body.title ?? "Untitled recording"},
+      ${body.title || "Untitled recording"},
       ${body.content_type},
       ${body.language},
       ${sql.array(body.tags)},
