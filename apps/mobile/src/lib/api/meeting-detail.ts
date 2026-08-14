@@ -73,6 +73,7 @@ export interface MeetingDetail {
   duration_sec: number | null;
   language: string;
   tags: string[];
+  is_favorite: boolean;
   /**
    * The live public share token, or null when nothing is shared.
    *

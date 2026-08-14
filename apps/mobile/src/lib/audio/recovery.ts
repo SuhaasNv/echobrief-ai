@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import { Alert, AppState } from "react-native";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { AppState } from "react-native";
 
 import { findOrphanedRecordings, discardRecording, resumeRecording } from "./segment-upload";
 
@@ -48,6 +48,65 @@ function describe(segmentCount: number, targetSeconds: number): string {
   if (seconds < 60) return "under a minute";
   if (seconds < 90) return "about a minute";
   return `about ${Math.round(seconds / 60)} minutes`;
+}
+
+/**
+ * The one interrupted recording currently waiting on the user, or null.
+ *
+ * A banner in the library reads this, rather than the sweep throwing an
+ * `Alert.alert` the instant the app foregrounds. An alert on launch is a modal
+ * ambush — it steals the first tap and blocks the whole UI over a question that
+ * is genuinely optional — where a banner sits quietly at the top of the list
+ * until the user is ready to answer it. The "already has a meeting id" orphan is
+ * still resumed silently; only the never-uploaded one, which is a real question,
+ * reaches this store.
+ */
+export interface PendingRecovery {
+  localId: string;
+  title: string;
+  /** Mid-sentence, e.g. "about 3 minutes"; from `describe`. */
+  audio: string;
+}
+
+let pending: PendingRecovery | null = null;
+const recoveryListeners = new Set<() => void>();
+
+function setPending(next: PendingRecovery | null): void {
+  // Reference identity is the change signal for useSyncExternalStore; re-setting
+  // the same orphan on a later sweep must not notify or the banner re-animates.
+  if (pending?.localId === next?.localId) return;
+  pending = next;
+  recoveryListeners.forEach((listener) => listener());
+}
+
+function subscribeRecovery(listener: () => void): () => void {
+  recoveryListeners.add(listener);
+  return () => {
+    recoveryListeners.delete(listener);
+  };
+}
+
+/** Reactive read of the waiting recovery, for the banner. */
+export function useRecovery(): PendingRecovery | null {
+  return useSyncExternalStore(subscribeRecovery, () => pending);
+}
+
+/** Upload it. Clears the banner first, then sweeps again for the next orphan. */
+export async function acceptRecovery(): Promise<void> {
+  const current = pending;
+  if (!current) return;
+  setPending(null);
+  await resumeRecording(current.localId).catch(() => undefined);
+  void recoverInterruptedRecordings().catch(() => undefined);
+}
+
+/** Discard it. Same shape as accept, so one orphan is resolved per tap. */
+export async function dismissRecovery(): Promise<void> {
+  const current = pending;
+  if (!current) return;
+  setPending(null);
+  await discardRecording(current.localId).catch(() => undefined);
+  void recoverInterruptedRecordings().catch(() => undefined);
 }
 
 /**
@@ -107,36 +166,15 @@ async function sweepOnce(): Promise<void> {
       continue;
     }
 
-    // Never reached the server. Ask.
-    const localId = orphan.manifest.localId;
-    Alert.alert(
-      "Finish an interrupted recording?",
-      // One sentence, joined with "but", rather than two. The duration is
-      // lowercase and used to open the second sentence — "...uploaded. under a
-      // minute of audio..." — and "but" both fixes that and does the work the
-      // line is actually for: the first clause is bad news, the second is that
-      // nothing was lost, and they belong in one breath.
-      `"${orphan.manifest.title}" was interrupted before it could be uploaded, but ${describe(
-        orphan.segmentCount,
-        orphan.manifest.targetSeconds,
-      )} of audio is still on this iPhone.`,
-      [
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            void discardRecording(localId).catch(() => undefined);
-          },
-        },
-        {
-          text: "Upload",
-          onPress: () => {
-            void resumeRecording(localId).catch(() => undefined);
-          },
-        },
-      ],
-    );
-    // One question per sweep. A queue of stacked alerts on launch is an ambush.
+    // Never reached the server. Ask — through the banner, not a modal alert.
+    setPending({
+      localId: orphan.manifest.localId,
+      title: orphan.manifest.title,
+      audio: describe(orphan.segmentCount, orphan.manifest.targetSeconds),
+    });
+    // One question at a time. The banner resolves this orphan and re-sweeps for
+    // the next, so a launch with several interrupted recordings surfaces them
+    // one banner after another rather than stacking.
     return;
   }
 }

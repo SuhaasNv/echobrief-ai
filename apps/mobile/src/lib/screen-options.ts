@@ -10,8 +10,9 @@ const TOKENS = ["--background", "--tint", "--label"] as const;
 /**
  * Shared header options for every tab's stack.
  *
- * Note `headerLargeTitleEnabled`, not `headerLargeTitle` — the latter is
- * deprecated in this version and would be a silent no-op.
+ * The large title uses `headerLargeTitle` (see the property below) — the
+ * `headerLargeTitleEnabled` spelling is not a native-stack option and silently
+ * did nothing, which is what took the iOS search bar down with it.
  *
  * `headerTransparent` is what lets iOS 26's scroll edge effect do the blur.
  * Do NOT add headerStyle.backgroundColor alongside it: Apple's guidance is to

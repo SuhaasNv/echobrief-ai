@@ -58,15 +58,26 @@ const FLICK_VELOCITY = 550;
  */
 let openRowCloser: (() => void) | null = null;
 
+/** Resting width of the leading (favorite) action — mirrors the trailing one. */
+const LEADING_ACTION_WIDTH = ACTION_WIDTH;
+
 /**
  * Position under the finger.
  *
- * 1:1 inside the live range — no easing, no lag, the row is literally where the
- * finger put it. Resistance applies only outside it, in both directions.
+ * 1:1 inside each live range — no easing, no lag, the row is literally where the
+ * finger put it. Resistance applies only outside it. Trailing (negative) always
+ * reveals Delete; leading (positive) reveals Favorite only when a favorite
+ * handler exists, and otherwise stays anchored so a right-drag on a list that
+ * cannot favorite does nothing.
  */
-function resist(x: number): number {
+function resist(x: number, hasLeading: boolean): number {
   "worklet";
-  if (x >= 0) return x * WRONG_WAY_RESISTANCE;
+  if (x >= 0) {
+    if (!hasLeading) return x * WRONG_WAY_RESISTANCE;
+    return x <= LEADING_ACTION_WIDTH
+      ? x
+      : LEADING_ACTION_WIDTH + (x - LEADING_ACTION_WIDTH) * OVERSHOOT_RESISTANCE;
+  }
   if (x >= -ACTION_WIDTH) return x;
   return -ACTION_WIDTH + (x + ACTION_WIDTH) * OVERSHOOT_RESISTANCE;
 }
@@ -81,6 +92,22 @@ function TrashGlyph({ color }: { color?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
+      />
+    </Svg>
+  );
+}
+
+/** A star — filled once the meeting is a favorite, an outline while it is not. */
+function StarGlyph({ color, filled }: { color?: string; filled?: boolean }) {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 18 18">
+      <Path
+        d="M9 1.7l2.12 4.29 4.73.69-3.42 3.33.81 4.71L9 12.7l-4.24 2.22.81-4.71L2.15 6.68l4.73-.69z"
+        stroke={color}
+        strokeWidth={1.4}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        fill={filled ? color : "none"}
       />
     </Svg>
   );
@@ -171,6 +198,8 @@ export function SwipeToDelete({
   title,
   children,
   onDelete,
+  onFavorite,
+  favorited = false,
   pending = false,
   undoOverlay = null,
 }: {
@@ -186,14 +215,25 @@ export function SwipeToDelete({
    * put a swipe on action items would be the wrong kind of reuse.
    */
   onDelete: () => void;
+  /**
+   * Toggle the star. When omitted the leading (right) swipe is inert, so a list
+   * with no favorites keeps the gesture anchored rather than rubber-banding into
+   * an action that does nothing. Non-destructive, so a right FLICK commits it and
+   * springs back — there is no held-open state to tap through.
+   */
+  onFavorite?: () => void;
+  /** Current star state, for the leading action's filled/outline glyph + label. */
+  favorited?: boolean;
   /** True while this row is inside an undo window; suppresses the gesture. */
   pending?: boolean;
   /** Rendered over the row while `pending`. Lists without undo pass nothing. */
   undoOverlay?: React.ReactNode;
 }) {
   // The glyph on the destructive action, drawn on bg-danger — see the note at
-  // the call site for why it is the canvas colour and not near-white.
+  // the call site for why it is the canvas colour and not near-white. The star
+  // on the amber favorite action reads the same canvas token.
   const onDanger = useColorToken("--background");
+  const hasLeading = !!onFavorite;
   const translateX = useSharedValue(0);
   const startX = useSharedValue(0);
   /**
@@ -205,6 +245,9 @@ export function SwipeToDelete({
    * boundary fires a tick every frame and the row buzzes.
    */
   const pastThreshold = useSharedValue(false);
+  // Its leading-side twin, so the favorite side ticks at its own threshold
+  // without the trailing latch buzzing the whole way across.
+  const pastLead = useSharedValue(false);
 
   const [open, setOpen] = useState(false);
 
@@ -268,6 +311,13 @@ export function SwipeToDelete({
   // observable from the library. If that state is ever lifted, gate `tick` on it.
   const tick = useCallback(() => haptics.select(), []);
 
+  // A firmer haptic than the threshold tick, because the favorite actually
+  // committed on release rather than merely being armed.
+  const commitFavorite = useCallback(() => {
+    haptics.success();
+    onFavorite?.();
+  }, [onFavorite]);
+
   const pan = useMemo(
     () =>
       Gesture.Pan()
@@ -283,23 +333,49 @@ export function SwipeToDelete({
           // already-open row continues instead of jumping back to zero.
           startX.value = translateX.value;
           pastThreshold.value = translateX.value <= -OPEN_AT;
+          pastLead.value = translateX.value >= OPEN_AT;
           // onBegin, not onStart: the other row should close the moment a finger
           // lands, the same as UIKit, rather than waiting for the pan to clear
           // its activation threshold.
           runOnJS(dismissOthers)();
         })
         .onUpdate((event) => {
-          translateX.value = resist(startX.value + event.translationX);
+          translateX.value = resist(startX.value + event.translationX, hasLeading);
 
           const past = translateX.value <= -OPEN_AT;
           if (past !== pastThreshold.value) {
             pastThreshold.value = past;
-            // Crossings only, in either direction. This is the tick that tells
-            // the thumb "release now and the action stays".
+            // Crossings only. The tick that tells the thumb "release now and the
+            // action stays".
             runOnJS(tick)();
+          }
+          if (hasLeading) {
+            const lead = translateX.value >= OPEN_AT;
+            if (lead !== pastLead.value) {
+              pastLead.value = lead;
+              runOnJS(tick)();
+            }
           }
         })
         .onEnd((event) => {
+          // Leading favorite: a right flick, or a drag past the leading
+          // threshold, toggles the star and springs the row straight back.
+          // Non-destructive, so it commits on release instead of holding open —
+          // and swiping right again un-favorites, which is the whole gesture.
+          if (
+            hasLeading &&
+            (event.velocityX > FLICK_VELOCITY || translateX.value >= OPEN_AT)
+          ) {
+            runOnJS(commitFavorite)();
+            runOnJS(settle)(false);
+            translateX.value = withSpring(0, {
+              ...SPRING.snappy,
+              velocity: event.velocityX,
+              reduceMotion: ReduceMotion.Never,
+            });
+            return;
+          }
+
           // Velocity beats position: a fast flick should open even if the finger
           // lifted short of the threshold, and a fast flick back should close
           // even from beyond it.
@@ -325,10 +401,32 @@ export function SwipeToDelete({
             reduceMotion: ReduceMotion.Never,
           });
         }),
-    [pending, dismissOthers, settle, tick, translateX, startX, pastThreshold],
+    [
+      pending,
+      dismissOthers,
+      settle,
+      tick,
+      commitFavorite,
+      hasLeading,
+      translateX,
+      startX,
+      pastThreshold,
+      pastLead,
+    ],
   );
 
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
+
+  // Leading (favorite) track — the mirror of the trailing one. Parked one full
+  // width off the LEFT edge and rides in as the row is dragged right; the action
+  // counter-translates so it holds at the leading edge through the rubber-band
+  // instead of drifting with the finger.
+  const leadTrackStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: "-100%" }, { translateX: translateX.value }],
+  }));
+  const leadActionStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: LEADING_ACTION_WIDTH - translateX.value }],
+  }));
 
   /**
    * The track is parked one full width past the trailing edge and rides in with
@@ -410,6 +508,34 @@ export function SwipeToDelete({
             </Pressable>
           </Animated.View>
         </Animated.View>
+
+        {hasLeading ? (
+          // Favorite reveal on the LEFT. Visual only — a right flick commits the
+          // star and springs the row back (mirroring how Mail flags on a right
+          // swipe without a held panel), so there is no button to tap here. Amber
+          // is the one place it appears in the list, reserved for this.
+          <Animated.View
+            className="absolute inset-0 flex-row justify-end overflow-hidden bg-warning"
+            style={leadTrackStyle}
+            pointerEvents="none"
+          >
+            <Animated.View style={leadActionStyle}>
+              <View
+                style={{ width: LEADING_ACTION_WIDTH }}
+                className="h-full items-center justify-center gap-1"
+              >
+                <StarGlyph color={onDanger} filled={favorited} />
+                <Text
+                  className="text-[12px] font-semibold text-background"
+                  maxFontSizeMultiplier={1.3}
+                  numberOfLines={1}
+                >
+                  {favorited ? "Unfavorite" : "Favorite"}
+                </Text>
+              </View>
+            </Animated.View>
+          </Animated.View>
+        ) : null}
 
         <Animated.View style={rowStyle}>
           {children}

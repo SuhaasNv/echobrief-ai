@@ -26,8 +26,11 @@ export default function MeetingsStack() {
       )}
     >
       <Stack screenOptions={screenOptions}>
-        {/* Search options are set from the screen itself, which owns the query
-            state. Declaring them here left a search field wired to nothing. */}
+        {/* Search lives in the list itself (see MeetingSearchField), not the
+            native nav bar: `headerSearchBarOptions` does not install its
+            UISearchController on this react-native-screens / iOS pairing, so the
+            field was silently absent. An in-content field is fully ours to style
+            and behaves identically across OS versions. */}
         <Stack.Screen name="index" options={{ title: "Meetings" }} />
         <Stack.Screen name="[id]" options={{ title: "" }} />
       </Stack>

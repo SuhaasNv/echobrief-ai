@@ -29,6 +29,7 @@ export interface MeetingSummary {
   participant_count: number | null;
   action_item_count: number | null;
   summary_excerpt: string | null;
+  is_favorite: boolean;
   recorded_at: string | null;
   created_at: string;
   tags: string[] | null;

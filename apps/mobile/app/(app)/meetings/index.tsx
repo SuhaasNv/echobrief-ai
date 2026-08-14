@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshControl, SectionList, Text, View } from "react-native";
-import { router, Stack } from "expo-router";
+import { router } from "expo-router";
 
 import { describeError, useOnline } from "@/lib/api/errors";
 import { useMeetings, type MeetingSummary } from "@/lib/api/meetings";
@@ -10,7 +10,10 @@ import { useColorTokens } from "@/lib/tokens";
 import { ErrorState, StaleNotice } from "@/components/error-state";
 import { ListEndCap } from "@/components/meetings/end-cap";
 import { LibraryEmpty, NoResults } from "@/components/meetings/empty-state";
+import { FavoritesSectionHeader } from "@/components/meetings/favorites-section-header";
 import { MeetingRow } from "@/components/meetings/meeting-row";
+import { RecoveryBanner } from "@/components/meetings/recovery-banner";
+import { MeetingSearchField } from "@/components/meetings/search-field";
 import { MeetingsSkeleton } from "@/components/meetings/skeleton";
 import { StatHeader } from "@/components/meetings/stat-header";
 
@@ -42,10 +45,14 @@ function timeOfDay(iso: string): string {
 }
 
 interface Section {
+  /** "favorites" gets the collapsible header; every day gets the plain one. */
+  kind: "favorites" | "day";
   title: string;
   /** Index of this section's first row in the flattened list, for stagger. */
   offset: number;
   first: boolean;
+  /** Header count. A collapsed favorites section has empty data but a real count. */
+  count: number;
   data: MeetingSummary[];
 }
 
@@ -85,17 +92,20 @@ function SectionHeader({ title, count, first }: { title: string; count: number; 
 const SEARCH_DEBOUNCE_MS = 250;
 
 /**
- * Every colour UISearchBar and UIRefreshControl need, resolved.
- *
- * Both are native controls handed to UIKit through options objects, so none of
- * this is reachable by a className.
+ * The one colour UIRefreshControl needs, resolved. It is a native control handed
+ * to UIKit through a prop, so its spinner tint is not reachable by a className.
+ * (Search moved to the in-content MeetingSearchField, which resolves its own.)
  */
-const TOKENS = ["--label", "--label-secondary", "--tint"] as const;
+const TOKENS = ["--label-secondary"] as const;
 
 export default function MeetingsScreen() {
-  const [label, secondary, tint] = useColorTokens(TOKENS);
+  const [secondary] = useColorTokens(TOKENS);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
+  // Session-scoped, defaulting open. Persisting it across launches would mean a
+  // preference key and a server round-trip for a fold state; the section is
+  // cheap to re-open, so it starts shown.
+  const [favoritesCollapsed, setFavoritesCollapsed] = useState(false);
 
   useEffect(() => {
     if (searchInput === query) return;
@@ -166,11 +176,25 @@ export default function MeetingsScreen() {
 
   const items = useMemo(() => data?.pages.flatMap((p) => p.items) ?? [], [data]);
   const total = data?.pages[0]?.total ?? items.length;
-  const searching = query.trim().length > 0;
+  const searching = searchInput.trim().length > 0;
+
+  // The field is pinned once there is anything to search, and stays put through a
+  // no-result query so it can be cleared. It is only withheld from the pristine
+  // empty library, where LibraryEmpty owns the screen and there is nothing to
+  // filter yet.
+  const showSearch = searching || items.length > 0;
 
   const sections = useMemo<Section[]>(() => {
+    // Favorites lift into their own pinned, collapsible group at the top of the
+    // full library, and drop out of the day sections so nothing appears twice —
+    // un-favouriting a meeting returns it to its date. A search is already a
+    // filter, so it groups purely by day across everything that matched rather
+    // than fighting the results with a second grouping.
+    const favorites = searching ? [] : items.filter((m) => m.is_favorite);
+    const rest = searching ? items : items.filter((m) => !m.is_favorite);
+
     const groups = new Map<string, MeetingSummary[]>();
-    for (const meeting of items) {
+    for (const meeting of rest) {
       const when = meeting.recorded_at ?? meeting.created_at;
       const title = sectionTitle(when);
       const bucket = groups.get(title);
@@ -181,13 +205,36 @@ export default function MeetingsScreen() {
     // The stagger has to run down the SCREEN, not restart inside each day, or
     // the second group appears before the tail of the first and the list
     // assembles out of order.
+    const out: Section[] = [];
     let offset = 0;
-    return Array.from(groups.entries()).map(([title, data], i) => {
-      const section = { title, data, offset, first: i === 0 };
+
+    if (favorites.length > 0) {
+      out.push({
+        kind: "favorites",
+        title: "Favorites",
+        // Collapsed keeps the header and its count but sheds the rows.
+        data: favoritesCollapsed ? [] : favorites,
+        count: favorites.length,
+        offset,
+        first: true,
+      });
+      offset += favoritesCollapsed ? 0 : favorites.length;
+    }
+
+    for (const [title, data] of groups) {
+      out.push({
+        kind: "day",
+        title,
+        data,
+        count: data.length,
+        offset,
+        first: out.length === 0,
+      });
       offset += data.length;
-      return section;
-    });
-  }, [items]);
+    }
+
+    return out;
+  }, [items, searching, favoritesCollapsed]);
 
   const failure = describeError(error, { online: isOnline, subject: "your meetings" });
 
@@ -214,37 +261,14 @@ export default function MeetingsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <Stack.Screen
-        options={{
-          headerSearchBarOptions: {
-            placeholder: "Search meetings",
-            // Pinned rather than hiding on scroll: the show/hide animation is
-            // what makes the field lurch when it gains focus.
-            hideWhenScrolling: false,
-            // Every colour on the field is set explicitly. UISearchBar in a dark
-            // navigation bar leaves its placeholder and magnifier on a
-            // low-opacity system grey, which over this near-black canvas
-            // measures well under AA and reads as an empty field with no hint
-            // at all.
-            //
-            // Placeholder and glyph are --label-secondary, not
-            // --label-tertiary. Against the field's own dark fill (#1C1F25 in
-            // our ramp, and iOS composites its tertiary system fill over the
-            // canvas to roughly the same value) that is 6.4:1, and 5.4:1 even
-            // against a considerably lighter #2C2C2E field. The previous
-            // tertiary grey managed 2.6:1.
-            //
-            // The container stays dark on purpose: lightening the field to fix
-            // a text problem would put a grey slab in the navigation bar.
-            textColor: label,
-            hintTextColor: secondary,
-            headerIconColor: secondary,
-            tintColor: tint,
-            onChangeText: (e) => setSearchInput(e.nativeEvent.text),
-            onClose: () => setSearchInput(""),
-          },
-        }}
-      />
+      {/* Above the search field: an interrupted recording waiting on a decision
+          is more urgent than filtering the list, and it clears itself once the
+          user answers. */}
+      <RecoveryBanner />
+
+      {showSearch ? (
+        <MeetingSearchField value={searchInput} onChangeText={setSearchInput} />
+      ) : null}
 
       {!isOnline ? (
         <StaleNotice>Offline. Showing your last synced meetings.</StaleNotice>
@@ -264,9 +288,17 @@ export default function MeetingsScreen() {
             />
           </View>
         )}
-        renderSectionHeader={({ section }) => (
-          <SectionHeader title={section.title} count={section.data.length} first={section.first} />
-        )}
+        renderSectionHeader={({ section }) =>
+          section.kind === "favorites" ? (
+            <FavoritesSectionHeader
+              count={section.count}
+              collapsed={favoritesCollapsed}
+              onToggle={() => setFavoritesCollapsed((c) => !c)}
+            />
+          ) : (
+            <SectionHeader title={section.title} count={section.count} first={section.first} />
+          )
+        }
         ListHeaderComponent={
           items.length > 0 && !searching ? <StatHeader meetings={items} total={total} /> : null
         }
@@ -301,6 +333,9 @@ export default function MeetingsScreen() {
         // and left the list scrolling a bar past its own end cap.
         contentContainerStyle={{ paddingTop: 8, paddingBottom: SCROLL_TAB_BAR_AIR }}
         keyboardDismissMode="on-drag"
+        // Open a result on the first tap while the keyboard is up, rather than
+        // spending that tap only to dismiss it.
+        keyboardShouldPersistTaps="handled"
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
         }}

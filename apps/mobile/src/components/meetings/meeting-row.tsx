@@ -12,7 +12,12 @@ import { router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { percentForStatus } from "@/lib/api/meeting-status";
-import { isProcessing, useMeetingDeletePending, type MeetingSummary } from "@/lib/api/meetings";
+import {
+  isProcessing,
+  useMeetingDeletePending,
+  useToggleFavorite,
+  type MeetingSummary,
+} from "@/lib/api/meetings";
 import { displayTitle, formatDuration, pluralize } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { SPRING, TIMING } from "@/lib/motion";
@@ -194,6 +199,7 @@ export const MeetingRow = memo(function MeetingRow({
   const queryClient = useQueryClient();
   // Lifted out of SwipeToDelete when that component stopped being meetings-only.
   const deletePending = useMeetingDeletePending(meeting.id);
+  const favorite = useToggleFavorite(meeting.id);
 
   // Cards scale on press; full-width list ROWS would not, but these are cards
   // sitting on a canvas, which is the case where scale reads correctly. The
@@ -223,6 +229,8 @@ export const MeetingRow = memo(function MeetingRow({
       pending={deletePending}
       undoOverlay={<MeetingUndoVeil id={meeting.id} title={title} />}
       onDelete={() => confirmDeleteMeeting({ id: meeting.id, title, queryClient })}
+      favorited={meeting.is_favorite}
+      onFavorite={() => favorite.mutate(!meeting.is_favorite)}
     >
       <Animated.View
         // Entrance only on first paint, never on scroll, and only for the rows
