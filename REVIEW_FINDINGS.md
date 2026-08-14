@@ -24,21 +24,21 @@ fresh eyes. Committing to one and tightening the tab bar is the last mile.
 
 **CEO functional audit — the one that matters most is a data-loss hole.**
 
-1. **`meetings.status` can get stuck non-terminal, then the audio is deleted.**
-   The worker writes status in-band with no reconciler comparing it to queue
-   reality. A lost confirm call, an OOM/SIGKILL mid-job (`workers/main.ts` skips
-   `markFailed` for stalled failures below the attempt limit), or any
-   interruption leaves a meeting pinned in `queued`/`transcribing` with durable
-   audio in R2, no job, no route to `failed`, and no user-visible error — after
-   which retention (`cleanup-r2.ts`) deletes the audio. The R2 orphan reconciler
-   proves this pattern is understood for storage but it was never applied to
-   meeting status, and `captureException` is never called from any `workers/`
-   file, so these failures are silent to ops. **This is the #1 thing to fix
-   before a paying user — a recording app must never silently lose a recording.**
-   The fix is a status reconciler (find non-terminal meetings with no live job →
-   mark failed so the user gets a retry and retention does not treat the audio as
-   abandoned) plus error reporting from the workers. Deferred here because it is a
-   worker-lifecycle change that needs its own tests, not an overnight rush.
+1. **~~`meetings.status` can get stuck non-terminal, then the audio is
+   deleted.~~ FIXED.** The worker wrote status in-band with no reconciler
+   comparing it to queue reality, so an OOM/SIGKILL mid-job or a lost confirm
+   call could strand a meeting in `queued`/`transcribing` with durable audio, no
+   job, no route to `failed`, and no user-visible error — after which retention
+   deleted the audio. A recording silently lost.
+
+   Fixed in `src/server/workers/reconcile-stuck.ts` — the meeting-status twin of
+   the R2 orphan reconciler. It finds non-terminal meetings past a grace window
+   with no live BullMQ job and marks them `failed`, so the user gets the
+   retryable FailureCard and ops sees it (logged at error level), within minutes
+   — long before retention treats the audio as abandoned. It fails closed (does
+   nothing if the queue can't be read) and never touches a meeting with a live
+   job. Scheduled every 5 min plus on startup; four tests cover stuck→failed,
+   terminal-untouched, the grace window, and a live job being spared.
 
 2. **Integrations are fake.** "Export to Notion/Linear/Jira" returns a fabricated
    id and sends nothing (`action-items.ts:241` TODO); OAuth stores placeholder
