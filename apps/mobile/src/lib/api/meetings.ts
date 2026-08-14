@@ -186,6 +186,56 @@ export function useRenameMeeting(id: string) {
   });
 }
 
+/**
+ * Star / un-star a meeting.
+ *
+ * Optimistic, because a favorite that lags behind the thumb reads as a missed
+ * tap. It writes through the same PATCH /meetings/:id the rename uses, so the
+ * SERVER owns the flag: the star shows on the web and survives a reinstall. Both
+ * the detail and every cached list page are flipped at once, and snapshotted so
+ * a failed write puts the star back exactly where it was.
+ */
+export function useToggleFavorite(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (next: boolean) =>
+      api.apiRequest(`/meetings/${id}`, { method: "PATCH", body: { is_favorite: next } }),
+
+    onMutate: async (next: boolean) => {
+      const detail = queryClient.getQueryData(qk.meeting(id));
+      const lists = queryClient.getQueriesData<InfiniteData<MeetingListResponse>>({
+        queryKey: qk.allMeetings,
+      });
+
+      queryClient.setQueryData<{ is_favorite: boolean }>(qk.meeting(id), (old) =>
+        old ? { ...old, is_favorite: next } : old,
+      );
+      queryClient.setQueriesData<InfiniteData<MeetingListResponse>>(
+        { queryKey: qk.allMeetings },
+        (old) =>
+          old
+            ? {
+                ...old,
+                pages: old.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((m) => (m.id === id ? { ...m, is_favorite: next } : m)),
+                })),
+              }
+            : old,
+      );
+
+      return { detail, lists };
+    },
+
+    onError: (_err, _next, ctx) => {
+      if (!ctx) return;
+      queryClient.setQueryData(qk.meeting(id), ctx.detail);
+      for (const [key, data] of ctx.lists) queryClient.setQueryData(key, data);
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Delete — DELETE /meetings/:id, deferred behind a real undo window
 // ---------------------------------------------------------------------------

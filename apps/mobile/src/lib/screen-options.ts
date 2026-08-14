@@ -38,7 +38,11 @@ export function useStackScreenOptions(): StackScreenOptions {
   return useMemo(
     () =>
       ({
-        headerLargeTitleEnabled: true,
+        // headerLargeTitle, NOT headerLargeTitleEnabled — the latter is not a
+        // native-stack option, so it silently did nothing and the iOS search bar
+        // (which docks under the large title) had no large title to attach to,
+        // which read as "search is gone".
+        headerLargeTitle: true,
         headerTransparent: false,
         // No blur. A material needs content behind it to blur; ours sits below
         // the header at rest, so the effect resolved to a flat grey panel with a
