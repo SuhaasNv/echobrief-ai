@@ -26,6 +26,7 @@ import { closeSql } from "../db";
 import { closeRedis } from "../services/redis";
 import type { ProcessingJob } from "../env";
 import { cleanupOldAudioFiles } from "./cleanup-r2";
+import { reconcileStuckMeetings } from "./reconcile-stuck";
 
 // SCALABILITY: Configurable concurrency via environment variables
 const PROCESSING_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || "10");
@@ -139,6 +140,29 @@ function scheduleNextCleanup() {
 // Start the cleanup scheduler
 scheduleNextCleanup();
 
+/**
+ * Reconcile interrupted meetings — often, because the whole point is speed.
+ *
+ * Unlike the once-a-day R2 sweep, this runs every few minutes: a meeting stuck
+ * in a non-terminal status is a spinner the user is staring at right now, and
+ * the sooner it becomes a retryable failure the less it looks like the app hung.
+ * The pass is cheap (one indexed query plus a queue snapshot) and does nothing
+ * when there is nothing stuck. See reconcile-stuck.ts for why doing nothing is
+ * always the safe outcome.
+ *
+ * A plain interval, not an aligned clock like the cleanup: there is no good time
+ * of day to notice a dropped job, only "soon".
+ */
+const RECONCILE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const reconcileTimer = setInterval(() => {
+  void reconcileStuckMeetings().catch((err) => console.error("[reconcile-stuck] run failed:", err));
+}, RECONCILE_INTERVAL_MS);
+// One pass on startup, too: a worker that just came up after a crash is exactly
+// when meetings the previous process abandoned are waiting to be reconciled.
+void reconcileStuckMeetings().catch((err) =>
+  console.error("[reconcile-stuck] startup run failed:", err),
+);
+
 // Optional: Run cleanup immediately on startup (useful for testing)
 // Uncomment the line below to run cleanup when worker starts:
 // cleanupOldAudioFiles().catch((err) => console.error("[r2-cleanup] startup run failed:", err));
@@ -151,11 +175,12 @@ async function shutdown(signal: string) {
   await worker.pause();
   await exportWorker.pause();
 
-  // 2. Clear cleanup timer
+  // 2. Clear the periodic timers
   if (cleanupTimer) {
     clearTimeout(cleanupTimer);
     console.log("[r2-cleanup] timer cleared");
   }
+  clearInterval(reconcileTimer);
 
   // 3. Wait for in-flight jobs to complete (with timeout)
   const shutdownTimeout = setTimeout(() => {
