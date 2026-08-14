@@ -417,54 +417,41 @@ function Landing() {
               Pay for what you record.
             </h2>
           </motion.div>
-          <div className="mt-14 grid gap-5 md:grid-cols-4">
+          {/*
+            Two tiers, matching what the product actually sells (SELLABLE_TIERS
+            = free, pro) and enforces. Numbers mirror usage-tracker.ts and the
+            mobile paywall exactly: free 2 hrs / 25 questions, Pro 15 hrs / 500
+            questions at $9. Retention is a per-user preference, not tier-gated,
+            so it is not sold as a differentiator; integrations and email
+            generation are not shipped, so they are not listed. Student and Team
+            are hidden from sale, not deleted — kept whole server-side for later.
+          */}
+          <div className="mx-auto mt-14 grid max-w-3xl gap-5 md:grid-cols-2">
             {[
               {
                 name: "Free",
                 price: "$0",
                 desc: "For solo work and casual notes.",
                 cta: "Start free",
-                features: ["5 hrs / month", "10 AI queries", "1 workspace", "30-day history"],
-                featured: false,
-              },
-              {
-                name: "Student",
-                price: "$7",
-                desc: "For students with .edu email.",
-                cta: "Start trial",
                 features: [
-                  "Unlimited hours",
-                  "Unlimited AI queries",
-                  "Flashcards",
-                  "1-year history",
+                  "2 hrs recording / month",
+                  "25 Ask questions / month",
+                  "Live transcription & semantic search",
+                  "1 workspace",
                 ],
                 featured: false,
               },
               {
                 name: "Pro",
-                price: "$14",
+                price: "$9",
                 desc: "For builders and operators.",
-                cta: "Start trial",
+                cta: "Get started",
                 features: [
-                  "Everything in Student",
-                  "Integrations",
-                  "Email generation",
-                  "2-year history",
+                  "Everything in Free",
+                  "15 hrs recording / month",
+                  "500 Ask questions / month",
                 ],
                 featured: true,
-              },
-              {
-                name: "Team",
-                price: "$29",
-                desc: "For teams of 5+.",
-                cta: "Talk to sales",
-                features: [
-                  "Everything in Pro",
-                  "Shared workspaces",
-                  "Unlimited history",
-                  "Priority support",
-                ],
-                featured: false,
               },
             ].map((p) => (
               <div
