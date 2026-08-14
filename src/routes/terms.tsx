@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 
 export const Route = createFileRoute("/terms")({
-  head: () => ({ meta: [{ title: "Terms of Service — Puffin" }] }),
+  head: () => ({ meta: [{ title: "Terms of Service — EchoBrief" }] }),
   component: TermsPage,
 });
 
@@ -90,7 +90,7 @@ function TermsPage() {
           number="05"
           title="AI output"
           plain="AI is good but not perfect. Don't act on it without sanity-checking."
-          legal="Transcripts, summaries, and action items are AI-generated and may contain errors. Puffin is not liable for decisions made based solely on AI output. Always verify against the source audio for material decisions."
+          legal="Transcripts, summaries, and action items are AI-generated and may contain errors. EchoBrief is not liable for decisions made based solely on AI output. Always verify against the source audio for material decisions."
         />
 
         <Clause
@@ -106,7 +106,7 @@ function TermsPage() {
           number="07"
           title="Liability"
           plain="If we break something, the most you can claim from us is what you paid us in the last 12 months."
-          legal="To the maximum extent permitted by law, Puffin's aggregate liability for any claim arising out of the Service is limited to the fees you paid in the twelve months preceding the claim. We are not liable for indirect, incidental, or consequential damages."
+          legal="To the maximum extent permitted by law, EchoBrief's aggregate liability for any claim arising out of the Service is limited to the fees you paid in the twelve months preceding the claim. We are not liable for indirect, incidental, or consequential damages."
         />
 
         {/* Contact */}

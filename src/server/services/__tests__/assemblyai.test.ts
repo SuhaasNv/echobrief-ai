@@ -83,14 +83,14 @@ describe("transcribeAudioUrl — profanity filtering", () => {
   it("does not disturb the other transcription options", async () => {
     await transcribeAudioUrl("https://audio.test/meeting.m4a", {
       language: "en",
-      wordBoost: ["Puffin", "Kubernetes"],
+      wordBoost: ["EchoBrief", "Kubernetes"],
       filterProfanity: true,
     });
 
     const params = sentParams();
     expect(params.language_code).toBe("en");
     expect(params.speaker_labels).toBe(true);
-    expect(params.word_boost).toEqual(["Puffin", "Kubernetes"]);
+    expect(params.word_boost).toEqual(["EchoBrief", "Kubernetes"]);
     expect(params.filter_profanity).toBe(true);
   });
 

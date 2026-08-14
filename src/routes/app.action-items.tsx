@@ -18,7 +18,7 @@ import { useLabels, useActiveWorkspaceKind } from "@/lib/workspace-store";
 import { formatDue, isOverdue } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/app/action-items")({
-  head: () => ({ meta: [{ title: "Action Items — Puffin" }] }),
+  head: () => ({ meta: [{ title: "Action Items — EchoBrief" }] }),
   component: ActionItemsPage,
 });
 
@@ -146,7 +146,7 @@ function ActionItemsPage() {
           <CheckCircle2 className="mx-auto h-6 w-6 text-muted-foreground" />
           <p className="mt-3 text-sm font-medium">No action items yet.</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Upload a meeting and Puffin will extract them automatically.
+            Upload a meeting and EchoBrief will extract them automatically.
           </p>
         </div>
       ) : (

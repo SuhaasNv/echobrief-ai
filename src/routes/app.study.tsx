@@ -6,7 +6,7 @@ import { useReviewQueue, useUpdateFlashcard, type FlashcardWithMeeting } from "@
 import { useActiveWorkspaceKind } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/study")({
-  head: () => ({ meta: [{ title: "Study — Puffin" }] }),
+  head: () => ({ meta: [{ title: "Study — EchoBrief" }] }),
   component: StudyGate,
 });
 

@@ -56,7 +56,7 @@ export function describeError(
   if (!online) {
     return {
       title: "You are offline",
-      body: `Puffin loads ${subject} again as soon as you are back on a network.`,
+      body: `EchoBrief loads ${subject} again as soon as you are back on a network.`,
       retryable: false,
     };
   }
@@ -96,7 +96,7 @@ export function describeError(
 
     if (error.status >= 500) {
       return {
-        title: "Puffin is having trouble",
+        title: "EchoBrief is having trouble",
         body: `The server could not return ${subject}. This is a fault on our side, not with your account.`,
         retryable: true,
       };
@@ -112,7 +112,7 @@ export function describeError(
   // No status at all: DNS, TLS, a dropped socket, or a body that was not JSON.
   // The network state says we are online, so this is worth retrying.
   return {
-    title: "Cannot reach Puffin",
+    title: "Cannot reach EchoBrief",
     body: `The request for ${subject} did not complete. The connection may have dropped part way through.`,
     retryable: true,
   };
@@ -122,7 +122,7 @@ export function describeError(
  * One sentence for a WRITE that failed: a save, a toggle, a delete.
  *
  * Separate from `describeError` because the two situations read differently.
- * "Puffin loads your name again once you are online" is nonsense on a save
+ * "EchoBrief loads your name again once you are online" is nonsense on a save
  * that has just been rolled back.
  */
 export function describeActionFailure(error: unknown, { online }: { online: boolean }): string {
@@ -141,5 +141,5 @@ export function describeActionFailure(error: unknown, { online }: { online: bool
     return error.message;
   }
 
-  return "Puffin could not reach the server.";
+  return "EchoBrief could not reach the server.";
 }

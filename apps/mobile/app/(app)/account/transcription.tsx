@@ -108,7 +108,7 @@ export default function TranscriptionScreen() {
 
       <Section
         title="Speakers"
-        footer="Names apply to the meeting you set them in. Telling one voice from another across different meetings needs stored voice prints, which Puffin does not keep — so the next recording starts from Speaker A again."
+        footer="Names apply to the meeting you set them in. Telling one voice from another across different meetings needs stored voice prints, which EchoBrief does not keep — so the next recording starts from Speaker A again."
       >
         <ToggleRow
           icon="person.2"

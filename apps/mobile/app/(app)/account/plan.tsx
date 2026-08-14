@@ -189,7 +189,7 @@ export default function PlanScreen() {
         />
       </Section>
 
-      {/* Was: "Puffin does not sell subscriptions inside the app." That is
+      {/* Was: "EchoBrief does not sell subscriptions inside the app." That is
           now false — it does, through StoreKit — and a footnote contradicting
           the button 40pt above it is worse than no footnote. What replaces it is
           the part a subscriber actually needs, which is where to cancel. */}

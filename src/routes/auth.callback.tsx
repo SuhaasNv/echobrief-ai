@@ -9,7 +9,7 @@ import { setActiveWorkspace } from "@/lib/workspace-store";
 import { qk, type AccountMe, type Workspace } from "@/lib/api/hooks";
 
 export const Route = createFileRoute("/auth/callback")({
-  head: () => ({ meta: [{ title: "Signing in — Puffin" }] }),
+  head: () => ({ meta: [{ title: "Signing in — EchoBrief" }] }),
   component: AuthCallbackPage,
 });
 

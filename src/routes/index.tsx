@@ -24,13 +24,13 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Puffin — Meeting intelligence for modern teams" },
+      { title: "EchoBrief — Meeting intelligence for modern teams" },
       {
         name: "description",
         content:
           "Upload calls, voice notes, and meetings. Get instant summaries, action items, and AI answers across every conversation.",
       },
-      { property: "og:title", content: "Puffin — Meeting intelligence for modern teams" },
+      { property: "og:title", content: "EchoBrief — Meeting intelligence for modern teams" },
       {
         property: "og:description",
         content:
@@ -177,7 +177,7 @@ function Landing() {
               An AI layer over every conversation your team has.
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Puffin turns raw audio into structured knowledge — accurate transcripts, decisions,
+              EchoBrief turns raw audio into structured knowledge — accurate transcripts, decisions,
               action items, and answers, available the moment a call ends.
             </p>
           </motion.div>
@@ -267,7 +267,7 @@ function Landing() {
               {
                 n: "02",
                 icon: Brain,
-                title: "Puffin processes",
+                title: "EchoBrief processes",
                 body: "Transcription, diarization, topic segmentation, and summarization in under a minute.",
               },
               {
@@ -307,7 +307,7 @@ function Landing() {
             variants={fadeUp}
           >
             <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">
-              Ask Puffin
+              Ask EchoBrief
             </p>
             <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
               A research assistant that's listened to every meeting you've had.
@@ -396,7 +396,7 @@ function Landing() {
         One quote claimed action items "appear in Linear before the call ends"
         - per-provider export adapters are still a TODO in action-items.ts.
 
-        Heading was "The teams that ship fastest run on Puffin" under a "Loved
+        Heading was "The teams that ship fastest run on EchoBrief" under a "Loved
         by teams" eyebrow. There are no teams yet. Ship the section when there
         is one real quote from one real user; one true sentence with a name
         attached is worth more than three polished inventions.
@@ -511,7 +511,7 @@ function Landing() {
               Stop forgetting what your team said.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-muted-foreground">
-              Puffin is free to try for 14 days. Set it up in under 60 seconds.
+              EchoBrief is free to try for 14 days. Set it up in under 60 seconds.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Button asChild size="lg" className="h-11 rounded-full px-5">

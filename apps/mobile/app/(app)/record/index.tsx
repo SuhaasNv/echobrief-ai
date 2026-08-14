@@ -560,7 +560,7 @@ export default function RecordScreen() {
       // will offer it on the next launch, so this is the one failure that still
       // belongs on THIS screen — the user has not gone anywhere yet.
       Alert.alert(
-        "Could not reach Puffin",
+        "Could not reach EchoBrief",
         "Your recording is saved on this iPhone. It will be uploaded the next time you open the app with a connection.",
       );
       localIdRef.current = null;

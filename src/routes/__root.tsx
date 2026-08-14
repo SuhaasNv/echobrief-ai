@@ -14,9 +14,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { themeBootScript } from "@/lib/theme";
 
 import appCss from "../styles.css?url";
-import faviconLightUrl from "@/assets/brand/favicon-light.png?url";
-import faviconDarkUrl from "@/assets/brand/favicon-dark.png?url";
-import appleTouchIconUrl from "@/assets/brand/apple-touch-icon.png?url";
+import faviconUrl from "@/assets/favicon.svg?url";
 
 function NotFoundComponent() {
   return (
@@ -80,14 +78,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Puffin — Meeting intelligence for modern teams" },
+      { title: "EchoBrief — Meeting intelligence for modern teams" },
       {
         name: "description",
         content:
           "Upload calls and meetings. Get summaries, action items, and AI answers across every conversation.",
       },
-      { name: "author", content: "Puffin" },
-      { property: "og:title", content: "Puffin — Meeting intelligence for modern teams" },
+      { name: "author", content: "EchoBrief" },
+      { property: "og:title", content: "EchoBrief — Meeting intelligence for modern teams" },
       {
         property: "og:description",
         content: "Your meetings finally become searchable intelligence.",
@@ -96,25 +94,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary" },
     ],
     links: [
-      // Two favicons, chosen by the BROWSER via prefers-color-scheme. A tab
-      // strip is painted light or dark by the OS and we do not control that
-      // ground: one dark-ground icon becomes a black tile on a light tab, and a
-      // transparent one loses the puffin's black head against a dark tab.
-      {
-        rel: "icon",
-        href: faviconLightUrl,
-        type: "image/png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        rel: "icon",
-        href: faviconDarkUrl,
-        type: "image/png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      // Fallback for anything that ignores `media` on an icon link.
-      { rel: "icon", href: faviconDarkUrl, type: "image/png" },
-      { rel: "apple-touch-icon", href: appleTouchIconUrl },
+      { rel: "icon", href: faviconUrl, type: "image/svg+xml" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

@@ -162,7 +162,7 @@ export default function AccountScreen() {
   const confirmSignOut = () => {
     haptics.medium();
     Alert.alert(
-      "Sign out of Puffin?",
+      "Sign out of EchoBrief?",
       "Recordings that haven't finished uploading will be removed from this iPhone.",
       [
         // Cancel first: iOS renders the leading button on the left, and every

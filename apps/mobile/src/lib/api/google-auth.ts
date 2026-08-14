@@ -17,7 +17,7 @@ import { api } from "./client";
  * the API's web client id and the API's own /auth/google/callback as
  * redirect_uri. The API then does the code exchange with its client *secret*,
  * verifies the returned ID token against Google's JWKS (pinning `aud` to its
- * client id), links or creates the user, and signs the same 7-day Puffin JWT
+ * client id), links or creates the user, and signs the same 7-day EchoBrief JWT
  * that POST /auth/login signs.
  *
  * Two consequences worth stating outright:
@@ -140,7 +140,7 @@ function resultParams(url: string): URLSearchParams {
 }
 
 /**
- * Run the consent round-trip and return the Puffin JWT.
+ * Run the consent round-trip and return the EchoBrief JWT.
  *
  * openAuthSessionAsync is ASWebAuthenticationSession on iOS: a system sheet, not
  * an embedded web view. That is not a preference — Google blocks OAuth in

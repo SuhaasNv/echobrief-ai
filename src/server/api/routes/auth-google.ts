@@ -17,7 +17,7 @@
  * our client ID — which is what stops a token minted for a *different* app
  * from being replayed here.
  *
- * The resulting Puffin JWT is handed to the browser in the URL *fragment*,
+ * The resulting EchoBrief JWT is handed to the browser in the URL *fragment*,
  * not the query string. Fragments are never sent to the server, so the token
  * stays out of access logs, Referer headers, and Railway's HTTP logs.
  */
@@ -298,7 +298,7 @@ googleAuth.get("/google/callback", async (c) => {
 
     // email_verified is the linchpin of the account-linking rule below. Without
     // it, anyone able to set an arbitrary unverified email at an IdP could take
-    // over an existing Puffin account by signing in with a matching address.
+    // over an existing EchoBrief account by signing in with a matching address.
     if (payload.email_verified !== true) return failTo(returnTo, "email_unverified");
 
     if (typeof payload.sub !== "string" || typeof payload.email !== "string") {
@@ -314,7 +314,7 @@ googleAuth.get("/google/callback", async (c) => {
     return failTo(returnTo, "invalid_id_token");
   }
 
-  // --- Resolve to an Puffin user ---------------------------------------
+  // --- Resolve to an EchoBrief user ---------------------------------------
   const sql = getSql();
   let user: UserRow | undefined;
 

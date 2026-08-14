@@ -140,7 +140,7 @@ export default function ProfileScreen() {
       </View>
 
       <Footnote>
-        Your picture is stored on this iPhone only. Puffin has no avatar upload yet, so it is never
+        Your picture is stored on this iPhone only. EchoBrief has no avatar upload yet, so it is never
         sent to your account or shared with your workspace.
       </Footnote>
 

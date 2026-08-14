@@ -47,7 +47,7 @@ import { SpeakerNames } from "@/components/app/speaker-names";
 import { percentForStatus, EASE } from "@/lib/processing-status";
 
 export const Route = createFileRoute("/app/meetings_/$id")({
-  head: () => ({ meta: [{ title: "Meeting — Puffin" }] }),
+  head: () => ({ meta: [{ title: "Meeting — EchoBrief" }] }),
   component: MeetingDetailPage,
 });
 
@@ -741,12 +741,12 @@ function FailedState({
             <p className="mt-1 text-xs text-muted-foreground">
               {exhausted ? (
                 <>
-                  Puffin couldn&rsquo;t process &ldquo;{meeting.title}&rdquo; after {attempts}{" "}
+                  EchoBrief couldn&rsquo;t process &ldquo;{meeting.title}&rdquo; after {attempts}{" "}
                   attempts. Delete it and upload again, or contact support.
                 </>
               ) : (
                 <>
-                  Puffin couldn&rsquo;t process &ldquo;{meeting.title}&rdquo;. You can retry — most
+                  EchoBrief couldn&rsquo;t process &ldquo;{meeting.title}&rdquo;. You can retry — most
                   failures resolve on a second attempt.
                 </>
               )}

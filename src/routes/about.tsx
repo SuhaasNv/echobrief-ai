@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 
 export const Route = createFileRoute("/about")({
-  head: () => ({ meta: [{ title: "About — Puffin" }] }),
+  head: () => ({ meta: [{ title: "About — EchoBrief" }] }),
   component: AboutPage,
 });
 
@@ -22,7 +22,7 @@ const TIMELINE = [
   },
   {
     year: "2026",
-    title: "We built Puffin",
+    title: "We built EchoBrief",
     body: "Not because transcription is new. Because every product in this space stops at 'here's the transcript'. We wanted something that treats every meeting as a node in a permanent, searchable knowledge graph.",
   },
 ];
@@ -62,7 +62,7 @@ function AboutPage() {
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
           <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-brand">
-            About Puffin
+            About EchoBrief
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight md:text-6xl">
             Meetings shouldn't end
@@ -71,7 +71,7 @@ function AboutPage() {
           </h1>
           <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
             Knowledge workers spend ~22 hours a week in meetings. The decisions made in those rooms
-            drive everything — and the moment the call ends, most of that signal disappears. Puffin
+            drive everything — and the moment the call ends, most of that signal disappears. EchoBrief
             is the layer that captures it.
           </p>
         </motion.div>

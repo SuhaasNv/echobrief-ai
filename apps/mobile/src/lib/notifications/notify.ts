@@ -35,7 +35,7 @@ export interface MeetingAnnouncement {
 /**
  * Copy.
  *
- * The title is the MEETING's name, never "Puffin". The user knows which app
+ * The title is the MEETING's name, never "EchoBrief". The user knows which app
  * it is; what they do not know is which of their recordings just finished, and
  * on the lock screen the title is the only line guaranteed to be read.
  *

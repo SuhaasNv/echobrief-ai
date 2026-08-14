@@ -407,7 +407,7 @@ function ConfirmDeleteCard({ target }: { target: AskActionCandidate }) {
       <Body>
         {`Deleting this will destroy the recording itself, its transcript, its summary and any action items that came out of it${
           described ? ` (${described})` : ""
-        }. Puffin cannot get it back.`}
+        }. EchoBrief cannot get it back.`}
       </Body>
       <View className="flex-row flex-wrap gap-2">
         <PillButton

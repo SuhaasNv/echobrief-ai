@@ -1,5 +1,5 @@
 /**
- * Puffin API server (Node.js).
+ * EchoBrief API server (Node.js).
  *
  * Standalone process: Hono API mounted at /api/v1, served by @hono/node-server.
  * Deployed as a Railway service. The BullMQ worker is a sibling process

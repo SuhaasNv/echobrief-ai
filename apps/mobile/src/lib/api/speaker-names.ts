@@ -154,7 +154,7 @@ export function useRenameSpeakers(meetingId: string) {
       haptics.error();
       Alert.alert(
         `That voice is still ${variables.previousLabel}`,
-        `${describeActionFailure(error, { online: onlineManager.isOnline() })} Puffin put the label back. Choosing the name again retries.`,
+        `${describeActionFailure(error, { online: onlineManager.isOnline() })} EchoBrief put the label back. Choosing the name again retries.`,
       );
     },
 

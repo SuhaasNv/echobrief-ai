@@ -8,7 +8,7 @@
  *
  * Blue and violet carry the form. Green is an accent that only becomes legible
  * where it crosses one of the others, which is what keeps this reading as
- * Puffin rather than as the generic "AI product" rainbow.
+ * EchoBrief rather than as the generic "AI product" rainbow.
  *
  * These five are stated rather than read from global.css, and they stay that
  * way when the rest of the app moves to tokens. They are EMITTED LIGHT, not

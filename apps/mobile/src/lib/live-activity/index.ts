@@ -9,7 +9,7 @@ import { NativeModule, requireOptionalNativeModule } from "expo";
  *   - Android, and any platform where the native module is not linked at all,
  *     so `requireOptionalNativeModule` returns null.
  *   - iOS below 16.1, which has no ActivityKit.
- *   - A user who has turned Live Activities off for Puffin in Settings,
+ *   - A user who has turned Live Activities off for EchoBrief in Settings,
  *     which `areActivitiesEnabled` reports as false at any time.
  *   - `Activity.request` throwing because the app is not in the foreground.
  *
@@ -31,7 +31,7 @@ type Events = {
   onRecordingControl: () => void;
 };
 
-declare class PuffinLiveActivityModule extends NativeModule<Events> {
+declare class EchoBriefLiveActivityModule extends NativeModule<Events> {
   areActivitiesEnabled(): boolean;
   startActivity(title: string): boolean;
   setPaused(paused: boolean): void;
@@ -46,11 +46,11 @@ declare class PuffinLiveActivityModule extends NativeModule<Events> {
 // THE STRING IS "EchoBriefLiveActivity" AND MUST STAY THAT WAY. It is matched
 // against `Name("EchoBriefLiveActivity")` in
 // modules/echobrief-live-activity/ios/EchoBriefLiveActivityModule.swift. The
-// Puffin rename touched this line once and the mismatch does not throw and does
+// EchoBrief rename touched this line once and the mismatch does not throw and does
 // not warn: `requireOptionalNativeModule` returns null, every export below
 // becomes the documented no-op, and the Live Activity silently never appears
 // again. Rename the Swift `Name(...)` first if this ever has to change.
-const native = requireOptionalNativeModule<PuffinLiveActivityModule>("EchoBriefLiveActivity");
+const native = requireOptionalNativeModule<EchoBriefLiveActivityModule>("EchoBriefLiveActivity");
 
 /**
  * True when a Live Activity would actually appear.

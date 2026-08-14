@@ -147,7 +147,7 @@ function buildAuthorizeUrl(
     case "jira":
       return `https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id=&redirect_uri=${encodedRedirect}&response_type=code&prompt=consent&state=${encodedState}`;
     case "trello":
-      return `https://trello.com/1/authorize?expiration=never&name=Puffin&scope=read,write&response_type=token&key=&return_url=${encodedRedirect}`;
+      return `https://trello.com/1/authorize?expiration=never&name=EchoBrief&scope=read,write&response_type=token&key=&return_url=${encodedRedirect}`;
   }
 }
 

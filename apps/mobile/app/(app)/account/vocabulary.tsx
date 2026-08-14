@@ -83,7 +83,7 @@ export default function VocabularyScreen() {
               setDraft(next);
               if (notice) setNotice(null);
             }}
-            placeholder="Puffin, Nakamura, ARR"
+            placeholder="EchoBrief, Nakamura, ARR"
             placeholderTextColor={tertiary}
             autoCapitalize="words"
             autoCorrect={false}

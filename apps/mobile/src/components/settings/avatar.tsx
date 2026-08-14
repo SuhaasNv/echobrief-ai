@@ -91,7 +91,7 @@ export function useAvatarPicker(currentUri: string | null) {
         // not ask again, so the only honest next step is Settings.
         Alert.alert(
           "Photo access is off",
-          "Puffin needs access to your photo library to set a profile picture. You can turn it on in Settings.",
+          "EchoBrief needs access to your photo library to set a profile picture. You can turn it on in Settings.",
           [
             { text: "Not now", style: "cancel" },
             { text: "Open Settings", onPress: () => void Linking.openSettings() },

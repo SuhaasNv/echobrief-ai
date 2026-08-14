@@ -5,7 +5,7 @@ import { formatDate } from "@/lib/date-utils";
 import { useLabels } from "@/lib/workspace-store";
 
 export const Route = createFileRoute("/app/shared")({
-  head: () => ({ meta: [{ title: "Shared Meetings — Puffin" }] }),
+  head: () => ({ meta: [{ title: "Shared Meetings — EchoBrief" }] }),
   component: SharedPage,
 });
 

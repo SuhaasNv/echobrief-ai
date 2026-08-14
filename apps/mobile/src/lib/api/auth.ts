@@ -117,12 +117,12 @@ export function useSignUp() {
  */
 export function authErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) {
-    return "Can't reach Puffin. Check your connection and try again.";
+    return "Can't reach EchoBrief. Check your connection and try again.";
   }
 
   if (error.status === 401) return "Email or password is incorrect.";
   // The server's rate-limit copy already names the retry window.
   if (error.status === 429) return error.message;
   if (error.status === 400) return error.message;
-  return "Can't reach Puffin. Check your connection and try again.";
+  return "Can't reach EchoBrief. Check your connection and try again.";
 }

@@ -73,7 +73,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Admin Console — Puffin" }] }),
+  head: () => ({ meta: [{ title: "Admin Console — EchoBrief" }] }),
   component: AdminGate,
 });
 
@@ -142,7 +142,7 @@ function AdminConsole({ adminEmail }: { adminEmail: string }) {
         <div className="border-b border-border/60 px-4 py-4">
           <Link to="/" className="block">
             <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              Puffin
+              EchoBrief
             </p>
             <div className="mt-1 flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-brand" />

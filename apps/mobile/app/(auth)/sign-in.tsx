@@ -82,7 +82,7 @@ export default function SignInScreen() {
           className="mt-3 font-display text-[40px] leading-[46px] text-label"
           maxFontSizeMultiplier={1.4}
         >
-          Puffin
+          EchoBrief
         </Text>
         <Text className="mt-1.5 text-[17px] leading-[22px] text-label-secondary">
           Your meetings, remembered.
@@ -156,7 +156,7 @@ export default function SignInScreen() {
       </Animated.View>
 
       <Animated.View entering={enter(3)} className="mt-7">
-        <AuthFooterLink prompt="New to Puffin?" action="Create an account" href="/(auth)/sign-up" />
+        <AuthFooterLink prompt="New to EchoBrief?" action="Create an account" href="/(auth)/sign-up" />
       </Animated.View>
     </AuthScreen>
   );

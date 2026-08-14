@@ -132,7 +132,7 @@ const HEADLINES: Record<PaywallTrigger, string> = {
   retention: "Keep your recordings",
   ask_limit: "Ask more questions",
   minutes_limit: "More recording time",
-  settings: "Puffin Pro",
+  settings: "EchoBrief Pro",
 };
 
 /**

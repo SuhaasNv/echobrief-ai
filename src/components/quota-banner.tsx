@@ -84,7 +84,7 @@ export function QuotaBanner() {
         onClose={() => setShowUpgrade(false)}
         reason={
           showCritical
-            ? "Upgrade to continue using Puffin without limits"
+            ? "Upgrade to continue using EchoBrief without limits"
             : "Upgrade now to avoid interruptions"
         }
         currentTier={subscription.subscription.tier}

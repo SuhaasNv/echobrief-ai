@@ -62,7 +62,7 @@ export function FirstWorkspaceModal() {
           className="w-full max-w-md rounded-2xl border border-border/70 bg-popover p-7 shadow-elegant"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-brand">
-            Welcome to Puffin
+            Welcome to EchoBrief
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight">Name your first workspace</h2>
           <p className="mt-2 text-sm text-muted-foreground">

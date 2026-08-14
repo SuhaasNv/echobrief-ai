@@ -160,7 +160,7 @@ export function copyMeetingSummary(meeting: MeetingDetail, actionItems: ActionIt
  *
  * No network, no server round-trip, nothing minted: this path works on a plane.
  * `subject` is what Mail puts in the subject line — without it a shared summary
- * arrives titled "Shared from Puffin" or blank, depending on the target.
+ * arrives titled "Shared from EchoBrief" or blank, depending on the target.
  *
  * A dismissed sheet is a normal outcome and says nothing. A REJECTED one means
  * the sheet could not be presented at all, and that has to be reported or the
@@ -222,7 +222,7 @@ export async function shareMeetingLink(url: string, meeting: MeetingDetail): Pro
  * detail query carries only the raw token, so re-sharing an existing link has
  * to assemble the address here — exactly what the web app does with
  * window.location.origin. WEB_APP_URL has to track the API's APP_URL: both
- * answer "where does a browser reach Puffin".
+ * answer "where does a browser reach EchoBrief".
  *
  * Building it locally is also what lets a second share of the same meeting work
  * with no network.

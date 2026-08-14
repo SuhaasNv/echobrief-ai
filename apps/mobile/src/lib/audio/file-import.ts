@@ -356,11 +356,11 @@ export async function pickAudioFile(): Promise<ImportOutcome> {
 
     return mime === "" || mime === UNIDENTIFIED_MIME
       ? reject(
-          "Puffin cannot tell what that file is",
-          `iOS does not recognise the format of ${named}, and its name does not end in one Puffin transcribes. ${READABLE_FORMATS} all work.`,
+          "EchoBrief cannot tell what that file is",
+          `iOS does not recognise the format of ${named}, and its name does not end in one EchoBrief transcribes. ${READABLE_FORMATS} all work.`,
         )
       : reject(
-          "That is not a format Puffin can transcribe",
+          "That is not a format EchoBrief can transcribe",
           `${named} is ${mime}. ${READABLE_FORMATS} all work.`,
         );
   }
@@ -387,7 +387,7 @@ export async function pickAudioFile(): Promise<ImportOutcome> {
   if (size > MAX_UPLOAD_BYTES) {
     return reject(
       "That file is too large",
-      `${filename || "The file"} is ${formatBytes(size)}, and Puffin accepts recordings up to ${formatBytes(MAX_UPLOAD_BYTES)}. Splitting a long recording in two and adding each part works.`,
+      `${filename || "The file"} is ${formatBytes(size)}, and EchoBrief accepts recordings up to ${formatBytes(MAX_UPLOAD_BYTES)}. Splitting a long recording in two and adding each part works.`,
     );
   }
 

@@ -22,7 +22,7 @@ app.get("/", (c) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Puffin API Documentation</title>
+  <title>EchoBrief API Documentation</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -91,7 +91,7 @@ app.get("/", (c) => {
   </style>
 </head>
 <body>
-  <h1>Puffin API Documentation</h1>
+  <h1>EchoBrief API Documentation</h1>
   <p><strong>Base URL:</strong> <code>${baseUrl}/api/v1</code></p>
   <p><strong>Version:</strong> 1.0.0</p>
   
@@ -340,7 +340,7 @@ data = response.json()</code></pre>
   </ul>
   
   <footer style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #e5e7eb; color: #6b7280; text-align: center;">
-    <p>Puffin API Documentation v1.0.0 &bull; Last Updated: 2026-05-20</p>
+    <p>EchoBrief API Documentation v1.0.0 &bull; Last Updated: 2026-05-20</p>
   </footer>
 </body>
 </html>

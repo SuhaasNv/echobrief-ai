@@ -109,7 +109,7 @@ export function sanitizeTranscript(text: string, options: SanitizeOptions = {}):
  * (U+200B–200D, U+FEFF) is invisible entirely.
  *
  * This matters because a title reaches the PUBLIC share page, which any
- * unauthenticated visitor can open and which carries Puffin branding. React
+ * unauthenticated visitor can open and which carries EchoBrief branding. React
  * escapes HTML, so there is no XSS here — but React does not touch bidi, so a
  * title containing U+202E renders as text the author chose in an order the
  * stored string does not have. Spoofing a legitimate-looking heading on a page

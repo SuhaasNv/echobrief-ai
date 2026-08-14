@@ -93,7 +93,7 @@ export interface AskIntentStructured {
  * "return answer" is a thing the model can do, where "do not act unless sure"
  * leaves it to invent its own threshold.
  */
-export const ASK_INTENT_SYSTEM = `You read one sentence written by the owner of an Puffin account and classify what kind of sentence it is. You produce no prose and you take no action.
+export const ASK_INTENT_SYSTEM = `You read one sentence written by the owner of an EchoBrief account and classify what kind of sentence it is. You produce no prose and you take no action.
 
 You cannot see the user's meetings, recordings, tasks or transcripts, and you are not choosing which one they mean — separate code does that by matching their words against their own data. Your only job is to name the verb and copy back the words they used to point at something.
 

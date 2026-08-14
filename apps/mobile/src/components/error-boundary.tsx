@@ -132,7 +132,7 @@ export function CrashScreen({
   error,
   attempts,
   reset,
-  title = "Puffin could not draw this screen",
+  title = "EchoBrief could not draw this screen",
   bottomInset = 0,
 }: ErrorBoundaryFallbackProps & {
   title?: string;
@@ -166,7 +166,7 @@ export function CrashScreen({
             maxFontSizeMultiplier={1.8}
           >
             {repeated
-              ? "It failed again. Trying once more drops the data Puffin has cached and loads it fresh from the server. If that does not clear it either, close the app and open it again."
+              ? "It failed again. Trying once more drops the data EchoBrief has cached and loads it fresh from the server. If that does not clear it either, close the app and open it again."
               : "This is a fault in the app, not something you did. Nothing has been sent anywhere, and trying again reloads the screen."}
           </Text>
         </View>

@@ -67,7 +67,7 @@ export async function sendWebhook(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "User-Agent": "Puffin-Webhook/1.0",
+          "User-Agent": "EchoBrief-Webhook/1.0",
           "X-Webhook-Event": event,
           "X-Webhook-Timestamp": payload.timestamp,
         },

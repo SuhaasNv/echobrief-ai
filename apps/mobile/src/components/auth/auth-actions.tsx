@@ -144,7 +144,7 @@ export function AuthFormError({ message }: { message: string }) {
 }
 
 /**
- * "New to Puffin? Create an account" — prompt in body colour, action in tint.
+ * "New to EchoBrief? Create an account" — prompt in body colour, action in tint.
  *
  * `onPress` exists because the two directions are not symmetrical. Sign-in
  * pushes sign-up, so it wants a Link. Sign-up going back to sign-in must POP:

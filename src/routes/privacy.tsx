@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 
 export const Route = createFileRoute("/privacy")({
-  head: () => ({ meta: [{ title: "Privacy — Puffin" }] }),
+  head: () => ({ meta: [{ title: "Privacy — EchoBrief" }] }),
   component: PrivacyPage,
 });
 
@@ -139,7 +139,7 @@ function PrivacyPage() {
         </Section>
 
         {/* Vendors */}
-        <Section eyebrow="Who else touches it" title="Sub-processors that help us run Puffin.">
+        <Section eyebrow="Who else touches it" title="Sub-processors that help us run EchoBrief.">
           <p>
             These vendors process small slices of your data on our behalf. Each operates under a
             commercial agreement that prohibits using your data to train models or share it

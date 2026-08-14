@@ -94,7 +94,7 @@ export default function WorkspacesScreen() {
       haptics.warning();
       Alert.alert(
         "Switching needs a connection",
-        "Puffin has to load the other workspace's meetings and action items before it can show them, and it cannot do that offline.",
+        "EchoBrief has to load the other workspace's meetings and action items before it can show them, and it cannot do that offline.",
       );
       return;
     }
