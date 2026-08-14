@@ -44,7 +44,9 @@ type AskFailure =
   /** Anything else: a 500, a dropped socket, a malformed body. */
   | { kind: "generic"; message: string };
 
-/** Server copy: "You've used 10 of 10 AI queries this month. Upgrade for unlimited." */
+/** Server copy: "You've used 25 of 25 AI queries this month. Upgrade to Pro for
+ *  more, or wait for your allowance to reset." (numbers are the tier's real
+ *  limit; the regex matches any count, so it survives a limit change). */
 const QUOTA = /\d+\s+of\s+\d+\s+ai\s+quer/i;
 /** Server copy: "Too many requests. Try again in 1 minute(s)." */
 const THROTTLED = /too many requests/i;
