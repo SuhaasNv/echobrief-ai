@@ -12,11 +12,12 @@ import { Footnote, SettingsScroll } from "@/components/settings/screen";
 /**
  * Recording defaults.
  *
- * Every control here is live and persists on this device; none of them has a
- * server behind it yet. The footers say so once per group rather than
- * decorating each row with a caveat, and no row is disabled just because the
- * backend is missing — a switch that cannot be moved teaches people the screen
- * is broken.
+ * Most controls here persist on this device; none has a server behind it yet,
+ * and the footers say so once per group rather than decorating each row. The one
+ * exception is calendar auto-start: its feature (calendar access) is not in this
+ * build at all, so unlike the others there is nothing a flip could even record.
+ * It is shown DISABLED with a "Coming soon" note — which reads as not-yet-shipped
+ * rather than broken — and dropping the flag makes it live once access lands.
  */
 export default function RecordingScreen() {
   const preferences = usePreferences();
@@ -58,14 +59,15 @@ export default function RecordingScreen() {
 
       <Section
         title="Starting a recording"
-        footer="Calendar auto-start is queued behind calendar access, which this build does not request yet. Your choice is remembered for when it lands."
+        footer="Calendar auto-start needs calendar access, which this build does not request yet. It turns on here once that ships."
       >
         <ToggleRow
           icon="calendar"
           label="Auto-start on calendar events"
-          detail="Begin capturing when a scheduled meeting starts"
+          detail="Coming soon · begin capturing when a scheduled meeting starts"
           value={preferences.autoStartOnCalendar}
           onValueChange={(next) => setPreference("autoStartOnCalendar", next)}
+          disabled
         />
       </Section>
 

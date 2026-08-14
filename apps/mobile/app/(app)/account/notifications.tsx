@@ -12,10 +12,11 @@ import { Footnote, SettingsScroll } from "@/components/settings/screen";
  * while iOS silently drops every notification, and nothing on screen looks
  * wrong. Flipping it on repairs whichever half is missing.
  *
- * The other two have no delivery behind them yet, so they are stored on this
- * device and the footnote says so. They are still live controls rather than
- * disabled rows: a switch that cannot be moved reads as a broken screen, and a
- * choice recorded now is a choice honoured the day delivery ships.
+ * The other two have no delivery behind them yet. Rather than let someone turn
+ * on a reminder that will never arrive, they are shown DISABLED with a "Coming
+ * soon" note in the detail line: the row still says what it will do, so it reads
+ * as not-yet-shipped rather than broken. The moment a scheduler exists, dropping
+ * the `disabled` flag makes them live — the preference wiring is already here.
  */
 export default function NotificationsScreen() {
   const preferences = usePreferences();
@@ -56,23 +57,25 @@ export default function NotificationsScreen() {
         <ToggleRow
           icon="calendar"
           label="Action items due"
-          detail="The morning something is due"
+          detail="Coming soon · a reminder the morning something is due"
           value={preferences.notifyActionItemsDue}
           onValueChange={(next) => setPreference("notifyActionItemsDue", next)}
+          disabled
         />
         <ToggleRow
           icon="envelope"
           iconTone="violet"
           label="Weekly digest"
-          detail="Monday recap of last week's meetings"
+          detail="Coming soon · a Monday recap of last week's meetings"
           value={preferences.notifyWeeklyDigest}
           onValueChange={(next) => setPreference("notifyWeeklyDigest", next)}
+          disabled
         />
       </Section>
 
       <Footnote>
-        Reminders and the weekly digest are stored on this iPhone. Nothing is scheduled for them
-        yet, so turning one on records the choice rather than starting delivery.
+        Meeting-ready alerts work today. Reminders and the weekly digest are coming soon — these
+        switches turn on here the moment their delivery ships.
       </Footnote>
     </SettingsScroll>
   );
