@@ -832,6 +832,7 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       status: string;
       duration_sec: number | null;
       tags: string[];
+      is_favorite: boolean;
       created_at: string;
       recorded_at: string | null;
       processed_at: string | null;
@@ -848,6 +849,7 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
         m.status,
         m.duration_sec,
         m.tags,
+        m.is_favorite,
         m.created_at,
         m.recorded_at,
         m.processed_at,
@@ -870,6 +872,7 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       p.status,
       p.duration_sec,
       p.tags,
+      p.is_favorite,
       p.created_at,
       p.recorded_at,
       p.processed_at,
@@ -904,6 +907,7 @@ app.get("/", zValidator("query", MeetingListQuery), async (c) => {
       status: r.status,
       duration_sec: r.duration_sec,
       tags: r.tags ?? [],
+      is_favorite: r.is_favorite,
       created_at: r.created_at,
       recorded_at: r.recorded_at ?? null,
       processed_at: r.processed_at,
@@ -1187,6 +1191,7 @@ app.patch("/:id", zValidator("json", MeetingPatchRequest), async (c) => {
   if (patch.title !== undefined) sets.push(sql`title = ${patch.title}`);
   if (patch.tags !== undefined) sets.push(sql`tags = ${sql.array(patch.tags)}`);
   if (patch.visibility !== undefined) sets.push(sql`visibility = ${patch.visibility}`);
+  if (patch.is_favorite !== undefined) sets.push(sql`is_favorite = ${patch.is_favorite}`);
 
   if (sets.length === 0) return c.json({ ok: true });
 

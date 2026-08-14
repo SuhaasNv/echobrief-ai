@@ -73,6 +73,8 @@ export const MeetingSummary = z.object({
   status: MeetingStatus,
   duration_sec: z.number().int().nullable(),
   tags: z.array(z.string()),
+  /** Server-owned star. Default false so older cached rows read as un-favorited. */
+  is_favorite: z.boolean().default(false),
   created_at: isoDateSchema,
   /** When the audio was recorded. NULL when unknown — fall back to created_at. */
   recorded_at: isoDateSchema.nullable().optional(),
@@ -394,6 +396,7 @@ export const MeetingPatchRequest = z
     title: z.string().trim().min(1).max(200).optional(),
     tags: z.array(z.string().trim().max(50)).max(20).optional(),
     visibility: MeetingVisibility.optional(),
+    is_favorite: z.boolean().optional(),
   })
   .strict();
 export type MeetingPatchRequest = z.infer<typeof MeetingPatchRequest>;
@@ -425,6 +428,7 @@ export const MeetingDetail = z.object({
   duration_sec: z.number().int().nullable(),
   language: z.string(),
   tags: z.array(z.string()),
+  is_favorite: z.boolean().default(false),
   visibility: MeetingVisibility,
   share_token: z.string().nullable(),
   /** True if the meeting has an audio file in R2. False for pasted-transcript meetings. */

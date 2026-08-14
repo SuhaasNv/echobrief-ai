@@ -21,6 +21,7 @@ import {
   TAB_BAR_ORB_LIFT,
 } from "@/lib/layout";
 import { useColorTokens } from "@/lib/tokens";
+import { usePreference } from "@/components/settings/preferences";
 
 /**
  * The app's own bottom navigation, drawn rather than handed to UITabBar.
@@ -252,6 +253,11 @@ function TabItem({
   const reduceMotion = useReducedMotion();
   const pressed = useSharedValue(0);
   const active = useSharedValue(focused ? 1 : 0);
+  // The Account tab shows the user's own avatar once they've set one, and the
+  // stock person glyph until then. usePreference re-renders this tab only when
+  // the avatar actually changes, not on every preference write.
+  const [avatarUri] = usePreference("avatarUri");
+  const showAvatar = meta.label === "Account" && !!avatarUri;
 
   // The active state is a single shared value that drives the highlight's
   // opacity and scale — nothing else. It is a TIMING, not a layout change: the
@@ -317,12 +323,28 @@ function TabItem({
             pillStyle,
           ]}
         />
-        <Image
-          source={`sf:${meta.icon}`}
-          tintColor={focused ? activeColor : inactiveColor}
-          style={{ width: 24, height: 24 }}
-          contentFit="contain"
-        />
+        {showAvatar && avatarUri ? (
+          // Cropped to a circle with a ring that brightens on the active tab, so
+          // it reads as "you" without competing with the record orb.
+          <Image
+            source={{ uri: avatarUri }}
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 13,
+              borderWidth: 1.5,
+              borderColor: focused ? activeColor : inactiveColor,
+            }}
+            contentFit="cover"
+          />
+        ) : (
+          <Image
+            source={`sf:${meta.icon}`}
+            tintColor={focused ? activeColor : inactiveColor}
+            style={{ width: 24, height: 24 }}
+            contentFit="contain"
+          />
+        )}
       </Animated.View>
     </Pressable>
   );
