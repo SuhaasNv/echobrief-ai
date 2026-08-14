@@ -394,11 +394,11 @@ export default function MeetingDetailScreen() {
         // last lines of a transcript are readable rather than parked under the
         // transport.
         //
-        // contentPadding, NOT bottomInset. "automatic" above already inset this
-        // content by the safe area at both ends, and on a tab screen that bottom
-        // inset IS the tab bar — so bottomInset, which includes the bar, spent it
-        // twice and left the transcript scrolling a bar-height past its own end.
-        // contentPadding is the same clearance with UIKit's share taken out.
+        // contentPadding, NOT bottomInset. "automatic" already insets this
+        // content by the home indicator, so bottomInset (which also includes the
+        // bar and player) would count the home indicator twice. But the tab bar
+        // here is a JS overlay UIKit does not know about, so contentPadding keeps
+        // the bar's reserve in — it is bottomInset minus only the home indicator.
         contentContainerStyle={{ paddingBottom: follow.contentPadding }}
         /**
          * The ribbon pins instead of scrolling away.

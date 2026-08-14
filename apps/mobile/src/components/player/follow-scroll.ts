@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 import type { NativeScrollEvent, NativeSyntheticEvent, ScrollView, View } from "react-native";
 
+import { TAB_BAR_RESERVE } from "@/lib/layout";
+
 import { PLAYER_BAR_HEIGHT, PLAYER_TAB_BAR_GAP, useTabBarTopEdge } from "./metrics";
 
 /**
@@ -56,14 +58,17 @@ export interface FollowScroll {
    * The same clearance expressed as contentContainer paddingBottom, for a scroll
    * view running `contentInsetAdjustmentBehavior="automatic"`.
    *
-   * `bottomInset` minus the tab bar's top edge, because UIKit has already inset
-   * the content by exactly that under "automatic" — the safe area is applied at
-   * both ends, not only under the large title. Passing `bottomInset` straight
-   * into the style, which is what the transcript did, paid the bar's 83pt twice
-   * and left the screen scrolling a bar-height past the last line of a
-   * transcript. The two numbers are the same distance measured in different
-   * spaces, which is why they are named and derived here rather than at the call
-   * site: they must not be allowed to disagree.
+   * `bottomInset` minus ONLY the home indicator (`insets.bottom`), because that
+   * is the whole of what UIKit auto-insets here. The tab bar is a JS overlay —
+   * the native UITabBar was removed (see metrics.ts) — so UIKit never reserves
+   * it, and the padding must. This is the same reserve the meetings list applies
+   * as `SCROLL_TAB_BAR_AIR` (TAB_BAR_RESERVE + air) and clears its last row with.
+   *
+   * The earlier value subtracted the tab bar too, on the theory that "automatic"
+   * had already spent it; it had not, and the transcript's final paragraph
+   * scrolled to rest one tab-bar-height UNDER the player. `bottomInset` (the full
+   * screen-space distance to the top of the chrome) stays right for anchoring and
+   * the readable-band test; only the padding needed the bar added back.
    */
   contentPadding: number;
   /** Ref callback for the transcript's outer container. */
@@ -109,6 +114,12 @@ export function useFollowScroll({ hasPlayer }: { hasPlayer: boolean }): FollowSc
    */
   const aboveBar = hasPlayer ? PLAYER_TAB_BAR_GAP + PLAYER_BAR_HEIGHT + CONTENT_AIR : CONTENT_AIR;
   const bottomChrome = useTabBarTopEdge() + aboveBar;
+  // What the ScrollView actually reserves. UIKit's "automatic" inset covers only
+  // the home indicator, not this app's JS tab bar, so the bar's reserve has to be
+  // in the padding — otherwise the last line settles a tab-bar-height under the
+  // player. (bottomChrome − insets.bottom, with insets.bottom being all UIKit
+  // auto-insets; expressed as the two constants it sums to.)
+  const contentPadding = aboveBar + TAB_BAR_RESERVE;
 
   const publish = useCallback(
     (patch: Partial<FollowState>) => {
@@ -184,7 +195,7 @@ export function useFollowScroll({ hasPlayer }: { hasPlayer: boolean }): FollowSc
     () => ({
       scrollProps,
       bottomInset: bottomChrome,
-      contentPadding: aboveBar,
+      contentPadding,
       setContainer: (node: View | null) => {
         containerRef.current = node;
       },
@@ -210,7 +221,7 @@ export function useFollowScroll({ hasPlayer }: { hasPlayer: boolean }): FollowSc
         };
       },
     }),
-    [aboveBar, bottomChrome, listeners, publish, scrollProps, scrollTo],
+    [contentPadding, bottomChrome, listeners, publish, scrollProps, scrollTo],
   );
 }
 
