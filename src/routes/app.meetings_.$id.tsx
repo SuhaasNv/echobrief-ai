@@ -780,6 +780,70 @@ function FailedState({
   );
 }
 
+/**
+ * The meeting as plain text, for the clipboard.
+ *
+ * Mirrors the mobile share builder (apps/mobile/.../share-meeting.ts) on
+ * purpose: the same meeting copied from either surface should read identically.
+ * Plain text, not Markdown — this pastes into Docs, email, Slack, and Notes,
+ * and only some of those render `##`, while bare headings read correctly in all
+ * of them. Every block is dropped when empty rather than rendered as a bare
+ * heading, matching the summary pane: a heading with nothing under it reads as a
+ * pipeline fault, and in text there is no layout to soften it.
+ */
+function buildSummaryText(
+  meeting: MeetingDetail,
+  actionItems: Array<{
+    description: string;
+    assignee_name: string | null;
+    due_date: string | null;
+    completed: boolean;
+  }>,
+): string {
+  // Dates that leave the app are absolute (with year): the recipient may open
+  // this weeks later or in another timezone, where "Aug 14" is ambiguous.
+  const meta = [
+    formatDate(meeting.created_at, true),
+    meeting.duration_sec != null ? formatDuration(meeting.duration_sec) : null,
+  ].filter(Boolean);
+  const header = [meeting.title, meta.join(" · ")].filter(Boolean).join("\n");
+
+  const blocks: string[] = [header];
+
+  const executive = meeting.summary?.executive?.trim();
+  if (executive) blocks.push(executive);
+
+  const decisions = (meeting.summary?.decisions ?? []).map((d) => d.trim()).filter(Boolean);
+  if (decisions.length) {
+    blocks.push(["Decisions", ...decisions.map((d) => `• ${d}`)].join("\n"));
+  }
+
+  const items = actionItems.filter((a) => a.description.trim().length > 0);
+  if (items.length) {
+    blocks.push(
+      [
+        "Action items",
+        ...items.map((a) => {
+          const due = a.due_date ? formatDate(a.due_date, true) : null;
+          const context = [a.assignee_name?.trim() || null, due ? `due ${due}` : null].filter(
+            Boolean,
+          );
+          // Completed items stay and say so — dropping them hands the recipient a
+          // to-do list claiming work nobody started, on the meetings where the
+          // most was already done.
+          return [
+            `• ${a.description.trim()}`,
+            context.length ? ` (${context.join(", ")})` : "",
+            a.completed ? " — done" : "",
+          ].join("");
+        }),
+      ].join("\n"),
+    );
+  }
+
+  return blocks.join("\n\n");
+}
+
 function CompleteBody({
   meeting,
   actionItems,
@@ -813,6 +877,22 @@ function CompleteBody({
     [actionItems],
   );
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [summaryCopied, setSummaryCopied] = useState(false);
+
+  // Get the summary OUT of the app as text — the copy path the mobile app has
+  // and the web viewer was missing (the share dialog's "Copy" only copied the
+  // link). Carries the whole summary, not a URL: it pastes into any app and
+  // leaves nothing on the server.
+  const handleCopySummary = async () => {
+    try {
+      await navigator.clipboard.writeText(buildSummaryText(meeting, actionItems));
+      setSummaryCopied(true);
+      toast.success("Summary copied");
+      setTimeout(() => setSummaryCopied(false), 1500);
+    } catch {
+      toast.error("Copy failed — select the text manually");
+    }
+  };
 
   const seekTo = (seconds: number) => {
     const el = audioRef.current;
@@ -931,11 +1011,27 @@ function CompleteBody({
         <aside className="space-y-4">
           {meeting.summary?.executive && (
             <div className="rounded-xl border border-border/70 bg-surface-elevated p-5">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-brand" />
-                <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                  AI Summary
-                </span>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-3.5 w-3.5 text-brand" />
+                  <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    AI Summary
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopySummary}
+                  title="Copy summary as text"
+                  aria-label="Copy summary as text"
+                  className="flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  {summaryCopied ? (
+                    <Check className="h-3 w-3 text-success" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                  {summaryCopied ? "Copied" : "Copy"}
+                </button>
               </div>
               <p className="mt-3 text-sm leading-relaxed">{meeting.summary.executive}</p>
             </div>
