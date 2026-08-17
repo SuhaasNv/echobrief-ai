@@ -135,10 +135,6 @@ export interface UseMeetingPlaybackOptions {
   hasAudio: boolean;
   /** From the meeting row. Present long before the player reports its own. */
   durationSec: number | null;
-  /** First drawn second of the ribbon. See `progress`. */
-  ribbonOrigin: number;
-  /** Drawn width of the ribbon, in seconds. */
-  ribbonSpan: number;
 }
 
 /**
@@ -156,8 +152,6 @@ export function useMeetingPlayback({
   meetingId,
   hasAudio,
   durationSec,
-  ribbonOrigin,
-  ribbonSpan,
 }: UseMeetingPlaybackOptions): PlaybackController {
   // Created with no source. Fetching the signed URL on mount would spend most
   // of its 30 minute life before anyone pressed play; `replace()` attaches it
@@ -208,16 +202,38 @@ export function useMeetingPlayback({
     [stateListeners],
   );
 
-  const span = ribbonSpan > 0 ? ribbonSpan : (durationSec ?? 0);
-  const origin = span > 0 ? ribbonOrigin : 0;
+  /**
+   * The denominator for every progress fraction: the REAL length of the audio.
+   *
+   * This used to be the ribbon's drawn window — the transcript's first-to-last
+   * segment — which is systematically SHORTER than the recording (diarization
+   * stops at the last word; the file runs to the tap of the stop button). The
+   * playhead therefore outran the sound: on a one-minute meeting whose
+   * transcript spanned thirty seconds, the highlight sat at the middle by 0:15
+   * and pinned at the end while audio still played. Scrubs committed through
+   * the same window were offset identically.
+   *
+   * The player's own reported duration wins once a source has loaded, because
+   * it is the ground truth of the file being played; the meeting row's figure
+   * covers the gap before the first press of play. Read through a callback
+   * rather than captured, so a duration that arrives mid-playback corrects the
+   * mapping on the next position push instead of waiting for a re-render.
+   */
+  const spanNow = useCallback(() => {
+    const live = stateRef.current.duration;
+    return live > 0 ? live : (durationSec ?? 0);
+  }, [durationSec]);
 
   const fractionAt = useCallback(
-    (seconds: number) => (span > 0 ? clamp((seconds - origin) / span, 0, 1) : 0),
-    [origin, span],
+    (seconds: number) => {
+      const span = spanNow();
+      return span > 0 ? clamp(seconds / span, 0, 1) : 0;
+    },
+    [spanNow],
   );
   const secondsAt = useCallback(
-    (fraction: number) => origin + clamp(fraction, 0, 1) * span,
-    [origin, span],
+    (fraction: number) => clamp(fraction, 0, 1) * spanNow(),
+    [spanNow],
   );
 
   const armSeekGuard = useCallback((target: number) => {

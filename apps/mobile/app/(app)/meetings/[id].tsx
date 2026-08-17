@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -24,7 +24,6 @@ import { useMeetingPlayback } from "@/lib/audio/playback";
 import { displayTitle, formatDuration, formatListDate } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { SPRING, TIMING } from "@/lib/motion";
-import { ribbonSpan } from "@/components/ribbon";
 import { useFollowScroll } from "@/components/player/follow-scroll";
 import { PlayerBar } from "@/components/player/player-bar";
 import { RibbonScrubber } from "@/components/player/ribbon-scrubber";
@@ -309,13 +308,10 @@ export default function MeetingDetailScreen() {
    * fed defaults until the meeting arrives.
    */
   const segments = meeting?.transcript?.segments ?? NO_SEGMENTS;
-  const span = useMemo(() => ribbonSpan(segments), [segments]);
   const playback = useMeetingPlayback({
     meetingId: id,
     hasAudio: meeting?.has_audio ?? false,
     durationSec: meeting?.duration_sec ?? null,
-    ribbonOrigin: span?.origin ?? 0,
-    ribbonSpan: span?.span ?? 0,
   });
   const follow = useFollowScroll({ hasPlayer: meeting?.has_audio ?? false });
 
