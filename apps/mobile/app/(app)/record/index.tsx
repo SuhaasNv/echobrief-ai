@@ -633,6 +633,13 @@ export default function RecordScreen() {
   const onControl = useRef<(control: RecordingControl) => void>(() => undefined);
   useEffect(() => {
     onControl.current = (control) => {
+      // Only while a session actually exists. iOS can relaunch the app to
+      // deliver a QUEUED island intent, and audio capture does not survive
+      // process death — so a control drained on a cold launch would drive an
+      // idle recorder: pause() would paint "Paused" over nothing, and "end"
+      // would raise a bewildered "Nothing recorded" alert. A control with no
+      // recording to act on is stale by definition, and dropped.
+      if (recorder.state !== "recording" && recorder.state !== "paused") return;
       if (control === "pause") recorder.pause();
       else if (control === "resume") recorder.resume();
       else void onStop();
