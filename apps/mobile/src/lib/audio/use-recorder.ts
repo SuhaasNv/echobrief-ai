@@ -414,6 +414,23 @@ export function useRecorder({ onSegment, getTargetSeconds }: RecorderOptions): R
       return;
     }
 
+    /**
+     * Re-check AFTER the await. stop() and pause() can land inside
+     * prepareSlot's ~8ms — and at that instant neither `armedRef` nor the seam
+     * timer exists yet, so their teardown has nothing to clear. Proceeding
+     * would arm the successor against a session the user has already ended:
+     * the microphone stays live after "End meeting", capture silently resumes
+     * under a paused UI, and phantom segments upload into a finalized meeting.
+     * Both paths harvest `active` out of `openRef`, so its absence is the
+     * terminal signal — an `activeRef` check would miss pause, which nulls
+     * nothing. The freshly prepared slot is handed back through abandonSlot so
+     * its claimed index and 33-byte stub do not leak.
+     */
+    if (!openRef.current.has(active)) {
+      await abandonSlot(next);
+      return;
+    }
+
     // Read the audio clock and arm the successor in ONE synchronous tick. Both
     // are JSI calls, so the two land microseconds apart and the handoff is
     // fixed against the same clock the hardware uses. `currentTime` is negative
@@ -447,19 +464,37 @@ export function useRecorder({ onSegment, getTargetSeconds }: RecorderOptions): R
       // a seam rather than the audio a collision would have cost.
       seamTimerRef.current = setTimeout(
         () => {
-          next.record({ forDuration: target });
-          atSeam();
+          // Guarded: this runs inside a timer, OUTSIDE any error boundary, and
+          // record() throws synchronously when the audio session was taken
+          // mid-flight (an incoming call, Siri). An escaped throw here is an
+          // unhandled fault mid-meeting; a failed arm is just a dropped seam,
+          // and the retry tick recovers it.
+          try {
+            next.record({ forDuration: target });
+            atSeam();
+          } catch {
+            seamTimerRef.current = null;
+            void abandonSlot(next);
+            scheduleRotation(Math.max(1, target * 0.25));
+          }
         },
         Math.max(0, remaining) * 1000 + 40,
       );
       return;
     }
 
-    next.record({ atTime: remaining, forDuration: target });
+    // Same guard, same reason: rotate() itself is dispatched from a timer.
+    try {
+      next.record({ atTime: remaining, forDuration: target });
+    } catch {
+      void abandonSlot(next);
+      scheduleRotation(Math.max(1, target * 0.25));
+      return;
+    }
     armedRef.current = next;
 
     seamTimerRef.current = setTimeout(atSeam, remaining * 1000);
-  }, [getTargetSeconds, harvest, prepareSlot, scheduleRotation, slotA, slotB]);
+  }, [abandonSlot, getTargetSeconds, harvest, prepareSlot, scheduleRotation, slotA, slotB]);
 
   useEffect(() => {
     rotateRef.current = rotate;
@@ -527,7 +562,18 @@ export function useRecorder({ onSegment, getTargetSeconds }: RecorderOptions): R
     // has just pressed record and any deliberate delay is audio they think is
     // being captured. `forDuration` still fixes its stop, which is what lets
     // the successor be scheduled against it.
-    slotA.record({ forDuration: target });
+    //
+    // Guarded, because record() throws synchronously when the audio session is
+    // unavailable (a call in progress, another app holding the input). This is
+    // the one site with a user watching, so the failure becomes the same
+    // honest error the prepare failure above raises.
+    try {
+      slotA.record({ forDuration: target });
+    } catch {
+      await abandonSlot(slotA);
+      setState("idle");
+      throw new Error("The microphone is not available right now.");
+    }
     activeRef.current = slotA;
     armedRef.current = null;
 
@@ -535,7 +581,7 @@ export function useRecorder({ onSegment, getTargetSeconds }: RecorderOptions): R
     setDuration(0);
     setState("recording");
     scheduleRotation(target * ROTATE_AT_FRACTION);
-  }, [getTargetSeconds, prepareSlot, scheduleRotation, slotA]);
+  }, [abandonSlot, getTargetSeconds, prepareSlot, scheduleRotation, slotA]);
 
   /**
    * Close the current segment and hold.
@@ -579,13 +625,22 @@ export function useRecorder({ onSegment, getTargetSeconds }: RecorderOptions): R
         return;
       }
 
-      slot.record({ forDuration: target });
+      // Guarded like every other record(): thrown from this async closure it
+      // would be an unhandled rejection, and the UI would sit on "paused"
+      // believing resume worked. Failing silently leaves it paused — which is
+      // also the truth — and the user's next tap retries.
+      try {
+        slot.record({ forDuration: target });
+      } catch {
+        void abandonSlot(slot);
+        return;
+      }
       activeRef.current = slot;
       runStartedAtRef.current = Date.now();
       setState("recording");
       scheduleRotation(target * ROTATE_AT_FRACTION);
     })();
-  }, [getTargetSeconds, prepareSlot, scheduleRotation, slotA, slotB]);
+  }, [abandonSlot, getTargetSeconds, prepareSlot, scheduleRotation, slotA, slotB]);
 
   const stop = useCallback(async () => {
     setState("stopping");
