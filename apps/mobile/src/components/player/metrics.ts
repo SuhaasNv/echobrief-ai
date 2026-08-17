@@ -11,20 +11,15 @@ import { TAB_BAR_RESERVE } from "@/lib/layout";
  */
 
 /**
- * The player card, both rows, excluding the gap above the tab bar.
+ * The player pill, excluding the gap above the tab bar.
  *
- * Two fixed rows: a thin scrubber line over a transport row where skip-15 and
- * skip-30 flank play PERMANENTLY, rather than hiding behind a disclosure that
- * grew the card by a band and parked the last transcript line under it. The
- * height never changes now, so the scroll inset below reserves it exactly once —
- * which is the whole fix for that covered last line.
+ * One row now — a circular play/pause, a waveform scrubber, and the elapsed
+ * clock, in a single capsule (see PlayerBar). Shorter than the old two-row card,
+ * so it reserves less of the reading area; the height is fixed, so the scroll
+ * inset below reserves it exactly once, which is what keeps the last transcript
+ * line clear of it.
  */
-/** Top row: elapsed · ribbon scrubber · total. Thin; it carries no touch target of its own. */
-export const PLAYER_SCRUBBER_ROW = 26;
-/** Bottom row: skip-15 · play/pause · skip-30 — 44pt+ targets around a 52pt play. */
-export const PLAYER_TRANSPORT_ROW = 56;
-/** The whole card. What the scroll follower reserves below the transcript. */
-export const PLAYER_BAR_HEIGHT = PLAYER_SCRUBBER_ROW + PLAYER_TRANSPORT_ROW;
+export const PLAYER_BAR_HEIGHT = 60;
 
 /**
  * Air between the player card and the tab bar.

@@ -1,102 +1,67 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useDerivedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 
 import type { MeetingDetail } from "@/lib/api/meeting-detail";
-import {
-  SKIP_BACK_SEC,
-  SKIP_FORWARD_SEC,
-  usePlaybackState,
-  type PlaybackController,
-} from "@/lib/audio/playback";
+import { usePlaybackState, type PlaybackController } from "@/lib/audio/playback";
 import { formatClock } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { useColorTokens } from "@/lib/tokens";
 
-import { ChevronDownGlyph, PauseGlyph, PlayGlyph, SkipBackGlyph, SkipForwardGlyph } from "./glyphs";
+import { ChevronDownGlyph, PauseGlyph, PlayGlyph } from "./glyphs";
 import { useFollowState, type FollowScroll } from "./follow-scroll";
-import {
-  PLAYER_SCRUBBER_ROW,
-  PLAYER_TAB_BAR_GAP,
-  PLAYER_TRANSPORT_ROW,
-  useTabBarTopEdge,
-} from "./metrics";
-import { RibbonScrubber } from "./ribbon-scrubber";
+import { PLAYER_TAB_BAR_GAP, useTabBarTopEdge } from "./metrics";
+import { WaveformScrubber } from "./waveform-scrubber";
 
 /**
- * The transport.
+ * The transport, as one capsule.
  *
- * Floats above the tab bar and shares its 16pt side margins, so the two read as
- * one block of chrome with a single content inset below them.
+ * A circular play/pause at the left edge, a voice-memo waveform that doubles as
+ * the scrubber, and the elapsed clock at the right — the shape a voice note has
+ * everywhere, because it reads as "audio" before it reads as anything else. It
+ * floats above the tab bar on the same 16pt margins, so the two are one block of
+ * chrome with a single content inset below.
  *
- * TWO FIXED ROWS. A thin scrubber line — elapsed, the diarization ribbon, total —
- * over a transport row where skip-15 and skip-30 flank a 52pt play button.
+ * ONE ROW, and no skip buttons: the waveform is the seek surface (tap or drag
+ * anywhere), which is both what the reference does and what frees the height. A
+ * shorter pill covers less of the transcript, and the scroll inset reserves it
+ * exactly once so the last line always clears it.
  *
- * Skip is PERMANENT here, not hidden behind a disclosure chevron. The
- * tap-to-reveal band was the thing that read as clunky, and it was also what
- * grew the card by 44pt and parked the last line of the transcript underneath
- * it. A card that never changes height is the whole fix for both: the controls
- * are always where the thumb expects them, and the scroll inset below can
- * reserve the card exactly once.
+ * The capsule lights blue while playing and falls back to the flat surface when
+ * paused — the one moving thing on the bar that says, at a glance across the
+ * room, whether audio is running.
  *
- * Skip is 15 back and 30 forward — the podcast convention, and not arbitrary:
- * you skip back to re-hear a sentence and forward to get past a stretch, and
- * those are different distances.
- *
- * This component subscribes to playback state; the meeting screen does not. That
- * is what keeps a play tap from re-rendering an 800-row transcript.
+ * This component subscribes to playback state; the meeting screen does not, so a
+ * play tap never re-renders the 800-row transcript under it.
  */
 
-/** Diameter of the primary control — the one filled element, so it reads as the hero. */
-const PLAY_SIZE = 52;
+/** Diameter of the play/pause control. */
+const CONTROL_SIZE = 46;
+
+/** Advance of one tabular figure at 15px, rounded up — a floor for the clock. */
+const DIGIT_ADVANCE = 9;
 
 /**
- * Advance of one tabular figure at 12px, rounded up. A floor for the elapsed
- * slot, not a lock — if it is short the text simply sizes itself.
- */
-const DIGIT_ADVANCE = 7;
-
-function TransportButton({
-  onPress,
-  label,
-  hint,
-  disabled,
-  children,
-}: {
-  onPress: () => void;
-  label: string;
-  hint?: string;
-  disabled?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Pressable
-      onPress={() => {
-        if (disabled) return;
-        haptics.tap();
-        onPress();
-      }}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={hint}
-      accessibilityState={{ disabled: Boolean(disabled) }}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      className="h-11 w-11 items-center justify-center"
-    >
-      {/* Opacity, not scale: these sit in a row of fixed centres and a scaled
-          press would make the row appear to breathe. */}
-      {({ pressed }) => <View style={{ opacity: pressed ? 0.45 : 1 }}>{children}</View>}
-    </Pressable>
-  );
-}
-
-/**
- * Elapsed time, isolated in its own component on purpose.
+ * The blue wash under the pill while it plays.
  *
- * It re-renders once a second. Reading the position stream here rather than in
- * the bar keeps that tick off the transport controls and the scrubber, and
- * formatClock has one second of resolution anyway.
+ * Dark-theme values, hard-coded: the app is dark-only, and expo-linear-gradient
+ * needs concrete rgba it can interpolate rather than a token whose format we
+ * cannot reliably add alpha to. Brightest behind the control and fading right,
+ * matching where a glow sits in the reference. Its opacity crossfades with
+ * playback so paused is the plain surface.
+ */
+const GLOW_COLORS = ["rgba(76,153,248,0.42)", "rgba(52,96,168,0.16)", "rgba(76,153,248,0)"] as const;
+
+/**
+ * Elapsed time, isolated so its once-a-second tick does not re-render the
+ * transport or the scrubber beside it.
  */
 function Elapsed({ playback, total }: { playback: PlaybackController; total: number }) {
   const [seconds, setSeconds] = useState(() => Math.floor(playback.getPosition()));
@@ -112,13 +77,17 @@ function Elapsed({ playback, total }: { playback: PlaybackController; total: num
   }, [playback]);
 
   return (
+    // Primary label, not secondary: this is live data — the one number the bar
+    // exists to report — and at the edge of a tinted playing pill the secondary
+    // grey was the weakest thing on the card.
     <Text
-      className="text-[12px] text-label-secondary"
+      className="text-[15px] font-medium text-label"
       style={{
         fontVariant: ["tabular-nums"],
-        // Floored to the widest clock this meeting can print, so the ribbon
-        // beside it does not jump left when 9:59 becomes 10:00.
+        // Floored to the widest clock this meeting can print, so the waveform
+        // beside it does not shift when 9:59 becomes 10:00.
         minWidth: formatClock(total).length * DIGIT_ADVANCE,
+        textAlign: "right",
       }}
       maxFontSizeMultiplier={1.3}
     >
@@ -133,38 +102,37 @@ export interface PlayerBarProps {
   follow: FollowScroll;
 }
 
-const TOKENS = ["--label", "--label-quaternary"] as const;
+const TOKENS = ["--label", "--danger"] as const;
 
 export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
   const state = usePlaybackState(playback);
   const followState = useFollowState(follow);
-  // Transport colour for the two states this bar sets by hand: the skip pair
-  // greys out with no audio to skip through, and the spinner replaces the play
-  // glyph, so both need the value the glyphs would otherwise read themselves.
-  const [glyph, glyphDim] = useColorTokens(TOKENS);
-  // Sits on the tab bar. Six points of seam, measured from the bar's real top
-  // edge rather than from an inset that counted it twice.
+  const [glyph, danger] = useColorTokens(TOKENS);
+  // Sits on the tab bar. Six points of seam, from the bar's real top edge.
   const bottom = useTabBarTopEdge() + PLAYER_TAB_BAR_GAP;
 
   // A transcript-only meeting gets no transport at all. A play button that
   // cannot play is a bug report waiting to be filed.
-  if (!meeting.has_audio) return null;
+  const has = meeting.has_audio;
+
+  // Crossfade the blue wash with playback. Derived, so it lives on the UI thread
+  // and does not re-render the pill on every play/pause.
+  const glow = useDerivedValue(() => withTiming(state.playing ? 1 : 0, { duration: 260 }));
+  const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value }));
+
+  if (!has) return null;
 
   const total = state.duration > 0 ? state.duration : (meeting.duration_sec ?? 0);
-  const segments = meeting.transcript?.segments ?? [];
-  const speakers = meeting.transcript?.speakers ?? [];
   const busy = state.phase === "loading" || state.buffering;
-  const showJump = followState.canJump && !followState.following;
-  const canSkip = total > 0;
 
   return (
     <View
       className="absolute inset-x-0 bottom-0"
       style={{ paddingBottom: bottom }}
-      // Taps outside the card belong to the transcript underneath it.
+      // Taps outside the pill belong to the transcript underneath it.
       pointerEvents="box-none"
     >
-      {showJump ? (
+      {followState.canJump && !followState.following ? (
         <Animated.View
           entering={FadeIn.duration(160)}
           exiting={FadeOut.duration(120)}
@@ -199,93 +167,66 @@ export function PlayerBar({ meeting, playback, follow }: PlayerBarProps) {
       ) : null}
 
       <View
-        className="mx-4 overflow-hidden rounded-card border border-edge bg-elevated"
-        style={{ borderCurve: "continuous" }}
+        className="mx-4 flex-row items-center overflow-hidden rounded-full border border-edge bg-elevated pr-4"
+        style={{ height: 60, borderCurve: "continuous" }}
       >
-        {/* Scrubber line. Position and length flank the ribbon, which reads as
-            one fact — this much audio, this long — with the progress between
-            them. On error this row carries the message instead; the play button
-            below stays, as the retry. */}
-        <View className="flex-row items-center gap-2.5 px-4" style={{ height: PLAYER_SCRUBBER_ROW }}>
+        {/* Playing wash. Behind everything, ignoring touches. */}
+        <Animated.View style={[{ position: "absolute", inset: 0 }, glowStyle]} pointerEvents="none">
+          <LinearGradient
+            colors={GLOW_COLORS}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{ flex: 1 }}
+          />
+        </Animated.View>
+
+        {/* Play / pause. A dark disc that reads the same in both pill states; the
+            capsule changes colour, the control does not. On error it becomes the
+            retry, so it never disappears. */}
+        <Pressable
+          onPress={() => {
+            haptics.tap();
+            playback.toggle();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={state.playing ? "Pause" : state.phase === "error" ? "Try again" : "Play"}
+          // A visibly raised disc, not near-black on near-black: bg-fill keeps
+          // the control's form legible in the paused state, where the earlier
+          // canvas-dark disc only appeared once the playing wash lit the pill.
+          className="ml-[7px] items-center justify-center rounded-full border border-edge bg-fill"
+          style={{ width: CONTROL_SIZE, height: CONTROL_SIZE }}
+        >
+          {({ pressed }) => (
+            <View style={{ opacity: pressed ? 0.5 : 1 }}>
+              {busy ? (
+                <ActivityIndicator color={glyph} accessibilityLabel="Loading audio" />
+              ) : state.playing ? (
+                <PauseGlyph size={22} />
+              ) : (
+                <PlayGlyph size={22} />
+              )}
+            </View>
+          )}
+        </Pressable>
+
+        {/* Waveform + scrubber, taking the flexible middle. On error the strip is
+            replaced by the message; the disc above stays as the retry. */}
+        <View className="ml-3 mr-3 flex-1">
           {state.error ? (
             <Text
-              className="flex-1 text-[12px] leading-[16px] text-danger"
-              numberOfLines={1}
+              className="text-[12px] leading-[16px]"
+              style={{ color: danger }}
+              numberOfLines={2}
               maxFontSizeMultiplier={1.3}
             >
               {state.error}
             </Text>
           ) : (
-            <>
-              <Elapsed playback={playback} total={total} />
-
-              <View className="flex-1">
-                <RibbonScrubber
-                  playback={playback}
-                  segments={segments}
-                  speakers={speakers}
-                  height={8}
-                />
-              </View>
-
-              <Text
-                className="text-[12px] text-label-secondary"
-                style={{ fontVariant: ["tabular-nums"] }}
-                maxFontSizeMultiplier={1.3}
-              >
-                {formatClock(total)}
-              </Text>
-            </>
+            <WaveformScrubber playback={playback} seed={meeting.id} height={26} />
           )}
         </View>
 
-        {/* Transport. skip-15 · play/pause · skip-30, centred as one cluster.
-            Skip greys out when there is nothing to skip through. */}
-        <View
-          className="flex-row items-center justify-center gap-8 px-4"
-          style={{ height: PLAYER_TRANSPORT_ROW }}
-        >
-          <TransportButton
-            onPress={() => playback.skip(-SKIP_BACK_SEC)}
-            label={`Skip back ${SKIP_BACK_SEC} seconds`}
-            disabled={!canSkip}
-          >
-            <SkipBackGlyph seconds={SKIP_BACK_SEC} color={canSkip ? glyph : glyphDim} />
-          </TransportButton>
-
-          <Pressable
-            onPress={() => {
-              haptics.tap();
-              playback.toggle();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={
-              state.playing ? "Pause" : state.phase === "error" ? "Try again" : "Play"
-            }
-            className="items-center justify-center rounded-full bg-fill"
-            style={{ width: PLAY_SIZE, height: PLAY_SIZE }}
-          >
-            {({ pressed }) => (
-              <View style={{ opacity: pressed ? 0.5 : 1 }}>
-                {busy ? (
-                  <ActivityIndicator color={glyph} accessibilityLabel="Loading audio" />
-                ) : state.playing ? (
-                  <PauseGlyph size={26} />
-                ) : (
-                  <PlayGlyph size={26} />
-                )}
-              </View>
-            )}
-          </Pressable>
-
-          <TransportButton
-            onPress={() => playback.skip(SKIP_FORWARD_SEC)}
-            label={`Skip forward ${SKIP_FORWARD_SEC} seconds`}
-            disabled={!canSkip}
-          >
-            <SkipForwardGlyph seconds={SKIP_FORWARD_SEC} color={canSkip ? glyph : glyphDim} />
-          </TransportButton>
-        </View>
+        <Elapsed playback={playback} total={total} />
       </View>
     </View>
   );
