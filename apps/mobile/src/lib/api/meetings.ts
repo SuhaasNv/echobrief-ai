@@ -204,6 +204,13 @@ export function useToggleFavorite(id: string) {
       api.apiRequest(`/meetings/${id}`, { method: "PATCH", body: { is_favorite: next } }),
 
     onMutate: async (next: boolean) => {
+      // Cancel first, as every other optimistic mutation in this file does. The
+      // list polls every 15s while anything is processing, and a refetch already
+      // in flight carries the PRE-write flag — landing it after the optimistic
+      // write flipped the star back under the user's thumb.
+      await queryClient.cancelQueries({ queryKey: qk.allMeetings });
+      await queryClient.cancelQueries({ queryKey: qk.meeting(id) });
+
       const detail = queryClient.getQueryData(qk.meeting(id));
       const lists = queryClient.getQueriesData<InfiniteData<MeetingListResponse>>({
         queryKey: qk.allMeetings,
@@ -233,6 +240,13 @@ export function useToggleFavorite(id: string) {
       if (!ctx) return;
       queryClient.setQueryData(qk.meeting(id), ctx.detail);
       for (const [key, data] of ctx.lists) queryClient.setQueryData(key, data);
+    },
+
+    // Reconcile with the server either way, so the cache cannot drift from a
+    // write that raced another mutation.
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: qk.allMeetings });
+      void queryClient.invalidateQueries({ queryKey: qk.meeting(id) });
     },
   });
 }

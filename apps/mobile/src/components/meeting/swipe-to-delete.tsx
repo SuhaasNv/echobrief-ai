@@ -218,8 +218,9 @@ export function SwipeToDelete({
   /**
    * Toggle the star. When omitted the leading (right) swipe is inert, so a list
    * with no favorites keeps the gesture anchored rather than rubber-banding into
-   * an action that does nothing. Non-destructive, so a right FLICK commits it and
-   * springs back — there is no held-open state to tap through.
+   * an action that does nothing. Deliberately the SAME mechanism as Delete: the
+   * row settles open and the star is a button you tap — one gesture grammar for
+   * both edges, and no way to toggle a favorite by accident mid-scroll.
    */
   onFavorite?: () => void;
   /** Current star state, for the leading action's filled/outline glyph + label. */
@@ -311,12 +312,13 @@ export function SwipeToDelete({
   // observable from the library. If that state is ever lifted, gate `tick` on it.
   const tick = useCallback(() => haptics.select(), []);
 
-  // A firmer haptic than the threshold tick, because the favorite actually
-  // committed on release rather than merely being armed.
+  // A firmer haptic than the threshold tick, because tapping the revealed star
+  // actually commits the toggle. Closes the row the same way Delete does.
   const commitFavorite = useCallback(() => {
     haptics.success();
+    closeSelf();
     onFavorite?.();
-  }, [onFavorite]);
+  }, [closeSelf, onFavorite]);
 
   const pan = useMemo(
     () =>
@@ -358,17 +360,21 @@ export function SwipeToDelete({
           }
         })
         .onEnd((event) => {
-          // Leading favorite: a right flick, or a drag past the leading
-          // threshold, toggles the star and springs the row straight back.
-          // Non-destructive, so it commits on release instead of holding open —
-          // and swiping right again un-favorites, which is the whole gesture.
-          if (
-            hasLeading &&
-            (event.velocityX > FLICK_VELOCITY || translateX.value >= OPEN_AT)
-          ) {
-            runOnJS(commitFavorite)();
-            runOnJS(settle)(false);
-            translateX.value = withSpring(0, {
+          // Leading favorite: the SAME settle-open grammar as Delete, mirrored.
+          // A right drag past the threshold (or a right flick) parks the row
+          // open on the star, which is then a button to tap — never an action
+          // that commits from the swipe alone.
+          if (hasLeading && (translateX.value > 0 || event.velocityX > FLICK_VELOCITY)) {
+            const shouldOpen =
+              event.velocityX > FLICK_VELOCITY
+                ? true
+                : event.velocityX < -FLICK_VELOCITY
+                  ? false
+                  : translateX.value >= OPEN_AT;
+
+            runOnJS(settle)(shouldOpen);
+
+            translateX.value = withSpring(shouldOpen ? LEADING_ACTION_WIDTH : 0, {
               ...SPRING.snappy,
               velocity: event.velocityX,
               reduceMotion: ReduceMotion.Never,
@@ -510,19 +516,26 @@ export function SwipeToDelete({
         </Animated.View>
 
         {hasLeading ? (
-          // Favorite reveal on the LEFT. Visual only — a right flick commits the
-          // star and springs the row back (mirroring how Mail flags on a right
-          // swipe without a held panel), so there is no button to tap here. Amber
-          // is the one place it appears in the list, reserved for this.
+          // Favorite reveal on the LEFT — the exact mirror of Delete: the row
+          // settles open and this is the button you tap. Amber is the one place
+          // it appears in the list, reserved for this.
           <Animated.View
             className="absolute inset-0 flex-row justify-end overflow-hidden bg-warning"
             style={leadTrackStyle}
-            pointerEvents="none"
           >
             <Animated.View style={leadActionStyle}>
-              <View
+              <Pressable
+                onPress={commitFavorite}
                 style={{ width: LEADING_ACTION_WIDTH }}
                 className="h-full items-center justify-center gap-1"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  favorited ? `Remove ${title} from favorites` : `Add ${title} to favorites`
+                }
+                // Hidden from VoiceOver while closed, exactly as Delete is: an
+                // unreachable button in the rotor is worse than none.
+                accessibilityElementsHidden={!open}
+                importantForAccessibility={open ? "yes" : "no-hide-descendants"}
               >
                 <StarGlyph color={onDanger} filled={favorited} />
                 <Text
@@ -532,7 +545,7 @@ export function SwipeToDelete({
                 >
                   {favorited ? "Unfavorite" : "Favorite"}
                 </Text>
-              </View>
+              </Pressable>
             </Animated.View>
           </Animated.View>
         ) : null}
