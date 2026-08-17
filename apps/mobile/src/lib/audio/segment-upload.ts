@@ -526,9 +526,13 @@ async function putAndRegister(meetingId: string, segment: StoredSegment): Promis
     uploadType: UploadType.BINARY_CONTENT,
     mimeType: CONTENT_TYPE,
     headers: { "content-type": CONTENT_TYPE },
-    // Background session, so a segment in flight when the user leaves the app
-    // — which is exactly when they will leave it — still lands.
-    sessionType: "background",
+    // FOREGROUND, deliberately — see the long note in upload.ts. The library's
+    // background NSURLSession raises un-catchable ObjC exceptions once iOS has
+    // invalidated it (a process-lifetime singleton), which aborted the app on
+    // the segment hot path mid-recording. Durability lives in the on-disk
+    // segment store + recovery sweep, not in the session type; a foreground
+    // upload's failure is a rejected promise the retry logic already handles.
+    sessionType: "foreground",
   });
 
   const result = await task.uploadAsync();

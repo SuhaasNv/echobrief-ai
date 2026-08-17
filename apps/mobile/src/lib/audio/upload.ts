@@ -137,9 +137,22 @@ export async function uploadRecording(
       uploadType: UploadType.BINARY_CONTENT,
       mimeType: contentType,
       headers: { "content-type": contentType },
-      // Background session so a large upload survives the user leaving the app,
-      // which is exactly when they will leave it.
-      sessionType: "background",
+      // FOREGROUND, deliberately, and this line has crashed the app before.
+      //
+      // The background NSURLSession in expo-file-system is one process-lifetime
+      // singleton; once iOS invalidates it, every later task created on it
+      // raises an ObjC NSException that neither the library's Swift catch nor
+      // any JS try/catch can see — a straight SIGABRT, on the hot path of every
+      // upload, presenting as "the app randomly crashes". And because the
+      // recovery sweep re-drives stranded uploads on every launch, one crash
+      // strands a recording that then crashes every subsequent launch.
+      //
+      // What the background session was buying is already provided elsewhere:
+      // segments are crash-durable on disk and the recovery sweep resumes them.
+      // A foreground upload suspends while backgrounded and resumes on return;
+      // a real network failure arrives as a REJECTED PROMISE, which every call
+      // site here already handles.
+      sessionType: "foreground",
       onProgress: ({ bytesSent, totalBytes }) => {
         if (totalBytes <= 0) return;
         const ratio = bytesSent / totalBytes;
