@@ -11,9 +11,6 @@ import WidgetKit
  * URL's host and leave `record` as the whole path, which Expo Router then has to
  * guess at. With an empty host the entire `/(app)/record` survives as the path
  * and routes exactly like an in-app `router.push`.
- *
- * `internal`, not `private`, because PuffinHomeWidgets.swift links the same
- * routes. One list, so a renamed route breaks in one place.
  */
 enum AppLink {
   static let record = url("/(app)/record")
@@ -21,32 +18,23 @@ enum AppLink {
   static let ask = url("/(app)/ask")
   static let actions = url("/(app)/actions")
 
-  /// Non-optional so `Link(destination:)` can take it without unwrapping. The
-  /// fallback is inert rather than correct on purpose — a widget extension that
-  /// traps on a bad literal takes the Lock Screen surface down with it, and a
-  /// link that does nothing is a smaller failure than a crash in a system
-  /// process.
   private static func url(_ path: String) -> URL {
     URL(string: "echobrief://" + path) ?? URL(fileURLWithPath: "/")
   }
 }
 
 /// The island renders on black in every appearance, so these are the app's dark
-/// palette values verbatim rather than dynamic colours. There is no light mode
-/// to accommodate here and an asset catalog would only add a build step.
-///
-/// `internal` for the same reason as `AppLink`: the Home Screen widgets are the
-/// same brand and must not drift into a second set of reds.
+/// palette values verbatim rather than dynamic colours.
 enum Palette {
   /// --danger, dark. The colour the record screen already uses for "live".
   static let live = Color(red: 1.0, green: 0.373, blue: 0.384)
-  /// Deliberately desaturated. Paused has to read as "not recording" at a
-  /// glance, from the corner of the eye, without reading a word.
+  /// Deliberately desaturated. Paused has to read as "not recording" at a glance.
   static let paused = Color(red: 0.62, green: 0.64, blue: 0.67)
   static let label = Color.white
   static let secondary = Color.white.opacity(0.62)
-  /// --background and --surface, dark. Only the Home Screen widgets need these;
-  /// the island supplies its own black.
+  /// A hairline the divider uses; white knocked well back so it reads as a seam.
+  static let separator = Color.white.opacity(0.12)
+  /// --background and --surface, dark.
   static let canvas = Color(red: 0.024, green: 0.027, blue: 0.039)
   static let surface = Color(red: 0.047, green: 0.051, blue: 0.071)
   /// --tint, dark. Secondary navigation only — never the recording state.
@@ -59,52 +47,12 @@ enum Palette {
  * WHAT ACTUALLY MOVES IN HERE, AND WHY IT IS SO LITTLE.
  *
  * This hierarchy renders inside a system process on a hard budget, and Apple is
- * explicit about it in "Displaying live data with Live Activities":
- *
- *     "the system ignores any animation modifiers — for example,
- *      withAnimation(_:_:) and animation(_:value:) — and uses the system's
- *      animation timing instead."
- *
- * So there are no `.animation(_:value:)` or `withAnimation` calls anywhere below.
- * A modifier that reads as intent and does nothing is how the next person loses
- * an afternoon, so the file spends its motion budget on exactly two things:
- *
- *  1. `Text(timerInterval:)`. GUARANTEED. The system re-renders it every second
- *     with no update from us and no budget spent. This is the only thing in the
- *     island that is certain to move, so it carries "this is live" on its own.
- *
- *  2. The waveform's `.symbolEffect`. LIKELY, NOT GUARANTEED. A repeating
- *     `.symbolEffect` is not documented either way and behaviour has moved across
- *     iOS releases, but when it runs it is the single best "live audio" signal the
- *     API can produce. Nothing here depends on it: the red waveform reads as
- *     recording while perfectly still, and every colour and glyph choice below
- *     stands up in a frozen frame.
- *
- * A hand-rolled `repeatForever` would simply not play, and pushing a new
- * ContentState per frame spends the activity's update budget and gets the app
- * throttled. Those are not options, they are the reason for the two above.
- *
- * The effect is gated at iOS 17. On 16.4–16.7 the symbol renders still, and the
- * red glyph plus the ticking clock still say "live".
- */
-
-/**
- * Lights the waveform's variable layers in sequence — the animated recording
- * signal, applied wherever the live glyph appears.
- *
- * `waveform` and `waveform.slash` are both in SF Symbols' `variable` category, so
- * each bar is a separately addressable layer and this effect has something to
- * travel across. `.iterative` (not `.cumulative`): cumulative fills the bars up
- * and holds them, which reads as a progress bar approaching an end; a recording
- * has no end, so a single highlight travelling across is the truer statement.
- *
- * The API member is `dimInactiveLayers` (the spec's shorthand "dimInactive") —
- * chosen over `hideInactiveLayers` so the silhouette stays a recognisable
- * waveform in every frame instead of flickering down to nothing between passes.
- *
- * `.contentTransition(.symbolEffect(.replace))` swaps `waveform` ⇄
- * `waveform.slash` as one decisive change on pause rather than a dissolve through
- * an ambiguous middle frame.
+ * explicit: "the system ignores any animation modifiers ... and uses the
+ * system's animation timing instead." So there are no `.animation` or
+ * `withAnimation` calls anywhere below. The file spends its motion budget on two
+ * things: `Text(timerInterval:)`, which the system re-renders every second on its
+ * own, and the waveform's repeating `.symbolEffect`, which is the single best
+ * "live audio" signal the API can produce. Everything reads correctly frozen.
  */
 private struct WaveformMotion: ViewModifier {
   let isActive: Bool
@@ -127,14 +75,11 @@ private struct WaveformMotion: ViewModifier {
 // MARK: - Pieces
 
 /**
- * The live audio mark, and the identity of this whole activity.
- *
- * Everywhere the recording state is shown it is THIS glyph — a red animated
- * waveform when live, a static grey `waveform.slash` when paused — never a chip,
- * never a red dot. A dot is what the timer, the call and the screen recorder all
- * draw; the waveform is the one mark that says *audio* before it says anything
- * else, and red says *recording*. The pair carries the state standing still, so
- * the `.symbolEffect` on top is a bonus rather than a dependency.
+ * The live audio mark — a red animated waveform when live, a static grey
+ * `waveform.slash` when paused. Everywhere the recording state shows, it is THIS
+ * glyph: a dot is what the timer, the call and the screen recorder all draw; the
+ * waveform is the one mark that says *audio* before it says anything else, and
+ * red says *recording*.
  *
  * Scaled with `font(size:)` rather than `.resizable()` on purpose: a resizable SF
  * Symbol is no longer treated as a symbol and `symbolEffect` stops applying.
@@ -156,11 +101,7 @@ private struct AudioIndicator: View {
 ///
 /// WHITE while live, grey while paused — deliberately never red. Live reads as a
 /// single red element (the waveform) beside a white clock; paused drops the whole
-/// pair to grey. Two reds would blur which one is the state.
-///
-/// The range's upper bound is a 24 hour ceiling, not a duration: `timerInterval`
-/// only clamps the display, and nothing renders differently until it is reached.
-/// A meeting cannot get near it, and the activity's own stale date fires first.
+/// pair to grey.
 private struct ElapsedTime: View {
   let state: RecordingActivityAttributes.ContentState
   let size: CGFloat
@@ -171,92 +112,120 @@ private struct ElapsedTime: View {
       timerInterval: state.startedAt...state.startedAt.addingTimeInterval(24 * 60 * 60),
       pauseTime: state.pausedAt,
       countsDown: false,
-      // TRUE EVERYWHERE, DELIBERATELY. This renders `0:00:07` from the first
-      // second rather than `00:07`. Apple documents the flag as "whether the
-      // hours component is shown", not "shown once needed", and an hour-long
-      // meeting reading `05:12` is a wrong number on the one surface that exists
-      // to report a number.
       showsHours: true
     )
-    // Monospaced digits are not a nicety here. This reflows every second inside a
-    // fixed-width region, and proportional figures make the whole pill twitch on
-    // every tick.
     .font(.system(size: size, weight: weight, design: .rounded).monospacedDigit())
     .foregroundStyle(state.isPaused ? Palette.paused : Palette.label)
-    // Insurance, not layout. The compact region is the narrowest surface in the
-    // OS and the string grows a character at the one hour mark; scaling by a
-    // sixth is invisible, being truncated to `1:23:4…` is not.
     .lineLimit(1)
     .minimumScaleFactor(0.85)
   }
 }
 
-/// One capsule control. `tint` colours the icon+label; the fill is the same
-/// colour at a low opacity, so a button carries its own meaning without a second
-/// hue. `fill` and `height` differ per surface (Pause 10% vs End 15%; ~30pt in
-/// the island, ~34pt on the Lock Screen), so both are parameters rather than
-/// baked in.
-private struct ControlLabel: View {
-  let systemImage: String
-  let title: String
-  let tint: Color
-  let fill: Double
-  let height: CGFloat
+/**
+ * The app icon, drawn from the extension's own asset catalog — a widget cannot
+ * read the host app's icon, so expo-target.config.js bundles a copy. This is
+ * the mark that NAMES the card, the way ember's logo does in Apple's Live
+ * Activity examples. Falls back to the same mic-on-white the real icon shows if
+ * the asset ever goes missing, so the card never renders an empty square.
+ */
+private struct AppIconBadge: View {
+  let size: CGFloat
 
   var body: some View {
-    HStack(spacing: 5) {
-      Image(systemName: systemImage).font(.system(size: 12, weight: .bold))
-      Text(title).font(.system(size: 14, weight: .semibold))
+    // "BrandIcon", never "AppIcon": that name is reserved by the asset-catalog
+    // compiler for real app-icon sets, and a colliding imageset loads as a
+    // valid-but-empty image — the grey square this badge briefly shipped as.
+    if let icon = UIImage(named: "BrandIcon") {
+      Image(uiImage: icon)
+        .resizable()
+        .scaledToFill()
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous))
+    } else {
+      ZStack {
+        RoundedRectangle(cornerRadius: size * 0.24, style: .continuous).fill(Color.white)
+        Image(systemName: "mic.fill")
+          .font(.system(size: size * 0.5, weight: .semibold))
+          .foregroundStyle(Color.black)
+      }
+      .frame(width: size, height: size)
     }
-    .foregroundStyle(tint)
-    // maxWidth splits the row 50/50; the fixed height keeps the two capsules the
-    // same size regardless of label length.
-    .frame(maxWidth: .infinity)
-    .frame(height: height)
-    .background(tint.opacity(fill), in: Capsule())
-    .contentShape(Capsule())
   }
 }
 
 /**
- * Pause/Resume and End, side by side.
+ * One wide, labelled capsule — THE control on both surfaces.
  *
- * On iOS 17+ these are real `Button(intent:)` controls that act in place — see
- * RecordingIntents.swift for why they reach the recorder without an App Group.
- * On 16.4–16.7 `Button(intent:)` does not exist, so rather than draw two buttons
- * that quietly do nothing, the row collapses to one honest link that opens the
- * app. A dead control is worse than an absent one.
+ * The round discs this replaced were 34pt and pinned to the trailing edge: in
+ * the island's bottom region, which is screen-wide and only ~40pt tall, that
+ * read as a speck against a black slab and sat exactly where the expanded
+ * corner radius eats it; on the Lock Screen card the same pair floated in the
+ * left half with an "Open App ›" link opposite. Two equal capsules spend the
+ * width instead — bigger targets, named actions, well inside the curve — and
+ * one shape on both surfaces means neither can drift from the other.
  *
- * Pause = white content on white/10%. End = `Palette.live` content on live/15%,
- * so End reads as the one destructive action without shouting.
+ * `solid` inverts it for End — the consequential action carries the filled red
+ * so it cannot read as Pause's satellite.
  */
-private struct ControlRow: View {
+private struct CapsuleControl: View {
+  let systemImage: String
+  let label: String
+  let tint: Color
+  var solid: Bool = false
+
+  var body: some View {
+    HStack(spacing: 6) {
+      Image(systemName: systemImage)
+        .font(.system(size: 13, weight: .bold))
+      Text(label)
+        .font(.system(size: 15, weight: .semibold))
+        .lineLimit(1)
+    }
+    .foregroundStyle(solid ? Palette.label : tint)
+    // Both capsules take an equal share of the row. Safe here in a way it is not
+    // beside a clock: a greedy sibling squeezes `Text(timerInterval:)` until
+    // `minimumScaleFactor` engages and the timer renders as dashes.
+    .frame(maxWidth: .infinity)
+    .frame(height: 36)
+    .background(solid ? tint : tint.opacity(0.14), in: Capsule())
+    .contentShape(Capsule())
+  }
+}
+
+/// Pause/Resume and End, as the bottom row of the expanded island and of the
+/// Lock Screen card alike.
+///
+/// On iOS 17+ these are real `Button(intent:)` controls that act in place — see
+/// RecordingIntents.swift for why they reach the recorder without an App Group.
+/// On 16.4–16.7 `Button(intent:)` does not exist, so the pair collapses to one
+/// honest link that opens the app: a dead control is worse than an absent one.
+private struct CapsuleControlRow: View {
   let isPaused: Bool
-  let height: CGFloat
 
   var body: some View {
     if #available(iOS 17.0, *) {
-      HStack(spacing: 8) {
+      HStack(spacing: 10) {
         if isPaused {
           Button(intent: ResumeRecordingIntent()) {
-            ControlLabel(systemImage: "record.circle", title: "Resume", tint: Palette.label, fill: 0.10, height: height)
+            CapsuleControl(systemImage: "play.fill", label: "Resume", tint: Palette.label)
           }
           .buttonStyle(.plain)
         } else {
           Button(intent: PauseRecordingIntent()) {
-            ControlLabel(systemImage: "pause.fill", title: "Pause", tint: Palette.label, fill: 0.10, height: height)
+            CapsuleControl(systemImage: "pause.fill", label: "Pause", tint: Palette.label)
           }
           .buttonStyle(.plain)
         }
 
         Button(intent: EndRecordingIntent()) {
-          ControlLabel(systemImage: "stop.fill", title: "End", tint: Palette.live, fill: 0.15, height: height)
+          CapsuleControl(systemImage: "stop.fill", label: "End", tint: Palette.live, solid: true)
         }
         .buttonStyle(.plain)
       }
     } else {
       Link(destination: AppLink.record) {
-        ControlLabel(systemImage: "arrow.up.forward", title: "Open Puffin", tint: Palette.label, fill: 0.10, height: height)
+        CapsuleControl(
+          systemImage: "arrow.up.forward", label: "Open EchoBrief", tint: Palette.label)
       }
     }
   }
@@ -265,59 +234,63 @@ private struct ControlRow: View {
 // MARK: - Lock Screen / banner
 
 /**
- * Shown on the Lock Screen and as the banner on devices with no island, which is
- * every iPhone below the 14 Pro.
+ * Shown on the Lock Screen and as the banner on devices with no island.
  *
- * TWO TIGHT ROWS, not the old four-zone tower. Row one answers all three
- * questions a recording card exists to answer, left to right in the order they
- * are asked: *is it recording* (the red waveform), *of what* (the title, taking
- * the flexible middle), *for how long* (the clock, pinned trailing). Row two is
- * the only two things you can do, split evenly. Nothing floats and there is no
- * inner card — the activity background is the card.
+ * TWO ROWS, and the same vocabulary as the expanded island so the surfaces
+ * cannot drift: identity and title left, the live pair (waveform + clock)
+ * right, the two capsules across the bottom.
+ *
+ * What this replaced was a four-band card — header, then a hero clock opposite
+ * a large ringed waveform, then a rule, then round controls opposite an
+ * "Open App ›" link — and it read as four loosely-related quadrants with a
+ * pocket of dead space in the middle of each. Three things went:
+ *
+ *  - The ringed mark. A 50pt red ring beside a solid red End button is two
+ *    reds arguing about which one is the state.
+ *  - "Open App ›". The card already carries `widgetURL`, so the whole surface
+ *    opens the app; the link was a control that duplicated its own container.
+ *  - The rule. With two rows there is nothing left to separate.
  */
 private struct RecordingLockScreenView: View {
   let context: ActivityViewContext<RecordingActivityAttributes>
 
   var body: some View {
-    VStack(spacing: 8) {
-      HStack(spacing: 10) {
-        // The recording signal: red animated waveform live, grey slash paused.
-        AudioIndicator(isPaused: context.state.isPaused, size: 20, weight: .medium)
+    let paused = context.state.isPaused
+    let title = context.attributes.title
 
-        // Named recording or a quiet fallback. The recorder pre-fills the title
-        // with a timestamp; the JS side sends an empty string rather than that
-        // placeholder, so an empty title genuinely means "unnamed". Takes the
-        // flexible middle and is the one thing allowed to truncate, which is what
-        // keeps a long title from shoving the clock off the card.
-        Group {
-          if !context.attributes.title.isEmpty {
-            Text(context.attributes.title).foregroundStyle(Palette.label)
-          } else {
-            Text("Recording").foregroundStyle(Palette.secondary)
+    VStack(alignment: .leading, spacing: 14) {
+      HStack(spacing: 10) {
+        AppIconBadge(size: 26)
+
+        VStack(alignment: .leading, spacing: 2) {
+          Text(title.isEmpty ? "EchoBrief" : title)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(Palette.label)
+            .lineLimit(1)
+          HStack(spacing: 5) {
+            AudioIndicator(isPaused: paused, size: 11, weight: .semibold)
+            Text(paused ? "Paused" : "Recording")
+              .font(.system(size: 12, weight: .medium))
+              .foregroundStyle(Palette.secondary)
+              .lineLimit(1)
           }
         }
-        .font(.system(size: 16, weight: .medium))
-        .lineLimit(1)
-        .frame(maxWidth: .infinity, alignment: .leading)
 
-        // The reported number, pinned to the trailing edge. The minWidth is
-        // load-bearing: the title beside it is `maxWidth: .infinity` and would
-        // otherwise squeeze this to nothing, and a squeezed `Text(timerInterval:)`
-        // — which carries a `minimumScaleFactor` the system cannot pre-measure at
-        // a scaled width — falls back to its dashed "1:--" placeholder. Reserving
-        // room (never `.fixedSize()`, which hands a self-updating timer an
-        // indeterminate ideal size and renders the whole card blank) is exactly
-        // how the Dynamic Island keeps its own clock ticking.
-        ElapsedTime(state: context.state, size: 17, weight: .semibold)
-          .frame(minWidth: 72, alignment: .trailing)
+        Spacer(minLength: 12)
+
+        // The hero clock, and the fixed width is what makes the Spacer above
+        // safe: a flexible sibling beside an unconstrained `Text(timerInterval:)`
+        // squeezes it until `minimumScaleFactor` engages and it renders `1:--`.
+        // 112pt clears `1:00:00` at 30pt monospaced.
+        ElapsedTime(state: context.state, size: 30, weight: .semibold)
+          .multilineTextAlignment(.trailing)
+          .frame(width: 112, alignment: .trailing)
       }
 
-      ControlRow(isPaused: context.state.isPaused, height: 34)
+      CapsuleControlRow(isPaused: paused)
     }
-    // Tighter than before, and no inner box — the padding sits straight on the
-    // activity background tint.
     .padding(.horizontal, 16)
-    .padding(.vertical, 12)
+    .padding(.vertical, 14)
   }
 }
 
@@ -327,87 +300,111 @@ struct RecordingLiveActivity: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: RecordingActivityAttributes.self) { context in
       RecordingLockScreenView(context: context)
-        // 0.92 of the app's own canvas. This tint composites over whatever
-        // wallpaper the user has; near-opaque keeps 0.62-opacity secondary text
-        // and the desaturated paused grey above AA, and makes the card
-        // recognisably Puffin's surface rather than a grey rectangle.
         .activityBackgroundTint(Palette.canvas.opacity(0.92))
         .activitySystemActionForegroundColor(Palette.label)
         .widgetURL(AppLink.record)
     } dynamicIsland: { context in
       let paused = context.state.isPaused
+      let title = context.attributes.title
 
       return DynamicIsland {
         /*
-         * EXPANDED, ON LONG PRESS.
+         * EXPANDED, ON LONG PRESS. Laid out the way Music's is: what is playing
+         * on the left of the camera, the number on the right, the transport
+         * across the bottom.
          *
-         * The leading and trailing regions are the slivers either side of the
-         * camera housing, not halves of the screen, so they carry one object
-         * each: waveform left, clock right — the compact pill, grown. Every word
-         * lives in `.bottom`, the only full-width region. There is no "RECORDING"
-         * status chip anymore; the red waveform already is the status.
+         * `.center` is deliberately absent. It renders as its own band under the
+         * camera, and a band carrying one truncated title cost ~30pt of black
+         * card for a line that reads better beside the icon. Three regions, two
+         * bands, one card.
+         */
+        /*
+         * MEASURED, NOT GUESSED: this region is ~99pt wide on a 402pt screen,
+         * because leading and trailing split what the TrueDepth camera leaves.
+         * A 24pt badge and 7pt of gap spend 31 of it, so the text column has
+         * ~68pt — which is why the waveform that used to sit beside the status
+         * word had to go: it pushed "Recording" to "Record…". The waveform now
+         * rides with the clock opposite, where there is room, and the pairing
+         * mirrors the compact pill exactly.
          */
         DynamicIslandExpandedRegion(.leading) {
-          AudioIndicator(isPaused: paused, size: 22, weight: .medium)
-            .padding(.leading, 4)
-        }
-
-        DynamicIslandExpandedRegion(.trailing) {
-          ElapsedTime(state: context.state, size: 20, weight: .semibold)
-            .padding(.trailing, 4)
-        }
-
-        DynamicIslandExpandedRegion(.bottom) {
-          // Two tight lines: what is being recorded, then what you can do about
-          // it. ~78pt all in — one row shorter than the old chip-plus-title-plus-
-          // controls stack.
-          VStack(alignment: .leading, spacing: 8) {
-            if !context.attributes.title.isEmpty {
-              Text(context.attributes.title)
-                .font(.system(size: 15, weight: .medium))
+          HStack(spacing: 7) {
+            AppIconBadge(size: 24)
+            VStack(alignment: .leading, spacing: 1) {
+              // "EchoBrief" rather than "Recording" when the meeting is unnamed:
+              // the line below already says Recording, and the app's own name is
+              // what every system activity puts here.
+              Text(title.isEmpty ? "EchoBrief" : title)
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Palette.label)
                 .lineLimit(1)
-            } else {
-              // Quiet fallback — the waveform and clock are already saying the
-              // loud part.
-              Text("Recording")
-                .font(.system(size: 15, weight: .medium))
+              Text(paused ? "Paused" : "Recording")
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Palette.secondary)
                 .lineLimit(1)
             }
-
-            ControlRow(isPaused: paused, height: 30)
           }
+          .padding(.leading, 4)
+        }
+
+        DynamicIslandExpandedRegion(.trailing) {
+          HStack(spacing: 6) {
+            AudioIndicator(isPaused: paused, size: 13, weight: .semibold)
+            // A HARD width, not a minimum, and the same two alignments as the
+            // compact clock — see `compactTrailing` below for both.
+            ElapsedTime(state: context.state, size: 19, weight: .semibold)
+              .multilineTextAlignment(.trailing)
+              .frame(width: 72, alignment: .trailing)
+          }
+          // Pushes the pair to the region's trailing edge so the clock lands
+          // over the End capsule's outer edge instead of stopping ~55pt short
+          // of it. Safe beside a timer only because the timer already carries a
+          // fixed width above — a flexible frame around a greedy timer is what
+          // squeezes it into `1:--`.
+          .frame(maxWidth: .infinity, alignment: .trailing)
+          .padding(.trailing, 4)
+        }
+
+        DynamicIslandExpandedRegion(.bottom) {
+          // Inset from both edges: the island's expanded corner radius is large
+          // enough to clip anything flush to the bottom corners, which is what
+          // ate the trailing control when this row held round discs.
+          CapsuleControlRow(isPaused: paused)
+            .padding(.horizontal, 4)
+            .padding(.top, 8)
         }
       } compactLeading: {
-        /*
-         * THE SURFACE THAT MATTERS. Visible whenever the phone is unlocked and the
-         * recording is running — call it 99% of the activity's life. A bare red
-         * waveform, no capsule (a tinted pill inside the island's own pill reads
-         * as two fragments, not one control). The frame + leading padding keep it
-         * balanced against the numerals opposite the housing.
-         */
-        AudioIndicator(isPaused: paused, size: 16, weight: .semibold)
-          .frame(width: 20)
-          .padding(.leading, 2)
+        AudioIndicator(isPaused: paused, size: 15, weight: .semibold)
+          .frame(width: 17)
       } compactTrailing: {
-        // The clock — white while live, grey while paused, never red, so exactly
-        // one red element (the waveform) is on screen at a time. Already
-        // monospaced, so weight costs no width jitter as it ticks. This is the
-        // only guaranteed motion, alive even when the waveform is standing still.
-        ElapsedTime(state: context.state, size: 15, weight: .medium)
-          .frame(minWidth: 44, alignment: .trailing)
-      } minimal: {
         /*
-         * Shown when another activity holds the island and we are reduced to a
-         * single circle. The bare `waveform` (not the enclosed circle variant)
-         * keeps the identity mark consistent with every other surface; it is in
-         * the `variable` category, so the bars still animate while live.
+         * A HARD `width`, and this is the whole reason the pill was ~328pt wide
+         * on a 402pt screen.
+         *
+         * `Text(timerInterval:)` re-renders itself every second, so it cannot
+         * name an ideal width and instead asks for everything on offer — the
+         * same indeterminacy that blanks the card under `.fixedSize()`. The
+         * `minWidth: 44` this replaces set a floor and left the greed intact,
+         * so the system grew the compact region to its maximum and the island
+         * with it.
+         *
+         * 50pt fits `1:00:00` at 14pt monospaced with room to spare, and
+         * `minimumScaleFactor` absorbs the double-digit-hours case rather than
+         * letting iOS truncate the clock to `1:--`.
+         *
+         * `multilineTextAlignment` as well as the frame's own alignment, and
+         * both are needed. A greedy timer expands to fill the 50pt box, so the
+         * frame's `.trailing` has nothing left to push — the box IS the text —
+         * and the string then draws leading-aligned inside it, which is the
+         * dead space that sat between the clock and the pill's right edge while
+         * the waveform hugged the left. This aligns the glyphs, not the box.
          */
+        ElapsedTime(state: context.state, size: 14, weight: .semibold)
+          .multilineTextAlignment(.trailing)
+          .frame(width: 50, alignment: .trailing)
+      } minimal: {
         AudioIndicator(isPaused: paused, size: 15, weight: .medium)
       }
-      // Tints the hairline around the expanded island red while live, grey while
-      // paused, so the state is legible even in peripheral vision.
       .keylineTint(paused ? Palette.paused : Palette.live)
       .widgetURL(AppLink.record)
     }

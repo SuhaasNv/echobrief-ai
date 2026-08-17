@@ -37,9 +37,21 @@ module.exports = {
   // pbxproj and the .appex path for nothing.
   name: "EchoBriefActivity",
   // CFBundleDisplayName. USER-VISIBLE: Settings -> Face ID & Passcode -> Live
-  // Activities lists the extension by this name, so it says Puffin. Safe to
-  // change; it is not part of the App ID.
-  displayName: "Puffin Recording",
+  // Activities lists the extension by this name. Safe to change; it is not
+  // part of the App ID.
+  displayName: "EchoBrief Recording",
+  // Bundled into the extension's asset catalog. The Live Activity draws the
+  // app icon on its Lock Screen card and expanded island — the mark that names
+  // the app the way ember's logo does in Apple's own Live Activity examples —
+  // and an extension cannot read the host app's icon, so it carries its own
+  // copy. AppIconBadge in RecordingLiveActivity.swift falls back to a drawn
+  // glyph if this asset ever goes missing.
+  // A 96px COPY, not the 1024px original: ActivityKit renders oversized images
+  // as silent blanks inside a Live Activity, which is exactly how the badge
+  // shipped as an empty grey square twice. 96px covers the 22-24pt slots at 3x.
+  images: {
+    BrandIcon: "./assets/brand-icon.png",
+  },
   // Leading dot appends to the app's identifier -> com.suhaasnv.echobrief.activity.
   // A free team may only register 10 App IDs per 7 days and this burns one, so
   // treat it as permanent: renaming it costs another slot every time.
