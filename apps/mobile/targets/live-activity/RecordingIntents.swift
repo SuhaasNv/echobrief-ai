@@ -99,7 +99,7 @@ struct EndRecordingIntent: LiveActivityIntent {
   static var title: LocalizedStringResource = "End meeting"
   // User-visible in the Shortcuts app, so it says Puffin. The type name and the
   // notification string stay EchoBrief — they are identifiers.
-  static var description = IntentDescription("Stops recording and returns to Puffin.")
+  static var description = IntentDescription("Stops recording and returns to EchoBrief.")
 
   /// True, unlike the other two, and not for symmetry's sake. Ending a meeting
   /// hands off to an upload and a transcription flow that shows progress, can

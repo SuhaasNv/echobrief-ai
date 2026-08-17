@@ -243,7 +243,7 @@ private struct RectangularView: View {
       Image(systemName: "waveform.circle.fill")
         .font(.system(size: 22, weight: .regular))
       VStack(alignment: .leading, spacing: 1) {
-        Text("Puffin").font(.headline)
+        Text("EchoBrief").font(.headline)
         Text("Start recording").font(.caption)
       }
       Spacer(minLength: 0)
@@ -296,7 +296,7 @@ struct PuffinQuickActionsWidget: Widget {
       QuickActionsView()
     }
     // Both strings are user-visible in the widget gallery.
-    .configurationDisplayName("Puffin")
+    .configurationDisplayName("EchoBrief")
     .description("Start recording a meeting, or jump straight to Meetings, Ask and Action items.")
     .supportedFamilies([
       .systemSmall,
